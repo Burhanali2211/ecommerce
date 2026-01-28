@@ -1,0 +1,61 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "functions": {
+    "api/index.ts": {
+      "runtime": "@vercel/node@3.0.0",
+      "maxDuration": 30
+    }
+  },
+  "redirects": [
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "himalayanspicesexports.com"
+        }
+      ],
+      "destination": "https://www.himalayanspicesexports.com/$1",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://www.himalayanspicesexports.com"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization, X-Requested-With"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "IS_SERVERLESS": "true"
+  }
+}

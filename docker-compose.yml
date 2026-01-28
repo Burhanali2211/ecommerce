@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env.docker
+    depends_on:
+      - redis
+    volumes:
+      - ./uploads:/app/uploads
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+      args:
+        - VITE_API_URL=/api
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+
+# For Development (Optional override)
+# To use development mode, run: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
