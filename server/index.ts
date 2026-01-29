@@ -7,7 +7,6 @@ import { fileURLToPath } from 'url';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import { apiLimiter, adminLimiter } from './middleware/rateLimiter';
-import { logger } from './utils/logger';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -154,10 +153,10 @@ app.use((req: Request, res: Response) => {
 // Error handler
 app.use(errorHandler);
 
-// Start server
+// Start server only in development
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 

@@ -2,12 +2,6 @@
   "version": 2,
   "cleanUrls": true,
   "trailingSlash": false,
-  "functions": {
-    "api/index.ts": {
-      "runtime": "@vercel/node@4.0.0",
-      "maxDuration": 30
-    }
-  },
   "redirects": [
     {
       "source": "/((?!api/).*)",
@@ -23,21 +17,17 @@
   ],
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/api/(.*)",
+      "source": "/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://www.himalayanspicesexports.com"
+          "value": "*"
         },
         {
           "key": "Access-Control-Allow-Methods",
@@ -45,11 +35,7 @@
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, X-Requested-With"
-        },
-        {
-          "key": "Access-Control-Allow-Credentials",
-          "value": "true"
+          "value": "Content-Type, Authorization"
         }
       ]
     }
