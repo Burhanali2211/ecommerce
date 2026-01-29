@@ -53,9 +53,5 @@
         }
       ]
     }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "IS_SERVERLESS": "true"
-  }
+  ]
 }
