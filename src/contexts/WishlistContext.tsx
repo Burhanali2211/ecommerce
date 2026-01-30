@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { Product, WishlistItem, WishlistContextType } from '../types';
-import { apiClient } from '../lib/apiClient';
+import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { useNotification } from './NotificationContext';
 
@@ -28,27 +28,33 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
     setLoading(true);
 
     try {
-      const response = await apiClient.get('/wishlist');
-      const wishlistItems = response.data.map((item: any) => ({
+      const { data, error } = await supabase
+        .from('wishlist')
+        .select('*, products(*)')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const wishlistItems = (data || []).map((item: any) => ({
         id: item.id,
         product: {
-          id: item.product_id,
-          name: item.name,
-          slug: item.slug,
-          description: item.description,
-          shortDescription: item.short_description,
-          price: Number(item.price),
-          originalPrice: item.original_price ? Number(item.original_price) : undefined,
-          images: item.images,
-          stock: Number(item.stock),
-          rating: Number(item.rating),
-          reviewCount: Number(item.review_count),
-          isFeatured: item.is_featured,
-          categoryId: item.category_id,
-          category: item.category_name,
-          createdAt: item.created_at
+          id: item.products.id,
+          name: item.products.name,
+          slug: item.products.slug,
+          description: item.products.description,
+          shortDescription: item.products.short_description,
+          price: Number(item.products.price),
+          originalPrice: item.products.original_price ? Number(item.products.original_price) : undefined,
+          images: item.products.images || [],
+          stock: Number(item.products.stock),
+          rating: Number(item.products.rating || 0),
+          reviewCount: Number(item.products.review_count || 0),
+          featured: item.products.is_featured,
+          categoryId: item.products.category_id,
+          createdAt: new Date(item.products.created_at)
         },
-        addedAt: new Date(item.created_at)
+        productId: item.product_id,
+        createdAt: new Date(item.created_at)
       }));
       setItems(wishlistItems);
     } catch (error) {
@@ -56,13 +62,12 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
       showNotification({
         type: 'error',
         title: 'Error',
-        message: 'Failed to fetch wishlist items. Please try again later.'
+        message: 'Failed to fetch wishlist items.'
       });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [user, showNotification]);
-
-
 
   useEffect(() => {
     fetchWishlist();
@@ -73,29 +78,28 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
       showNotification({
         type: 'info',
         title: 'Authentication Required',
-        message: 'Please log in or create an account to add items to your wishlist.'
+        message: 'Please log in to add items to your wishlist.'
       });
       return;
     }
 
-    // Check if already in wishlist - if so, remove it (toggle behavior)
     const alreadyInWishlist = isInWishlist(product.id);
 
     if (alreadyInWishlist) {
       await removeItem(product.id);
-      // Don't show notification here - removeItem will handle it
     } else {
       try {
-        await apiClient.post('/wishlist', { productId: product.id });
+        const { error } = await supabase
+          .from('wishlist')
+          .insert([{ user_id: user.id, product_id: product.id }]);
+
+        if (error) throw error;
+        
         await fetchWishlist();
         showNotification({ type: 'success', title: 'Added to Wishlist', message: `${product.name} added to your wishlist.` });
       } catch (error: any) {
         console.error('Error adding to wishlist:', error);
-        if (error.response?.status === 409) {
-          showNotification({ type: 'info', title: 'Already in Wishlist', message: `${product.name} is already in your wishlist.` });
-        } else {
-          showNotification({ type: 'error', title: 'Error', message: 'Failed to add item to wishlist. Please try again later.' });
-        }
+        showNotification({ type: 'error', title: 'Error', message: 'Failed to add item to wishlist.' });
       }
     }
   };
@@ -104,12 +108,19 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (!user) return;
 
     try {
-      await apiClient.delete(`/wishlist/${productId}`);
+      const { error } = await supabase
+        .from('wishlist')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('product_id', productId);
+
+      if (error) throw error;
+      
       await fetchWishlist();
-      showNotification({ type: 'info', title: 'Removed from Wishlist', message: 'Item removed from your wishlist.' });
+      showNotification({ type: 'info', title: 'Removed', message: 'Item removed from your wishlist.' });
     } catch (error) {
       console.error('Error removing from wishlist:', error);
-      showNotification({ type: 'error', title: 'Error', message: 'Failed to remove item from wishlist. Please try again later.' });
+      showNotification({ type: 'error', title: 'Error', message: 'Failed to remove item.' });
     }
   };
 
@@ -119,11 +130,16 @@ export const WishlistProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (!user) return;
 
     try {
-      await apiClient.delete('/wishlist');
+      const { error } = await supabase
+        .from('wishlist')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) throw error;
       setItems([]);
     } catch (error) {
       console.error('Error clearing wishlist:', error);
-      showNotification({ type: 'error', title: 'Error', message: 'Failed to clear wishlist. Please try again later.' });
+      showNotification({ type: 'error', title: 'Error', message: 'Failed to clear wishlist.' });
     }
   };
 

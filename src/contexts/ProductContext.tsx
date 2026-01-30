@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { Product, ProductContextType, Category, Review } from '../types';
-import { apiClient } from '../lib/apiClient';
+import { supabase, db } from '../lib/supabase';
 import { useError } from './ErrorContext';
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
@@ -36,20 +36,55 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
   const { setError } = useError();
 
-  // Fetch categories on mount
-  useEffect(() => {
-    fetchCategories();
-  }, []);
+  const mapDbProductToAppProduct = (dbProduct: any): Product => ({
+    id: dbProduct.id,
+    name: dbProduct.name,
+    slug: dbProduct.slug,
+    description: dbProduct.description,
+    shortDescription: dbProduct.short_description,
+    price: dbProduct.price,
+    originalPrice: dbProduct.original_price,
+    categoryId: dbProduct.category_id,
+    images: dbProduct.images || [],
+    stock: dbProduct.stock,
+    minStockLevel: dbProduct.min_stock_level,
+    sku: dbProduct.sku,
+    weight: dbProduct.weight,
+    dimensions: dbProduct.dimensions,
+    rating: dbProduct.rating || 0,
+    reviewCount: dbProduct.review_count || 0,
+    reviews: [], // Reviews fetched separately if needed
+    sellerId: dbProduct.seller_id,
+    sellerName: dbProduct.seller_name || 'Himalayan Spices',
+    tags: dbProduct.tags || [],
+    specifications: dbProduct.specifications || {},
+    featured: dbProduct.is_featured || false,
+    showOnHomepage: dbProduct.show_on_homepage || false,
+    isActive: dbProduct.is_active,
+    metaTitle: dbProduct.meta_title,
+    metaDescription: dbProduct.meta_description,
+    createdAt: new Date(dbProduct.created_at),
+    updatedAt: dbProduct.updated_at ? new Date(dbProduct.updated_at) : undefined,
+  });
 
-  // Fetch initial products on mount
-  useEffect(() => {
-    fetchProducts(1);
-  }, []);
+  const mapDbCategoryToAppCategory = (dbCategory: any): Category => ({
+    id: dbCategory.id,
+    name: dbCategory.name,
+    slug: dbCategory.slug,
+    description: dbCategory.description,
+    imageUrl: dbCategory.image_url || '',
+    parentId: dbCategory.parent_id,
+    isActive: dbCategory.is_active,
+    sortOrder: dbCategory.sort_order,
+    productCount: dbCategory.product_count || 0,
+    createdAt: dbCategory.created_at ? new Date(dbCategory.created_at) : undefined,
+    updatedAt: dbCategory.updated_at ? new Date(dbCategory.updated_at) : undefined,
+  });
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await apiClient.getCategories();
-      setCategories(response.data || []);
+      const data = await db.getCategories();
+      setCategories(data.map(mapDbCategoryToAppCategory));
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch categories');
     }
@@ -58,19 +93,14 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const fetchProducts = useCallback(async (page: number = 1, limit: number = 20, filters?: any) => {
     try {
       setLoading(true);
-      const response = await apiClient.getProducts({
+      const response = await db.getProducts({
         page,
         limit,
         ...filters
       });
 
-      setProducts(response.data || []);
-      setPagination(response.pagination || {
-        page: page,
-        limit: limit,
-        total: 0,
-        pages: 0
-      });
+      setProducts(response.data.map(mapDbProductToAppProduct));
+      setPagination(response.pagination);
       setError(null);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch products');
@@ -82,12 +112,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const fetchFeaturedProducts = useCallback(async (limit: number = 10) => {
     try {
       setFeaturedLoading(true);
-      const response = await apiClient.getProducts({
-        featured: true,
-        showOnHomepage: true,
-        limit
-      });
-      setFeaturedProducts(response.data || []);
+      const data = await db.getFeaturedProducts(limit);
+      setFeaturedProducts(data.map(mapDbProductToAppProduct));
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch featured products');
     } finally {
@@ -98,11 +124,11 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const fetchBestSellers = useCallback(async (limit: number = 8) => {
     try {
       setBestSellersLoading(true);
-      const response = await apiClient.getProducts({
+      const response = await db.getProducts({
         bestSellers: true,
         limit
       });
-      setBestSellers(response.data || []);
+      setBestSellers(response.data.map(mapDbProductToAppProduct));
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch best sellers');
     } finally {
@@ -113,12 +139,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const fetchLatestProducts = useCallback(async (limit: number = 8) => {
     try {
       setLatestLoading(true);
-      const response = await apiClient.getProducts({
-        latest: true,
-        showOnHomepage: true,
-        limit
-      });
-      setLatestProducts(response.data || []);
+      const data = await db.getLatestProducts(limit);
+      setLatestProducts(data.map(mapDbProductToAppProduct));
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch latest products');
     } finally {
@@ -128,9 +150,15 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const fetchReviewsForProduct = useCallback(async (productId: string) => {
     try {
-      // For now, we'll return an empty array since reviews are included in the product data
-      // In a more complex implementation, this might fetch reviews separately
-      return [];
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*, profiles(full_name, avatar_url)')
+        .eq('product_id', productId)
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch reviews');
       return [];
@@ -139,10 +167,25 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const addProduct = useCallback(async (product: Omit<Product, 'id' | 'createdAt' | 'reviews' | 'rating' | 'reviewCount'>) => {
     try {
-      const response = await apiClient.createProduct(product);
-      // Refresh products list
+      const { data, error } = await supabase
+        .from('products')
+        .insert([{
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          category_id: product.categoryId,
+          images: product.images,
+          stock: product.stock,
+          seller_id: product.sellerId,
+          is_featured: product.featured,
+          show_on_homepage: product.showOnHomepage
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
       await fetchProducts(1);
-      return response;
+      return mapDbProductToAppProduct(data);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to create product');
       throw error;
@@ -151,8 +194,17 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const submitReview = useCallback(async (review: Omit<Review, 'id' | 'createdAt' | 'profiles'>) => {
     try {
-      // For now, we'll just log this as reviews would typically be handled separately
-      // In a real implementation, this would call an API endpoint to submit the review
+      const { error } = await supabase
+        .from('reviews')
+        .insert([{
+          product_id: review.productId,
+          user_id: review.userId,
+          rating: review.rating,
+          comment: review.comment,
+          title: review.title
+        }]);
+
+      if (error) throw error;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to submit review');
       throw error;
@@ -161,7 +213,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const getProductById = useCallback(async (id: string) => {
     try {
-      return await apiClient.getProduct(id);
+      const data = await db.getProduct(id);
+      return mapDbProductToAppProduct(data);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch product');
       return null;
@@ -171,11 +224,11 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const searchProducts = useCallback(async (query: string) => {
     try {
       setLoading(true);
-      const response = await apiClient.getProducts({
+      const response = await db.getProducts({
         search: query,
         limit: 50
       });
-      setProducts(response.data || []);
+      setProducts(response.data.map(mapDbProductToAppProduct));
       setPagination(response.pagination);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Search failed');
@@ -187,11 +240,11 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const filterByCategory = useCallback(async (categoryId: string) => {
     try {
       setLoading(true);
-      const response = await apiClient.getProducts({
+      const response = await db.getProducts({
         categoryId,
         limit: 50
       });
-      setProducts(response.data || []);
+      setProducts(response.data.map(mapDbProductToAppProduct));
       setPagination(response.pagination);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Filter failed');
@@ -201,23 +254,30 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, [setError]);
 
   const createProduct = useCallback(async (data: Partial<Product>) => {
-    try {
-      const response = await apiClient.createProduct(data);
-      // Refresh products list
-      await fetchProducts(1);
-      return response;
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to create product');
-      throw error;
-    }
-  }, [setError, fetchProducts]);
+    return addProduct(data as any);
+  }, [addProduct]);
 
   const updateProduct = useCallback(async (product: Product) => {
     try {
-      const response = await apiClient.updateProduct(product.id, product);
-      // Refresh products list
+      const { data, error } = await supabase
+        .from('products')
+        .update({
+          name: product.name,
+          description: product.description,
+          price: product.price,
+          category_id: product.categoryId,
+          images: product.images,
+          stock: product.stock,
+          is_featured: product.featured,
+          show_on_homepage: product.showOnHomepage
+        })
+        .eq('id', product.id)
+        .select()
+        .single();
+
+      if (error) throw error;
       await fetchProducts(pagination?.page || 1);
-      return response;
+      return mapDbProductToAppProduct(data);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to update product');
       throw error;
@@ -226,8 +286,12 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const deleteProduct = useCallback(async (id: string) => {
     try {
-      await apiClient.deleteProduct(id);
-      // Refresh products list
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
       await fetchProducts(pagination?.page || 1);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to delete product');
@@ -237,10 +301,23 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const createCategory = useCallback(async (data: Partial<Category>) => {
     try {
-      const response = await apiClient.createCategory(data);
-      // Refresh categories
+      const { data: category, error } = await supabase
+        .from('categories')
+        .insert([{
+          name: data.name,
+          slug: data.slug,
+          description: data.description,
+          image_url: data.imageUrl,
+          parent_id: data.parentId,
+          is_active: data.isActive,
+          sort_order: data.sortOrder
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
       await fetchCategories();
-      return response;
+      return mapDbCategoryToAppCategory(category);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to create category');
       throw error;
@@ -249,10 +326,24 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const updateCategory = useCallback(async (id: string, data: Partial<Category>) => {
     try {
-      const response = await apiClient.updateCategory(id, data);
-      // Refresh categories
+      const { data: category, error } = await supabase
+        .from('categories')
+        .update({
+          name: data.name,
+          slug: data.slug,
+          description: data.description,
+          image_url: data.imageUrl,
+          parent_id: data.parentId,
+          is_active: data.isActive,
+          sort_order: data.sortOrder
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
       await fetchCategories();
-      return response;
+      return mapDbCategoryToAppCategory(category);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to update category');
       throw error;
@@ -261,8 +352,12 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const deleteCategory = useCallback(async (id: string) => {
     try {
-      await apiClient.deleteCategory(id);
-      // Refresh categories
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
       await fetchCategories();
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to delete category');
@@ -287,6 +382,15 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       fetchProducts(page);
     }
   }, [pagination, fetchProducts]);
+
+  // Initial data loading
+  useEffect(() => {
+    fetchCategories();
+    fetchProducts(1);
+    fetchFeaturedProducts(8);
+    fetchLatestProducts(8);
+    fetchBestSellers(8);
+  }, []);
 
   const value: ProductContextType = {
     products,
@@ -327,4 +431,3 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
     </ProductContext.Provider>
   );
 };
-

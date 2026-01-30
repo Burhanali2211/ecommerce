@@ -12,17 +12,66 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Helper functions for common operations
 export const db = {
   // Products
-  async getProducts(page = 1, limit = 20) {
+  async getProducts(params?: {
+    page?: number;
+    limit?: number;
+    categoryId?: string;
+    search?: string;
+    featured?: boolean;
+    bestSellers?: boolean;
+    latest?: boolean;
+    showOnHomepage?: boolean;
+    sellerId?: string;
+  }) {
+    const page = params?.page || 1;
+    const limit = params?.limit || 20;
     const offset = (page - 1) * limit;
-    const { data, error, count } = await supabase
+
+    let query = supabase
       .from('products')
-      .select('*', { count: 'exact' })
+      .select('*', { count: 'exact' });
+
+    if (params?.categoryId) {
+      query = query.eq('category_id', params.categoryId);
+    }
+
+    if (params?.featured) {
+      query = query.eq('is_featured', true);
+    }
+
+    if (params?.showOnHomepage) {
+      query = query.eq('show_on_homepage', true);
+    }
+
+    if (params?.sellerId) {
+      query = query.eq('seller_id', params.sellerId);
+    }
+
+    if (params?.search) {
+      query = query.or(`name.ilike.%${params.search}%,description.ilike.%${params.search}%`);
+    }
+
+    if (params?.latest) {
+      query = query.order('created_at', { ascending: false });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    const { data, error, count } = await query
       .eq('is_active', true)
-      .range(offset, offset + limit - 1)
-      .order('created_at', { ascending: false });
+      .range(offset, offset + limit - 1);
     
     if (error) throw error;
-    return { data, total: count, page, limit };
+    
+    return { 
+      data, 
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        pages: Math.ceil((count || 0) / limit)
+      }
+    };
   },
 
   async getProduct(id: string) {
@@ -178,7 +227,7 @@ export const db = {
   async getCart(userId: string) {
     const { data, error } = await supabase
       .from('cart_items')
-      .select('*')
+      .select('*, products(*)')
       .eq('user_id', userId);
     
     if (error) throw error;
@@ -215,6 +264,15 @@ export const db = {
     if (error) throw error;
   },
 
+  async clearCart(userId: string) {
+    const { error } = await supabase
+      .from('cart_items')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+  },
+
   // Orders
   async getOrders(userId: string) {
     const { data, error } = await supabase
@@ -242,6 +300,17 @@ export const db = {
     const { data, error } = await supabase
       .from('orders')
       .insert([orderData])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async createOrderItems(items: any[]) {
+    const { data, error } = await supabase
+      .from('order_items')
+      .insert(items)
       .select();
     
     if (error) throw error;
@@ -287,6 +356,26 @@ export const db = {
       .eq('id', addressId);
     
     if (error) throw error;
+  },
+
+  async setDefaultAddress(userId: string, addressId: string) {
+    // First reset all addresses to not default
+    const { error: resetError } = await supabase
+      .from('addresses')
+      .update({ is_default: false })
+      .eq('user_id', userId);
+    
+    if (resetError) throw resetError;
+
+    // Set the specific address as default
+    const { data, error } = await supabase
+      .from('addresses')
+      .update({ is_default: true })
+      .eq('id', addressId)
+      .select();
+    
+    if (error) throw error;
+    return data;
   },
 };
 

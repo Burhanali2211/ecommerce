@@ -14,11 +14,11 @@ import {
 } from 'lucide-react';
 import { CustomerDashboardLayout } from '../Layout/CustomerDashboardLayout';
 import { useAuth } from '../../../contexts/AuthContext';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 export const CustomerProfilePage: React.FC = () => {
-  const { user, refreshUser } = useAuth();
+  const { user, updateProfile, refreshUser } = useAuth();
   const { showSuccess, showError } = useNotification();
   const [loading, setLoading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -39,7 +39,7 @@ export const CustomerProfilePage: React.FC = () => {
   useEffect(() => {
     if (user) {
       const data = {
-        fullName: user.fullName || '',
+        fullName: user.fullName || user.name || '',
         email: user.email || '',
         phone: user.phone || '',
         dateOfBirth: user.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
@@ -47,8 +47,8 @@ export const CustomerProfilePage: React.FC = () => {
       };
       setProfileData(data);
       setOriginalData(data);
+      fetchStats();
     }
-    fetchStats();
   }, [user]);
 
   useEffect(() => {
@@ -57,12 +57,16 @@ export const CustomerProfilePage: React.FC = () => {
   }, [profileData, originalData]);
 
   const fetchStats = async () => {
+    if (!user) return;
     try {
-      const ordersResponse = await apiClient.getOrders();
-      const orders = ordersResponse.data || [];
+      const [ordersRes, reviewsRes] = await Promise.all([
+        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('user_id', user.id)
+      ]);
+      
       setStats({
-        orders: orders.length,
-        reviews: 0 // Could fetch reviews count if needed
+        orders: ordersRes.count || 0,
+        reviews: reviewsRes.count || 0
       });
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -76,17 +80,12 @@ export const CustomerProfilePage: React.FC = () => {
   const handleSave = async () => {
     setLoading(true);
     try {
-      await apiClient.updateProfile({
+      await updateProfile({
         fullName: profileData.fullName,
-        phone: profileData.phone || null,
-        dateOfBirth: profileData.dateOfBirth || null,
-        gender: profileData.gender || null
+        phone: profileData.phone || undefined,
+        dateOfBirth: profileData.dateOfBirth || undefined,
+        gender: profileData.gender || undefined
       });
-
-      // Refresh user data in context
-      if (refreshUser) {
-        await refreshUser();
-      }
 
       setOriginalData(profileData);
       showSuccess('Success', 'Profile updated successfully');
@@ -107,50 +106,9 @@ export const CustomerProfilePage: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const resizeImageToAvatar = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxSize = 256; // Avatar is tiny, keep file small
-          let { width, height } = img;
-
-          if (width > height) {
-            if (width > maxSize) {
-              height = (height * maxSize) / width;
-              width = maxSize;
-            }
-          } else {
-            if (height > maxSize) {
-              width = (width * maxSize) / height;
-              height = maxSize;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            reject(new Error('Failed to get canvas context'));
-            return;
-          }
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-          resolve(dataUrl);
-        };
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = reader.result as string;
-      };
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     if (!file.type.startsWith('image/')) {
       showError('Invalid file', 'Please select an image file');
@@ -159,38 +117,29 @@ export const CustomerProfilePage: React.FC = () => {
 
     try {
       setAvatarUploading(true);
-      // Resize on client so the stored avatar is small
-      const resizedBase64 = await resizeImageToAvatar(file);
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
 
-      const uploadResponse = await apiClient.post('/upload/image', {
-        file: resizedBase64,
-        folder: 'avatars'
-      });
+      const { error: uploadError } = await supabase.storage
+        .from('public')
+        .upload(filePath, file);
 
-      const avatarUrl = uploadResponse?.data?.url || uploadResponse?.url;
-      if (!avatarUrl) {
-        showError('Upload failed', 'Could not get avatar URL from server');
-        return;
-      }
+      if (uploadError) throw uploadError;
 
-      await apiClient.updateProfile({
-        avatarUrl
-      });
+      const { data: { publicUrl } } = supabase.storage
+        .from('public')
+        .getPublicUrl(filePath);
 
-      if (refreshUser) {
-        await refreshUser();
-      }
-
+      await updateProfile({ avatar: publicUrl });
       showSuccess('Avatar updated', 'Your profile picture has been updated.');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update avatar:', error);
-      showError('Error', 'Failed to update avatar. Please try again.');
+      showError('Error', error.message || 'Failed to update avatar. Please try again.');
     } finally {
       setAvatarUploading(false);
-      // Reset input so the same file can be selected again
-      if (event.target) {
-        event.target.value = '';
-      }
+      if (event.target) event.target.value = '';
     }
   };
 
@@ -463,11 +412,11 @@ export const CustomerProfilePage: React.FC = () => {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Password</p>
-                  <p className="text-sm text-gray-500">Last changed 3 months ago</p>
+                  <p className="text-sm text-gray-500">Security and account access</p>
                 </div>
               </div>
               <button className="px-4 py-2 text-purple-600 font-medium hover:bg-purple-50 rounded-lg transition-colors">
-                Change
+                Manage
               </button>
             </div>
 
@@ -477,13 +426,13 @@ export const CustomerProfilePage: React.FC = () => {
                   <CheckCircle className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Two-Factor Authentication</p>
-                  <p className="text-sm text-gray-500">Add an extra layer of security</p>
+                  <p className="font-medium text-gray-900">Account Status</p>
+                  <p className="text-sm text-gray-500">Your account is active and secure</p>
                 </div>
               </div>
-              <button className="px-4 py-2 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors">
-                Enable
-              </button>
+              <div className="px-4 py-2 bg-green-100 text-green-700 font-medium rounded-lg">
+                Active
+              </div>
             </div>
           </div>
         </div>

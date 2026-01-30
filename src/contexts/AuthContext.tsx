@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, AuthContextType } from '../types';
-import { apiClient } from '../lib/apiClient';
+import { supabase } from '../lib/supabase';
 import { useError } from './ErrorContext';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,31 +24,57 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [mobileAuthMode, setMobileAuthMode] = useState<'login' | 'signup' | 'profile'>('login');
   const { setError } = useError();
 
-  // Initialize auth state on app load
+  const mapSupabaseUserToAppUser = (sbUser: any, profile: any): User => {
+    return {
+      id: sbUser.id,
+      email: sbUser.email || '',
+      name: profile?.full_name || sbUser.user_metadata?.full_name || 'User',
+      fullName: profile?.full_name || sbUser.user_metadata?.full_name || 'User',
+      role: profile?.role || 'customer',
+      avatar: profile?.avatar_url || sbUser.user_metadata?.avatar_url,
+      phone: profile?.phone || sbUser.user_metadata?.phone,
+      dateOfBirth: profile?.date_of_birth,
+      gender: profile?.gender,
+      isActive: profile?.is_active ?? true,
+      emailVerified: sbUser.email_confirmed_at ? true : false,
+      businessName: profile?.business_name,
+      businessAddress: profile?.business_address,
+      businessPhone: profile?.business_phone,
+      taxId: profile?.tax_id,
+      preferredLanguage: profile?.preferred_language || 'en',
+      newsletterSubscribed: profile?.newsletter_subscribed || false,
+      createdAt: new Date(sbUser.created_at),
+      updatedAt: profile?.updated_at ? new Date(profile.updated_at) : undefined,
+    };
+  };
+
+  const fetchProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching profile:', error);
+      return null;
+    }
+    return data;
+  };
+
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Ensure token is properly restored
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-          apiClient.setToken(token);
-          const response = await apiClient.getCurrentUser();
-          if (response.user) {
-            setUser(response.user);
-            setError(null);
-          } else {
-            // If user fetch fails, clear the token
-            localStorage.removeItem('auth_token');
-            apiClient.setToken(null);
-            setUser(null);
-          }
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id);
+          setUser(mapSupabaseUserToAppUser(session.user, profile));
         } else {
           setUser(null);
         }
       } catch (error) {
-        // User not authenticated or token invalid, clear token
-        localStorage.removeItem('auth_token');
-        apiClient.setToken(null);
+        console.error('Auth initialization error:', error);
         setUser(null);
       } finally {
         setLoading(false);
@@ -56,29 +82,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        setUser(mapSupabaseUserToAppUser(session.user, profile));
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Standard Authentication Methods
   const signIn = async (email: string, password: string): Promise<void> => {
     try {
       setLoading(true);
-      const response = await apiClient.login(email, password);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (response.token && response.user) {
-        // Ensure token is set in apiClient
-        apiClient.setToken(response.token);
-        setUser(response.user);
+      if (error) throw error;
+      
+      if (data.user) {
+        const profile = await fetchProfile(data.user.id);
+        setUser(mapSupabaseUserToAppUser(data.user, profile));
         setError(null);
-      } else {
-        throw new Error('Login failed');
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Login failed';
-      setError(message);
-      // Clear any invalid token
-      localStorage.removeItem('auth_token');
-      apiClient.setToken(null);
-      setUser(null);
+    } catch (error: any) {
+      setError(error.message || 'Login failed');
       throw error;
     } finally {
       setLoading(false);
@@ -92,31 +128,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   ): Promise<void> => {
     try {
       setLoading(true);
-      // Extract fullName from additionalData, or combine firstName and lastName
+      
       let fullName = additionalData?.fullName as string;
       if (!fullName) {
         const firstName = (additionalData?.firstName as string) || '';
         const lastName = (additionalData?.lastName as string) || '';
         fullName = `${firstName} ${lastName}`.trim() || 'User';
       }
-      const role = (additionalData?.role as string) || 'customer';
-      const response = await apiClient.register(email, password, fullName, role);
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: additionalData?.role || 'customer',
+          }
+        }
+      });
 
-      if (response.token && response.user) {
-        // Ensure token is set in apiClient
-        apiClient.setToken(response.token);
-        setUser(response.user);
+      if (error) throw error;
+      
+      if (data.user) {
+        // Profile creation is usually handled by a database trigger in Supabase
+        // but we'll fetch it to be sure
+        const profile = await fetchProfile(data.user.id);
+        setUser(mapSupabaseUserToAppUser(data.user, profile));
         setError(null);
-      } else {
-        throw new Error('Registration failed');
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Registration failed';
-      setError(message);
-      // Clear any invalid token
-      localStorage.removeItem('auth_token');
-      apiClient.setToken(null);
-      setUser(null);
+    } catch (error: any) {
+      setError(error.message || 'Registration failed');
       throw error;
     } finally {
       setLoading(false);
@@ -126,30 +167,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const signOut = async (): Promise<void> => {
     try {
       setLoading(true);
-      await apiClient.logout();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
       setUser(null);
       localStorage.removeItem('user_preferences');
       localStorage.removeItem('cart_items');
       setError(null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Logout failed';
-      setError(message);
+    } catch (error: any) {
+      setError(error.message || 'Logout failed');
       throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = async () => {
-    await signOut();
-  };
-
   const login = async (email: string, password: string): Promise<string | null> => {
     try {
       await signIn(email, password);
       return null;
-    } catch (error) {
-      return error instanceof Error ? error.message : 'Login failed';
+    } catch (error: any) {
+      return error.message || 'Login failed';
     }
   };
 
@@ -158,7 +196,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await signUp(
         userData.email!,
         userData.password!,
-        { fullName: userData.name || 'User' }
+        { fullName: userData.name || userData.fullName || 'User' }
       );
       return true;
     } catch (error) {
@@ -166,40 +204,85 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Update user profile
+  const logout = async () => {
+    await signOut();
+  };
+
   const updateProfile = async (updates: Partial<User>): Promise<void> => {
     try {
       if (!user) {
         throw new Error('No user is currently authenticated');
       }
 
-      const response = await apiClient.updateProfile(updates);
-      if (response.user) {
-        setUser(response.user);
+      // Update auth metadata if name changes
+      if (updates.fullName || updates.name) {
+        await supabase.auth.updateUser({
+          data: { full_name: updates.fullName || updates.name }
+        });
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Profile update failed';
-      setError(message);
+
+      // Update profiles table
+      const profileUpdates: any = {};
+      if (updates.fullName || updates.name) profileUpdates.full_name = updates.fullName || updates.name;
+      if (updates.avatar) profileUpdates.avatar_url = updates.avatar;
+      if (updates.phone) profileUpdates.phone = updates.phone;
+      if (updates.dateOfBirth) profileUpdates.date_of_birth = updates.dateOfBirth;
+      if (updates.gender) profileUpdates.gender = updates.gender;
+      if (updates.preferredLanguage) profileUpdates.preferred_language = updates.preferredLanguage;
+      if (updates.newsletterSubscribed !== undefined) profileUpdates.newsletter_subscribed = updates.newsletterSubscribed;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      const { data: { user: sbUser } } = await supabase.auth.getUser();
+      if (sbUser) {
+        setUser(mapSupabaseUserToAppUser(sbUser, data));
+      }
+    } catch (error: any) {
+      setError(error.message || 'Profile update failed');
       throw error;
     }
   };
 
-  // Refresh user data from server
   const refreshUser = async (): Promise<void> => {
     try {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        const response = await apiClient.getCurrentUser();
-        if (response.user) {
-          setUser(response.user);
-        }
+      const { data: { user: sbUser } } = await supabase.auth.getUser();
+      if (sbUser) {
+        const profile = await fetchProfile(sbUser.id);
+        setUser(mapSupabaseUserToAppUser(sbUser, profile));
       }
     } catch (error) {
       console.error('Failed to refresh user:', error);
     }
   };
 
-  // Mobile Authentication Methods
+  const resetPassword = async (email: string): Promise<void> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
+  };
+
+  const updatePassword = async (newPassword: string): Promise<void> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  };
+
+  const resendVerification = async (): Promise<void> => {
+    if (!user?.email) throw new Error('No email found');
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: user.email,
+    });
+    if (error) throw error;
+  };
+
   const openMobileAuth = (mode: 'login' | 'signup' | 'profile' = 'login') => {
     setMobileAuthMode(mode);
     setIsMobileAuthOpen(true);
@@ -207,19 +290,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const closeMobileAuth = () => {
     setIsMobileAuthOpen(false);
-  };
-
-  // Placeholder methods for required interface methods
-  const resetPassword = async (email: string): Promise<void> => {
-    throw new Error('Password reset not yet implemented');
-  };
-
-  const updatePassword = async (newPassword: string): Promise<void> => {
-    throw new Error('Password update not yet implemented');
-  };
-
-  const resendVerification = async (): Promise<void> => {
-    throw new Error('Email verification not yet implemented');
   };
 
   const value: AuthContextType = {
@@ -236,7 +306,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     resendVerification,
     updateProfile,
     refreshUser,
-
     openMobileAuth,
     closeMobileAuth,
     isMobileAuthOpen,

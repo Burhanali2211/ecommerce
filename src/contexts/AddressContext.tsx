@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { Address, AddressContextType } from '../types';
-import { apiClient } from '../lib/apiClient';
+import { supabase, db } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { useNotification } from './NotificationContext';
 
@@ -18,6 +18,22 @@ export const AddressProvider: React.FC<{ children: ReactNode }> = ({ children })
   const { user } = useAuth();
   const { showNotification } = useNotification();
 
+  const mapDbAddressToAppAddress = (dbAddress: any): Address => ({
+    id: dbAddress.id,
+    userId: dbAddress.user_id,
+    fullName: dbAddress.full_name,
+    streetAddress: dbAddress.street_address,
+    city: dbAddress.city,
+    state: dbAddress.state,
+    postalCode: dbAddress.postal_code,
+    country: dbAddress.country,
+    phone: dbAddress.phone,
+    isDefault: dbAddress.is_default,
+    type: dbAddress.type,
+    createdAt: new Date(dbAddress.created_at),
+    updatedAt: dbAddress.updated_at ? new Date(dbAddress.updated_at) : undefined,
+  });
+
   const fetchAddresses = useCallback(async () => {
     if (!user) {
       setAddresses([]);
@@ -26,8 +42,8 @@ export const AddressProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     setLoading(true);
     try {
-      const response = await apiClient.getAddresses();
-      setAddresses(response.data || []);
+      const data = await db.getAddresses(user.id);
+      setAddresses(data.map(mapDbAddressToAppAddress));
     } catch (error) {
       console.error('Error fetching addresses:', error);
       showNotification({
@@ -55,7 +71,20 @@ export const AddressProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
 
     try {
-      await apiClient.createAddress(address);
+      const addressData = {
+        user_id: user.id,
+        full_name: address.fullName,
+        street_address: address.streetAddress,
+        city: address.city,
+        state: address.state,
+        postal_code: address.postalCode,
+        country: address.country,
+        phone: address.phone,
+        is_default: address.isDefault || false,
+        type: address.type || 'shipping'
+      };
+
+      await db.createAddress(addressData);
       await fetchAddresses();
       showNotification({
         type: 'success',
@@ -73,8 +102,22 @@ export const AddressProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateAddress = async (address: Address) => {
+    if (!address.id) return;
+
     try {
-      await apiClient.updateAddress(address.id, address);
+      const addressData = {
+        full_name: address.fullName,
+        street_address: address.streetAddress,
+        city: address.city,
+        state: address.state,
+        postal_code: address.postalCode,
+        country: address.country,
+        phone: address.phone,
+        is_default: address.isDefault,
+        type: address.type
+      };
+
+      await db.updateAddress(address.id, addressData);
       await fetchAddresses();
       showNotification({
         type: 'success',
@@ -93,7 +136,7 @@ export const AddressProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const deleteAddress = async (addressId: string) => {
     try {
-      await apiClient.deleteAddress(addressId);
+      await db.deleteAddress(addressId);
       await fetchAddresses();
       showNotification({
         type: 'success',
@@ -111,8 +154,10 @@ export const AddressProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const setDefaultAddress = async (addressId: string, type: 'shipping' | 'billing') => {
+    if (!user) return;
+    
     try {
-      await apiClient.setDefaultAddress(addressId);
+      await db.setDefaultAddress(user.id, addressId);
       await fetchAddresses();
       showNotification({
         type: 'success',

@@ -14,8 +14,12 @@ if (typeof import.meta !== 'undefined' && import.meta.url) {
   __dirname = process.cwd();
 }
 
-// Load environment variables from project root
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Load environment variables from project root if not in serverless mode
+const isServerless = process.env.IS_SERVERLESS === 'true';
+
+if (!isServerless) {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+}
 
 /**
  * Optimized connection pool configuration
@@ -50,14 +54,12 @@ function getOptimalPoolSize(): number {
 // Supports both Neon connection string and individual env vars
 let pool: Pool;
 
-const isServerless = process.env.IS_SERVERLESS === 'true';
-
 const poolConfig = {
-  max: isServerless ? 1 : getOptimalPoolSize(),
+
+  max: isServerless ? 3 : getOptimalPoolSize(),
   min: 0,
-  idleTimeoutMillis: isServerless ? 0 : 10000,
+  idleTimeoutMillis: isServerless ? 1000 : 10000,
   connectionTimeoutMillis: isServerless ? 30000 : 10000,
-  maxUses: isServerless ? 1 : 7500,
   allowExitOnIdle: true,
 };
 

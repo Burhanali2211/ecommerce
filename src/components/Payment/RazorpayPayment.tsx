@@ -8,17 +8,7 @@ import { motion } from 'framer-motion';
 import { useNotification } from '../../contexts/NotificationContext';
 import { CartItem } from '../../types';
 import { loadRazorpayScript, getRazorpayInstance } from '../../utils/loadRazorpay';
-
-// Use relative path in dev (via Vite proxy) or env variable
-const getApiUrl = (): string => {
-  const customUrl = import.meta.env.VITE_API_URL;
-  if (customUrl) {
-    return customUrl;
-  }
-  return '/api';
-};
-
-const API_URL = getApiUrl();
+import { supabase } from '../../lib/supabase';
 
 interface RazorpayPaymentProps {
   amount: number;
@@ -35,7 +25,7 @@ interface RazorpayPaymentProps {
     zipCode: string;
     country: string;
   };
-  razorpayOrderId?: string; // Optional: if provided, use this instead of creating new order
+  razorpayOrderId?: string;
   onSuccess: (paymentId: string) => void;
   onError: (error: string) => void;
   onCancel: () => void;
@@ -55,44 +45,18 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   const [selectedMethod, setSelectedMethod] = useState('card');
   const { showNotification } = useNotification();
 
-  // Calculate totals
   const subtotal = amount;
   const gst = Math.round(subtotal * 0.18 * 100) / 100;
   const shipping = subtotal >= 2000 ? 0 : 5;
   const total = subtotal + gst + shipping;
 
   const paymentMethods = [
-    {
-      id: 'card',
-      name: 'Card',
-      description: 'Debit/Credit',
-      icon: CreditCard,
-      color: 'from-blue-500 to-blue-600'
-    },
-    {
-      id: 'upi',
-      name: 'UPI',
-      description: 'GPay, PhonePe',
-      icon: Smartphone,
-      color: 'from-green-500 to-green-600'
-    },
-    {
-      id: 'netbanking',
-      name: 'Net Banking',
-      description: 'All banks',
-      icon: Building,
-      color: 'from-purple-500 to-purple-600'
-    },
-    {
-      id: 'wallet',
-      name: 'Wallet',
-      description: 'Paytm, etc',
-      icon: Wallet,
-      color: 'from-orange-500 to-orange-600'
-    }
+    { id: 'card', name: 'Card', description: 'Debit/Credit', icon: CreditCard, color: 'from-blue-500 to-blue-600' },
+    { id: 'upi', name: 'UPI', description: 'GPay, PhonePe', icon: Smartphone, color: 'from-green-500 to-green-600' },
+    { id: 'netbanking', name: 'Net Banking', description: 'All banks', icon: Building, color: 'from-purple-500 to-purple-600' },
+    { id: 'wallet', name: 'Wallet', description: 'Paytm, etc', icon: Wallet, color: 'from-orange-500 to-orange-600' }
   ];
 
-  // Preload Razorpay script when component mounts
   useEffect(() => {
     loadRazorpayScript().catch((error) => {
       console.error('Failed to preload Razorpay script:', error);
@@ -103,26 +67,19 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
     setIsProcessing(true);
 
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         throw new Error('Please login to continue with payment');
       }
 
-      // Ensure Razorpay script is loaded
       await loadRazorpayScript();
 
-      // Use provided razorpayOrderId or create new order
       let razorpayOrderIdToUse = razorpayOrderId;
       
       if (!razorpayOrderIdToUse) {
-        // Create Razorpay order
-        const createOrderResponse = await fetch(`${API_URL}/razorpay/create-order`, {
+        const { data, error: functionError } = await supabase.functions.invoke('payment-process', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
+          body: {
             amount: total,
             currency: 'INR',
             receipt: `receipt_${Date.now()}`,
@@ -132,35 +89,20 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
               items_count: items.length,
               payment_method: selectedMethod
             }
-          })
+          },
+          queryParams: { action: 'create-order' }
         });
 
-        if (!createOrderResponse.ok) {
-          let errorMessage = 'Failed to create payment order';
-          try {
-            const errorData = await createOrderResponse.json();
-            errorMessage = errorData.error?.message || errorData.message || errorMessage;
-          } catch (e) {}
-          throw new Error(errorMessage);
+        if (functionError) throw functionError;
+        if (!data?.success || !data.data?.id) {
+          throw new Error('Failed to create payment order');
         }
-
-        const { data } = await createOrderResponse.json();
-        if (!data?.orderId) {
-          throw new Error('Invalid response from server');
-        }
-        razorpayOrderIdToUse = data.orderId;
+        razorpayOrderIdToUse = data.data.id;
       }
 
       const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
       if (!razorpayKeyId) {
-        throw new Error('Payment service not configured. Please add VITE_RAZORPAY_KEY_ID to your environment variables.');
-      }
-
-      // Validate Razorpay Key ID format
-      // Should start with 'rzp_test_' or 'rzp_live_'
-      if (!razorpayKeyId.match(/^rzp_(test|live)_/)) {
-        console.error('Invalid Razorpay Key ID format:', razorpayKeyId);
-        throw new Error('Invalid Razorpay Key ID format. Key ID should start with "rzp_test_" or "rzp_live_". Please check your VITE_RAZORPAY_KEY_ID environment variable.');
+        throw new Error('Payment service not configured. Please add VITE_RAZORPAY_KEY_ID.');
       }
 
       const options: any = {
@@ -179,34 +121,22 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           shipping_address: `${shippingAddress.street}, ${shippingAddress.city}`,
           payment_method: selectedMethod
         },
-        theme: {
-          color: '#7C3AED'
-        },
+        theme: { color: '#7C3AED' },
         method: selectedMethod !== 'card' ? selectedMethod : undefined,
         handler: async function (response: any) {
           try {
-            const token = localStorage.getItem('auth_token');
-            if (!token) throw new Error('Session expired');
-
-            const verifyResponse = await fetch(`${API_URL}/razorpay/verify-payment`, {
+            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('payment-process', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({
+              body: {
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature
-              })
+              },
+              queryParams: { action: 'verify-payment' }
             });
 
-            if (!verifyResponse.ok) {
-              throw new Error('Payment verification failed');
-            }
-
-            const verifyData = await verifyResponse.json();
-            if (verifyData.success && verifyData.data?.verified) {
+            if (verifyError) throw verifyError;
+            if (verifyData.success) {
               onSuccess(response.razorpay_payment_id);
             } else {
               throw new Error('Payment verification failed');
@@ -228,7 +158,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         }
       };
 
-      // Use the utility function to get Razorpay instance
       const razorpayInstance = await getRazorpayInstance(options);
       razorpayInstance.on('payment.failed', function (response: any) {
         setIsProcessing(false);
@@ -249,7 +178,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       exit={{ opacity: 0, scale: 0.95, y: 20 }}
       className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-md w-full mx-auto"
     >
-      {/* Header */}
       <div className="relative bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 px-6 py-6">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDJ2LTJoMzR6bTAtMzBWNkg0djJoMzJ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
         
@@ -271,7 +199,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           </button>
         </div>
 
-        {/* Amount Display */}
         <div className="mt-6 text-center">
           <p className="text-purple-200 text-sm">Amount to Pay</p>
           <p className="text-4xl font-bold text-white mt-1">₹{total.toLocaleString('en-IN')}</p>
@@ -279,7 +206,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       </div>
 
       <div className="p-6">
-        {/* Order Breakdown */}
         <div className="bg-gray-50 rounded-2xl p-4 mb-6">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
@@ -299,7 +225,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           </div>
         </div>
 
-        {/* Payment Methods */}
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Choose Payment Method</h3>
           <div className="grid grid-cols-4 gap-2">
@@ -337,7 +262,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           </div>
         </div>
 
-        {/* Security Badge */}
         <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-6 py-3 bg-gray-50 rounded-xl">
           <Shield className="w-4 h-4 text-green-500" />
           <span>Secured by Razorpay</span>
@@ -345,7 +269,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           <span>PCI DSS Compliant</span>
         </div>
 
-        {/* Payment Button */}
         <motion.button
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
@@ -364,7 +287,7 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           {isProcessing ? (
             <>
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span>Processing Payment...</span>
+              <span>Processing...</span>
             </>
           ) : (
             <>
@@ -375,7 +298,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           )}
         </motion.button>
 
-        {/* Cancel Button */}
         <button
           onClick={onCancel}
           disabled={isProcessing}
@@ -384,7 +306,6 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           Cancel and go back
         </button>
 
-        {/* Footer Info */}
         <p className="mt-4 text-center text-xs text-gray-400">
           By proceeding, you agree to our Terms of Service and Privacy Policy
         </p>

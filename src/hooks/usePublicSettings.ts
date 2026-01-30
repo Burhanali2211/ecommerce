@@ -64,41 +64,36 @@ export const usePublicSettings = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchPublicSettings = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Fetch all public settings in parallel
-        const [
-          siteSettingsResponse,
-          socialMediaResponse,
-          contactInfoResponse,
-          footerLinksResponse,
-          businessHoursResponse
-        ] = await Promise.all([
-          apiClient.get('/public/settings/site-settings'),
-          apiClient.get('/public/settings/social-media'),
-          apiClient.get('/public/settings/contact-info'),
-          apiClient.get('/public/settings/footer-links'),
-          apiClient.get('/public/settings/business-hours')
-        ]);
+    useEffect(() => {
+      const fetchPublicSettings = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          
+          // Fetch all public settings in a single combined request
+          // This reduces the number of function invocations in serverless environments
+          const response = await apiClient.get('/public/settings');
+          
+          if (response && response.success && response.data) {
+            setSettings({
+              siteSettings: response.data.siteSettings || [],
+              socialMedia: response.data.socialMedia || [],
+              contactInfo: response.data.contactInfo || [],
+              footerLinks: response.data.footerLinks || [],
+              businessHours: response.data.businessHours || []
+            });
+          } else {
+            console.warn('Invalid response format from settings API:', response);
+            throw new Error('Invalid response format from settings API');
+          }
+        } catch (err: any) {
+          console.error('Error fetching public settings:', err);
+          setError(err.message || 'Failed to fetch public settings');
+        } finally {
+          setLoading(false);
+        }
+      };
 
-        setSettings({
-          siteSettings: siteSettingsResponse.data || [],
-          socialMedia: socialMediaResponse.data || [],
-          contactInfo: contactInfoResponse.data || [],
-          footerLinks: footerLinksResponse.data || [],
-          businessHours: businessHoursResponse.data || []
-        });
-      } catch (err: any) {
-        console.error('Error fetching public settings:', err);
-        setError(err.message || 'Failed to fetch public settings');
-      } finally {
-        setLoading(false);
-      }
-    };
 
     fetchPublicSettings();
 

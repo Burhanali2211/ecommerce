@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
-import { Order, CartItem, Address, OrderContextType } from '../types';
-import { apiClient } from '../lib/apiClient';
+import { Order, CartItem, Address, OrderContextType, OrderItem } from '../types';
+import { supabase, db } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { useNotification } from './NotificationContext';
 
@@ -18,6 +18,47 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const mapDbOrderToAppOrder = (dbOrder: any): Order => ({
+    id: dbOrder.id,
+    orderNumber: dbOrder.order_number,
+    userId: dbOrder.user_id,
+    items: (dbOrder.order_items || []).map((item: any) => ({
+      id: item.id,
+      orderId: item.order_id,
+      productId: item.product_id,
+      variantId: item.variant_id,
+      quantity: item.quantity,
+      unitPrice: item.unit_price,
+      totalPrice: item.total_price,
+      productSnapshot: item.product_snapshot,
+      createdAt: new Date(item.created_at),
+      product: item.products ? {
+        id: item.products.id,
+        name: item.products.name,
+        price: item.products.price,
+        images: item.products.images || [],
+      } : undefined
+    })),
+    total: dbOrder.total_amount,
+    subtotal: dbOrder.subtotal,
+    taxAmount: dbOrder.tax_amount,
+    shippingAmount: dbOrder.shipping_amount,
+    discountAmount: dbOrder.discount_amount,
+    status: dbOrder.status,
+    paymentStatus: dbOrder.payment_status,
+    paymentMethod: dbOrder.payment_method,
+    paymentId: dbOrder.payment_id,
+    currency: dbOrder.currency || 'INR',
+    shippingAddress: dbOrder.shipping_address,
+    billingAddress: dbOrder.billing_address,
+    notes: dbOrder.notes,
+    trackingNumber: dbOrder.tracking_number,
+    shippedAt: dbOrder.shipped_at ? new Date(dbOrder.shipped_at) : undefined,
+    deliveredAt: dbOrder.delivered_at ? new Date(dbOrder.delivered_at) : undefined,
+    createdAt: new Date(dbOrder.created_at),
+    updatedAt: dbOrder.updated_at ? new Date(dbOrder.updated_at) : undefined,
+  });
+
   const fetchUserOrders = useCallback(async () => {
     if (!user) {
       setOrders([]);
@@ -25,10 +66,15 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     setLoading(true);
-
     try {
-      const response = await apiClient.getOrders();
-      setOrders(response.data || []);
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*, products(*))')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setOrders(data.map(mapDbOrderToAppOrder));
     } catch (error) {
       console.error('Error fetching orders:', error);
       showNotification({
@@ -41,7 +87,6 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
   }, [user, showNotification]);
 
-  // Initial fetch
   useEffect(() => {
     fetchUserOrders();
   }, [fetchUserOrders]);
@@ -63,51 +108,72 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
 
     setLoading(true);
-
     try {
-      // Transform cart items to order items format
+      const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      
+      // Calculate subtotal, tax, etc.
+      const subtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+      const shippingAmount = total > 1000 ? 0 : 50; // Simple logic
+      const taxAmount = subtotal * 0.18; // 18% GST example
+
+      // 1. Create order record
+      const orderData = {
+        user_id: user.id,
+        order_number: orderNumber,
+        total_amount: total,
+        subtotal,
+        tax_amount: taxAmount,
+        shipping_amount: shippingAmount,
+        status: 'pending',
+        payment_status: 'pending',
+        payment_method: paymentMethod,
+        razorpay_order_id: razorpay_order_id,
+        shipping_address: shippingAddress,
+        billing_address: shippingAddress,
+      };
+
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([orderData])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 2. Create order items
       const orderItems = items.map(item => ({
+        order_id: order.id,
         product_id: item.product.id,
-        productId: item.product.id, // Include both for compatibility
+        variant_id: item.variantId,
         quantity: item.quantity,
-        price: item.product.price,
-        variantId: item.variantId
+        unit_price: item.product.price,
+        total_price: item.product.price * item.quantity,
+        product_snapshot: item.product
       }));
 
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
 
-      const response = await apiClient.createOrder({
-        items: orderItems,
-        shippingAddress,
-        billingAddress: shippingAddress, // For now, use shipping address as billing
-        paymentMethod,
-        total,
-        razorpay_order_id
+      if (itemsError) throw itemsError;
+
+      // 3. Clear cart if order created successfully
+      await db.clearCart(user.id);
+
+      await fetchUserOrders();
+      showNotification({
+        type: 'success',
+        title: 'Order Placed!',
+        message: `Order ${orderNumber} created successfully.`
       });
 
-      if (response.data?.id) {
-        // Refresh orders list to include the new order
-        await fetchUserOrders();
-        showNotification({
-          type: 'success',
-          title: 'Order Placed Successfully!',
-          message: 'Your order has been saved and will appear in your order history.',
-          duration: 5000
-        });
-        return response.data.id;
-      } else {
-        showNotification({
-          type: 'error',
-          title: 'Order Failed',
-          message: 'Failed to create order. Please try again.'
-        });
-        return null;
-      }
+      return order.id;
     } catch (error) {
       console.error('Error creating order:', error);
       showNotification({
         type: 'error',
         title: 'Order Failed',
-        message: 'An unexpected error occurred. Please try again.'
+        message: 'Failed to create order. Please try again.'
       });
       return null;
     } finally {
@@ -117,36 +183,33 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const updateOrderStatus = async (orderId: string, status: string): Promise<boolean> => {
     try {
-      await apiClient.updateOrderStatus(orderId, status);
+      const { error } = await supabase
+        .from('orders')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', orderId);
+
+      if (error) throw error;
       await fetchUserOrders();
-      showNotification({
-        type: 'success',
-        title: 'Status Updated',
-        message: `Order status updated to ${status}`
-      });
       return true;
     } catch (error) {
       console.error('Error updating order status:', error);
-      showNotification({
-        type: 'error',
-        title: 'Update Failed',
-        message: 'Failed to update order status. Please try again later.'
-      });
       return false;
     }
   };
 
   const getOrderById = async (orderId: string): Promise<Order | null> => {
     try {
-      const response = await apiClient.getOrder(orderId);
-      return response.data || null;
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*, products(*))')
+        .eq('id', orderId)
+        .single();
+      
+      if (error) throw error;
+      return mapDbOrderToAppOrder(data);
     } catch (error) {
       console.error('Error fetching order:', error);
-      // Check local orders as fallback
-      const localOrder = orders.find(order => order.id === orderId);
-      if (localOrder) return localOrder;
-
-      return null;
+      return orders.find(o => o.id === orderId) || null;
     }
   };
 
@@ -155,8 +218,14 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     if (!targetUserId) return [];
 
     try {
-      const response = await apiClient.getOrders();
-      return response.data || [];
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*, products(*))')
+        .eq('user_id', targetUserId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data.map(mapDbOrderToAppOrder);
     } catch (error) {
       console.error('Error fetching user orders:', error);
       return [];

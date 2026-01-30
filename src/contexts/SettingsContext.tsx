@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { apiClient } from '../lib/apiClient';
+import { db } from '../lib/supabase';
 
 // Type definitions matching the backend response
 interface SiteSetting {
@@ -70,19 +70,6 @@ interface SettingsProviderProps {
   children: ReactNode;
 }
 
-/**
- * SettingsProvider - Centralized provider for public site settings
- * 
- * This provider fetches all public settings once on app load and provides
- * them to all components via context. This eliminates redundant API calls
- * and ensures a single source of truth for settings data.
- * 
- * Features:
- * - Fetches all settings in a single API call via /api/public/settings
- * - Caches settings in memory
- * - Provides helper methods for accessing specific settings
- * - Supports manual refetch for admin updates
- */
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
   const [settings, setSettings] = useState<PublicSettings>({
     siteSettings: [],
@@ -99,49 +86,20 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       setLoading(true);
       setError(null);
       
-      // Use the combined endpoint to fetch all settings in one request
-      const response = await apiClient.get<{ success: boolean; data: PublicSettings }>('/public/settings');
-      
-      // apiClient.get returns the JSON response directly from the server
-      // The server returns: { success: true, data: { siteSettings: [...], ... } }
-      if (!response || typeof response !== 'object') {
-        throw new Error('Invalid response format from settings API');
-      }
-      
-      // Handle different response formats
-      let settingsData: PublicSettings | null = null;
-      
-      // Format 1: { success: true, data: {...} }
-      if ('success' in response && 'data' in response) {
-        const typedResponse = response as { success: boolean; data: PublicSettings };
-        if (typedResponse.success && typedResponse.data) {
-          settingsData = typedResponse.data;
-        } else {
-          throw new Error('Settings API returned unsuccessful response');
-        }
-      } 
-      // Format 2: { data: {...} }
-      else if ('data' in response) {
-        const typedResponse = response as { data: PublicSettings };
-        if (typedResponse.data) {
-          settingsData = typedResponse.data;
-        }
-      }
-      // Format 3: Direct settings object (unlikely but handle it)
-      else if ('siteSettings' in response || 'socialMedia' in response) {
-        settingsData = response as PublicSettings;
-      }
+      const settingsData = await db.getAllPublicSettings();
       
       if (settingsData) {
-        setSettings(settingsData);
-      } else {
-        throw new Error('Invalid response format from settings API');
+        setSettings({
+          siteSettings: settingsData.siteSettings || [],
+          socialMedia: settingsData.socialMedia || [],
+          contactInfo: settingsData.contactInfo || [],
+          footerLinks: settingsData.footerLinks || [],
+          businessHours: settingsData.businessHours || []
+        });
       }
     } catch (err: any) {
       console.error('Error fetching public settings:', err);
-      const errorMessage = err.message || 'Failed to fetch public settings';
-      setError(errorMessage);
-      // Set default empty settings to prevent undefined errors
+      setError(err.message || 'Failed to fetch public settings');
       setSettings({
         siteSettings: [],
         socialMedia: [],
@@ -154,11 +112,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     }
   }, []);
 
-  // Fetch settings on mount
   useEffect(() => {
     fetchSettings();
 
-    // Listen for settings updates from admin panel
     const handleSettingsUpdate = () => {
       fetchSettings();
     };
@@ -170,13 +126,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     };
   }, [fetchSettings]);
 
-  // Helper function to get a specific site setting by key
   const getSiteSetting = useCallback((key: string): string | undefined => {
     const setting = settings.siteSettings.find(s => s.setting_key === key);
     return setting?.setting_value;
   }, [settings.siteSettings]);
 
-  // Helper function to get all settings in a category
   const getSiteSettingsByCategory = useCallback((category: string): SiteSetting[] => {
     return settings.siteSettings.filter(s => s.category === category);
   }, [settings.siteSettings]);
@@ -197,15 +151,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   );
 };
 
-/**
- * Hook to access settings from the SettingsContext
- * 
- * @example
- * ```tsx
- * const { settings, loading, getSiteSetting } = useSettings();
- * const siteName = getSiteSetting('site_name');
- * ```
- */
 export const useSettings = (): SettingsContextType => {
   const context = useContext(SettingsContext);
   if (context === undefined) {
@@ -213,4 +158,3 @@ export const useSettings = (): SettingsContextType => {
   }
   return context;
 };
-
