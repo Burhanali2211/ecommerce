@@ -111,26 +111,7 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ categories, loading }) => 
           </Link>
         )}
 
-        {/* 4. Small Tile 3 - Now with full image like others */}
-        {secondaryCats[2] && (
-          <Link
-            to={`/products?category=${secondaryCats[2].id}`}
-            className="group relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm hover:shadow-md aspect-square sm:aspect-auto sm:min-h-[140px] md:min-h-0"
-          >
-            <img
-              src={getCatImage(secondaryCats[2], fallbackImages[2])}
-              alt={secondaryCats[2].name}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-              onError={(e) => { (e.target as HTMLImageElement).src = fallbackImages[2]; }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
-            <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 right-2">
-              <h3 className="text-[11px] sm:text-sm font-bold text-white drop-shadow-md line-clamp-1">{secondaryCats[2].name}</h3>
-            </div>
-          </Link>
-        )}
-
-        {/* 5. Wide Tile - Full width on mobile */}
+        {/* 4. Wide Tile - Full width on mobile (moved up so last 2 tiles pair together) */}
         {secondaryCats[3] && (
           <Link
             to={`/products?category=${secondaryCats[3].id}`}
@@ -150,7 +131,26 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ categories, loading }) => 
           </Link>
         )}
 
-        {/* 6. Small Tile - Now with full image like others */}
+        {/* 5. Small Tile - Side by side with tile 6 on mobile */}
+        {secondaryCats[2] && (
+          <Link
+            to={`/products?category=${secondaryCats[2].id}`}
+            className="group relative overflow-hidden rounded-xl bg-white border border-gray-100 shadow-sm hover:shadow-md aspect-square sm:aspect-auto sm:min-h-[140px] md:min-h-0"
+          >
+            <img
+              src={getCatImage(secondaryCats[2], fallbackImages[2])}
+              alt={secondaryCats[2].name}
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              onError={(e) => { (e.target as HTMLImageElement).src = fallbackImages[2]; }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
+            <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 right-2">
+              <h3 className="text-[11px] sm:text-sm font-bold text-white drop-shadow-md line-clamp-1">{secondaryCats[2].name}</h3>
+            </div>
+          </Link>
+        )}
+
+        {/* 6. Small Tile - Side by side with tile 5 on mobile */}
         {secondaryCats[4] && (
           <Link
             to={`/products?category=${secondaryCats[4].id}`}
