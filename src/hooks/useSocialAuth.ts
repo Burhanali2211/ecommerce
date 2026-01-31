@@ -1,5 +1,5 @@
 import React from 'react';
-import { apiClient } from '../lib/apiClient';
+import { supabase } from '../lib/supabase';
 import { useNotification } from '../contexts/NotificationContext';
 
 // Hook for social auth state
@@ -26,7 +26,7 @@ export const useSocialAuth = () => {
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : `Failed to sign in with ${provider}`;
       setError(errorMessage);
-      showNotification(errorMessage, 'error');
+      showNotification({ type: 'error', title: 'Sign In Failed', message: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -48,11 +48,11 @@ export const useSocialAuth = () => {
         throw error;
       }
 
-      showNotification(`Successfully linked ${provider} account`, 'success');
+      showNotification({ type: 'success', title: 'Account Linked', message: `Successfully linked ${provider} account` });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : `Failed to link ${provider} account`;
       setError(errorMessage);
-      showNotification(errorMessage, 'error');
+      showNotification({ type: 'error', title: 'Link Failed', message: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -71,11 +71,11 @@ export const useSocialAuth = () => {
         throw error;
       }
 
-      showNotification(`Successfully unlinked ${provider} account`, 'success');
+      showNotification({ type: 'success', title: 'Account Unlinked', message: `Successfully unlinked ${provider} account` });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : `Failed to unlink ${provider} account`;
       setError(errorMessage);
-      showNotification(errorMessage, 'error');
+      showNotification({ type: 'error', title: 'Unlink Failed', message: errorMessage });
     } finally {
       setLoading(false);
     }

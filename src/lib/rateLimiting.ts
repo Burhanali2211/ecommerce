@@ -77,32 +77,25 @@ export class RateLimiter extends DataService {
   // Decorator for applying rate limiting to methods
   static limit(config: RateLimitConfig = RATE_LIMIT_CONFIGS.ANONYMOUS) {
     return function(
-      target: any,
-      propertyKey: string,
+      _target: any,
+      _propertyKey: string,
       descriptor: PropertyDescriptor
     ) {
       const originalMethod = descriptor.value;
       
       descriptor.value = async function(...args: any[]) {
-        // Get user ID for identification
-        let userId: string | undefined;
-        try {
-          const user = await this.getCurrentUser();
-          userId = user?.id;
-        } catch {
-          // User not authenticated, use anonymous limits
+        // Generate a unique identifier for this client
+        // In browser, we use localStorage or generate a random one
+        let clientId = localStorage.getItem('client_rate_limit_id');
+        if (!clientId) {
+          clientId = Math.random().toString(36).substring(2, 15);
+          localStorage.setItem('client_rate_limit_id', clientId);
         }
         
-        // Use user ID as identifier, or generate one for anonymous users
-        const identifier = userId || `anonymous:${this.getRequestIp()}`;
-        
-        // Get appropriate config based on user role
-        const userConfig = userId ? 
-          RATE_LIMIT_CONFIGS.AUTHENTICATED : 
-          config;
+        const identifier = `client:${clientId}`;
         
         // Check rate limit
-        const result = await RateLimiter.checkRateLimit(identifier, userConfig);
+        const result = await RateLimiter.checkRateLimit(identifier, config);
         
         if (!result.allowed) {
           throw new Error(`Rate limit exceeded. Try again in ${Math.ceil((result.resetTime - Date.now()) / 1000)} seconds.`);
@@ -116,10 +109,13 @@ export class RateLimiter extends DataService {
     };
   }
 
-  // Simple method to get request IP (placeholder)
-  private getRequestIp(): string {
-    // In a real implementation, this would get the client's IP address
-    // This is a placeholder that returns a random identifier
-    return Math.random().toString(36).substring(2, 15);
+  // Simple method to get client identifier
+  static getClientId(): string {
+    let clientId = localStorage.getItem('client_rate_limit_id');
+    if (!clientId) {
+      clientId = Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('client_rate_limit_id', clientId);
+    }
+    return clientId;
   }
 }

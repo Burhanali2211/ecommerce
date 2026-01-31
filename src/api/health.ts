@@ -1,5 +1,8 @@
 // Health check endpoint for external monitoring services
-// This would typically be implemented as a serverless function in a real deployment
+// Browser-compatible client-side health check
+
+// Store app start time for uptime calculation
+const appStartTime = Date.now();
 
 interface HealthCheckResponse {
   status: 'ok' | 'error';
@@ -16,6 +19,23 @@ interface HealthCheckResponse {
   };
 }
 
+/**
+ * Get browser-compatible uptime in seconds
+ */
+const getUptime = (): number => {
+  return Math.floor((Date.now() - appStartTime) / 1000);
+};
+
+/**
+ * Get memory usage if available (Chrome only)
+ */
+const getMemoryUsage = (): number => {
+  if (typeof window !== 'undefined' && (performance as any).memory) {
+    return (performance as any).memory.usedJSHeapSize || 0;
+  }
+  return 0;
+};
+
 export const healthCheck = async (): Promise<HealthCheckResponse> => {
   // Check actual service health
   const response: HealthCheckResponse = {
@@ -28,8 +48,8 @@ export const healthCheck = async (): Promise<HealthCheckResponse> => {
       api: 'ok'
     },
     metrics: {
-      uptime: process.uptime ? process.uptime() : Date.now() - (window as any).appStartTime || 0,
-      memoryUsage: (window.performance as any).memory?.usedJSHeapSize || 0
+      uptime: getUptime(),
+      memoryUsage: getMemoryUsage()
     }
   };
   
@@ -39,12 +59,12 @@ export const healthCheck = async (): Promise<HealthCheckResponse> => {
 // Simple uptime endpoint
 export const uptimeCheck = async (): Promise<{ uptime: number; status: 'ok' }> => {
   return {
-    uptime: process.uptime ? process.uptime() : Date.now() - (window as any).appStartTime || 0,
+    uptime: getUptime(),
     status: 'ok'
   };
 };
 
-// Export as default for compatibility with serverless function handlers
+// Export as default for compatibility
 export default {
   healthCheck,
   uptimeCheck

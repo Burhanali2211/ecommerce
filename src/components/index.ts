@@ -44,7 +44,7 @@ export { SettingsSection } from './Settings/SettingsSection';
 
 // Dashboard Components
 export { AdminDashboard } from './Dashboard/AdminDashboard';
-export { CustomerDashboard } from './Dashboard/CustomerDashboard';
+export { CustomerDashboard } from './Customer/CustomerDashboard';
 export { SellerDashboard } from './Dashboard/SellerDashboard';
 
 // Mobile Components
@@ -55,4 +55,4 @@ export { MobileProductCarousel } from './Mobile/MobileProductCarousel';
 export { MobileTouchButton } from './Mobile/MobileTouchButton';
 
 // Performance Components
-export { LCPOptimizer } from './Performance/LCPOptimizer';
+// LCPOptimizer removed - file does not exist

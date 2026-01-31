@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { apiClient } from '../lib/apiClient';
+import { useState, useEffect, useCallback } from 'react';
+import { db } from '../lib/supabase';
 
 interface SiteSetting {
   setting_key: string;
@@ -64,37 +64,40 @@ export const usePublicSettings = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-      const fetchPublicSettings = async () => {
-        try {
-          setLoading(true);
-          setError(null);
-          
-          // Fetch all public settings in a single combined request
-          // This reduces the number of function invocations in serverless environments
-          const response = await apiClient.get('/public/settings');
-          
-          if (response && response.success && response.data) {
-            setSettings({
-              siteSettings: response.data.siteSettings || [],
-              socialMedia: response.data.socialMedia || [],
-              contactInfo: response.data.contactInfo || [],
-              footerLinks: response.data.footerLinks || [],
-              businessHours: response.data.businessHours || []
-            });
-          } else {
-            console.warn('Invalid response format from settings API:', response);
-            throw new Error('Invalid response format from settings API');
-          }
-        } catch (err: any) {
-          console.error('Error fetching public settings:', err);
-          setError(err.message || 'Failed to fetch public settings');
-        } finally {
-          setLoading(false);
-        }
-      };
+  const fetchPublicSettings = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Fetch all public settings directly from Supabase
+      const settingsData = await db.getAllPublicSettings();
+      
+      if (settingsData) {
+        setSettings({
+          siteSettings: settingsData.siteSettings || [],
+          socialMedia: settingsData.socialMedia || [],
+          contactInfo: settingsData.contactInfo || [],
+          footerLinks: settingsData.footerLinks || [],
+          businessHours: settingsData.businessHours || []
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching public settings:', err);
+      setError(err.message || 'Failed to fetch public settings');
+      // Set empty defaults on error
+      setSettings({
+        siteSettings: [],
+        socialMedia: [],
+        contactInfo: [],
+        footerLinks: [],
+        businessHours: []
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-
+  useEffect(() => {
     fetchPublicSettings();
 
     // Listen for settings updates from admin panel
@@ -107,7 +110,7 @@ export const usePublicSettings = () => {
     return () => {
       window.removeEventListener('settingsUpdated', handleSettingsUpdate);
     };
-  }, []);
+  }, [fetchPublicSettings]);
 
   // Helper functions to get specific settings
   const getSiteSetting = (key: string): string | undefined => {

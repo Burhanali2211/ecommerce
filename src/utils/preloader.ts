@@ -2,8 +2,32 @@
  * Preloader utility for optimistic data loading
  */
 
-import { apiClient } from '../lib/apiClient';
+import { db } from '../lib/supabase';
 import { productCache, categoryCache, generateCacheKey } from './cache';
+
+// Helper functions for preloader
+const getProductById = async (productId: string) => {
+  return db.getProduct(productId);
+};
+
+const getProductsBasic = async (params: { 
+  categoryId?: string; 
+  limit?: number; 
+  offset?: number;
+  featured?: boolean;
+}) => {
+  const result = await db.getProducts({
+    categoryId: params.categoryId,
+    limit: params.limit || 12,
+    page: params.offset ? Math.floor(params.offset / (params.limit || 12)) + 1 : 1,
+    featured: params.featured,
+  });
+  return result.data;
+};
+
+const getCategories = async () => {
+  return db.getCategories();
+};
 
 interface PreloadOptions {
   priority?: 'high' | 'medium' | 'low';
