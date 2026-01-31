@@ -26,7 +26,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         />
       )}
 
-      <main className={`${!isHomePage && !isDashboardPage && !isAuthPage ? "pt-20" : ""} relative`}>
+      <main className={`${!isHomePage && !isDashboardPage && !isAuthPage ? "pt-24" : ""} relative`}>
         <div className="min-h-[calc(100vh-200px)]">
           {children}
         </div>

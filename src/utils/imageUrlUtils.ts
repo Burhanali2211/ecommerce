@@ -30,6 +30,11 @@ export function normalizeImageUrl(url: string | null | undefined, fallback?: str
     return fallback || '';
   }
 
+  // Reject localhost URLs in production
+  if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
+    return fallback || '';
+  }
+
   // Base64 data URLs - return as-is (already valid)
   if (trimmed.startsWith('data:image/')) {
     return trimmed;
@@ -87,6 +92,11 @@ export function isValidImageUrl(url: string | null | undefined): boolean {
 
   // Reject old Express backend upload paths that don't exist in static deployment
   if (trimmed.includes('/uploads/')) {
+    return false;
+  }
+
+  // Reject localhost URLs in production
+  if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
     return false;
   }
 
