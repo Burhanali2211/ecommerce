@@ -1,6 +1,19 @@
 import { supabase, db } from '../lib/supabase';
+import { apiClient } from '../lib/apiClient';
 
-export { supabase, db };
+export { supabase, db, apiClient };
+
+// API Endpoints (for backward compatibility - not used with direct Supabase)
+export const API_ENDPOINTS = {
+  PRODUCTS: '/products',
+  CATEGORIES: '/categories',
+  ORDERS: '/orders',
+  CART: '/cart',
+  ADDRESSES: '/addresses',
+  AUTH: '/auth',
+  SETTINGS: '/settings',
+  ADMIN: '/admin',
+};
 
 // Re-export for backward compatibility
 export const api = {

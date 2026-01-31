@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MapPin, Phone, Mail, Clock, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSettings } from '../contexts/SettingsContext';
-import { apiClient } from '../config/api';
+import { supabase } from '../lib/supabase';
 
 interface FormData {
   name: string;
@@ -125,31 +125,38 @@ export const ContactPage: React.FC = () => {
     setSubmitMessage('');
 
     try {
-      const response = await apiClient.post('/contact', {
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim() || undefined,
-        subject: formData.subject.trim(),
-        message: formData.message.trim(),
-      });
+      // Submit to Supabase contact_submissions table
+      const { error } = await supabase
+        .from('contact_submissions')
+        .insert([{
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim() || null,
+          subject: formData.subject.trim(),
+          message: formData.message.trim(),
+          status: 'new',
+          created_at: new Date().toISOString(),
+        }]);
 
-      if (response.data.success) {
-        setSubmitStatus('success');
-        setSubmitMessage(response.data.message || 'Thank you for contacting us! We will get back to you soon.');
-        // Reset form
-        setFormData({
-          name: '',
-          email: '',
-          phone: '',
-          subject: '',
-          message: '',
-        });
+      if (error) {
+        throw error;
       }
+
+      setSubmitStatus('success');
+      setSubmitMessage('Thank you for contacting us! We will get back to you soon.');
+      // Reset form
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        subject: '',
+        message: '',
+      });
     } catch (error: any) {
+      console.error('Contact form error:', error);
       setSubmitStatus('error');
       setSubmitMessage(
-        error.response?.data?.error?.userMessage || 
-        error.response?.data?.error?.message || 
+        error.message || 
         'Failed to send message. Please try again later.'
       );
     } finally {
