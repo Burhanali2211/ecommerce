@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useSettings } from '../../../contexts/SettingsContext';
+import { isValidImageUrl } from '../../../utils/imageUrlUtils';
 
 interface CustomerDashboardLayoutProps {
   children: React.ReactNode;
@@ -48,7 +49,9 @@ export const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = (
   subtitle
 }) => {
   const { user, logout } = useAuth();
-  const { settings } = useSettings();
+  const { settings, getSiteSetting } = useSettings();
+  const logoUrl = getSiteSetting('logo_url');
+  const siteName = getSiteSetting('site_name') || 'HimalayanSpicesExports';
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -97,11 +100,11 @@ export const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = (
           
           <div className="flex items-center gap-2">
             <Link to="/" className="flex items-center gap-2">
-              {settings?.logo_url ? (
-                <img src={settings.logo_url} alt="Logo" className="h-8 w-auto" />
+              {logoUrl && isValidImageUrl(logoUrl) ? (
+                <img src={logoUrl} alt="Logo" className="h-8 w-auto" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               ) : (
                 <span className="text-lg font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                  {settings?.site_name || 'HimalayanSpicesExportss'}
+                  {siteName}
                 </span>
               )}
             </Link>
@@ -130,8 +133,8 @@ export const CustomerDashboardLayout: React.FC<CustomerDashboardLayoutProps> = (
         {/* Sidebar Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <Link to="/" className="flex items-center gap-3">
-            {settings?.logo_url ? (
-              <img src={settings.logo_url} alt="Logo" className="h-10 w-auto" />
+            {logoUrl && isValidImageUrl(logoUrl) ? (
+              <img src={logoUrl} alt="Logo" className="h-10 w-auto" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             ) : (
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
                 <ShoppingBag className="w-5 h-5 text-white" />

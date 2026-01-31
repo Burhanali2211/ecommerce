@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
+import { isValidImageUrl } from '../../../utils/imageUrlUtils';
 
 interface AdminDashboardLayoutProps {
   children: React.ReactNode;
@@ -154,11 +155,12 @@ export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
           </Link>
 
           <div className="flex items-center gap-2">
-              {settings.dashboard_logo_url ? (
+              {settings.dashboard_logo_url && isValidImageUrl(settings.dashboard_logo_url) ? (
                 <img 
                   src={settings.dashboard_logo_url} 
                   alt="Logo" 
                   className="w-8 h-8 rounded-lg object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
               ) : (
                 <div 
@@ -203,11 +205,12 @@ export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
         {/* Sidebar Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <Link to="/" className="flex items-center gap-3">
-            {settings.dashboard_logo_url ? (
+            {settings.dashboard_logo_url && isValidImageUrl(settings.dashboard_logo_url) ? (
               <img 
                 src={settings.dashboard_logo_url} 
                 alt="Logo" 
                 className="w-10 h-10 rounded-xl object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             ) : (
               <div 

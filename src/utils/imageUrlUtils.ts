@@ -25,6 +25,11 @@ export function normalizeImageUrl(url: string | null | undefined, fallback?: str
     return fallback || '';
   }
 
+  // Reject old Express backend upload paths - use fallback instead
+  if (trimmed.includes('/uploads/')) {
+    return fallback || '';
+  }
+
   // Base64 data URLs - return as-is (already valid)
   if (trimmed.startsWith('data:image/')) {
     return trimmed;
@@ -77,6 +82,11 @@ export function isValidImageUrl(url: string | null | undefined): boolean {
 
   // Check for invalid values
   if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined' || trimmed === 'NaN') {
+    return false;
+  }
+
+  // Reject old Express backend upload paths that don't exist in static deployment
+  if (trimmed.includes('/uploads/')) {
     return false;
   }
 
