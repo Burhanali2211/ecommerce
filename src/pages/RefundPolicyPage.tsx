@@ -59,7 +59,7 @@ const RefundPolicyPage: React.FC = () => {
         >
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Our Commitment</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            At HimalayanSpicesExports, we stand behind the quality of our authentic Kashmir perfumes and attars. 
+            At HimalayanSpicesExports, we stand behind the quality of our authentic Kashmir and Himalayan spices. 
             We want you to be completely satisfied with your purchase. If you're not happy with your order, 
             we're here to help.
           </p>
@@ -153,8 +153,8 @@ const RefundPolicyPage: React.FC = () => {
             <div className="flex items-start">
               <XCircle className="w-5 h-5 text-red-600 mt-1 mr-3 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-gray-800">Opened Perfumes</p>
-                <p className="text-gray-600">Due to hygiene reasons, opened perfume bottles cannot be returned</p>
+                <p className="font-semibold text-gray-800">Opened Spice Packs</p>
+                <p className="text-gray-600">Due to hygiene reasons, opened spice packs cannot be returned</p>
               </div>
             </div>
             <div className="flex items-start">

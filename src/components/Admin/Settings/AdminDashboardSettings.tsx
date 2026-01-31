@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, RefreshCw, Palette, Image, Sparkles, Wand2 } from 'lucide-react';
-import { api, API_ENDPOINTS } from '@/config/api';
+import { supabase } from '@/lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { updateDashboardStyles, clearSettingsCache } from '../../../utils/adminDashboardStyles';
 
@@ -461,45 +461,31 @@ export const AdminDashboardSettings: React.FC = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      const response = await api.get(API_ENDPOINTS.ADMIN.SETTINGS.DASHBOARD);
-      const data = response.data;
       
-      if (data.success && data.data) {
-        console.log('Fetched settings data:', data.data);
-        console.log('Flat format:', data.flat);
-        
-        // Use flat format if available, otherwise use nested format
-        const sourceData = data.flat || data.data;
-        
-        // Convert the key-value object to our settings format
+      // Fetch dashboard settings from site_settings table
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('setting_key, setting_value')
+        .like('setting_key', 'dashboard_%');
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
         const settingsObj: Partial<DashboardSettings> = {};
-        Object.keys(defaultSettings).forEach(key => {
-          const settingKey = key as keyof DashboardSettings;
-          // Check if the setting exists in the response
-          if (sourceData[settingKey] !== undefined && sourceData[settingKey] !== null) {
-            // Handle both object format {value: ...} and direct value
-            let value: string;
-            if (typeof sourceData[settingKey] === 'object' && sourceData[settingKey] !== null) {
-              value = sourceData[settingKey].value || sourceData[settingKey];
-            } else {
-              value = sourceData[settingKey];
-            }
-            settingsObj[settingKey] = value || defaultSettings[settingKey];
-          } else {
-            // Use default if not found
-            settingsObj[settingKey] = defaultSettings[settingKey];
+        data.forEach((item) => {
+          const key = item.setting_key as keyof DashboardSettings;
+          if (key in defaultSettings) {
+            settingsObj[key] = item.setting_value || defaultSettings[key];
           }
         });
         
         const loadedSettings = { ...defaultSettings, ...settingsObj };
-        console.log('Loaded settings:', loadedSettings);
         setSettings(loadedSettings);
         
         // Check which preset matches (if any)
         const matchingPreset = Object.entries(colorPresets).find(([_, preset]) => {
           return Object.keys(defaultSettings).every(key => {
             const k = key as keyof DashboardSettings;
-            // Skip logo_url in comparison
             if (k === 'dashboard_logo_url') return true;
             return preset[k] === loadedSettings[k];
           });
@@ -509,18 +495,10 @@ export const AdminDashboardSettings: React.FC = () => {
           setSelectedPreset(matchingPreset[0]);
         }
       } else {
-        // If no data, use defaults
-        console.warn('No settings data received, using defaults');
         setSettings(defaultSettings);
       }
     } catch (error: any) {
       console.error('Error fetching dashboard settings:', error);
-      console.error('Error details:', error.response?.data);
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: error.response?.data?.message || 'Failed to load dashboard settings. Using defaults.'
-      });
       setSettings(defaultSettings);
     } finally {
       setLoading(false);
@@ -536,64 +514,41 @@ export const AdminDashboardSettings: React.FC = () => {
     try {
       setSaving(true);
       
-      // Convert settings to key-value format for bulk update
-      // Ensure all values are strings and not null/undefined
-      const settingsToUpdate: Record<string, string> = {};
-      Object.keys(settings).forEach(key => {
-        const value = settings[key as keyof DashboardSettings];
-        // Convert to string, handle null/undefined
-        if (value === null || value === undefined) {
-          settingsToUpdate[key] = '';
-        } else {
-          settingsToUpdate[key] = String(value);
-        }
-      });
-
-      console.log('Saving settings:', settingsToUpdate);
-      console.log('Settings count:', Object.keys(settingsToUpdate).length);
-
-      const response = await api.put(API_ENDPOINTS.ADMIN.SETTINGS.DASHBOARD, {
-        settings: settingsToUpdate
-      });
-
-      console.log('Save response:', response.data);
-
-      if (response.data.success) {
-        // Immediately apply styles to prevent flash of old colors
-        // This happens BEFORE page reload, so no flash occurs
-        updateDashboardStyles(settings);
+      // Save each setting to site_settings table
+      const entries = Object.entries(settings);
+      for (const [key, value] of entries) {
+        const { error } = await supabase
+          .from('site_settings')
+          .upsert({
+            setting_key: key,
+            setting_value: String(value || ''),
+            setting_type: 'string',
+            category: 'dashboard',
+            is_public: true
+          }, { onConflict: 'setting_key' });
         
-        showNotification({
-          type: 'success',
-          title: 'Success',
-          message: response.data.message || 'Dashboard settings saved successfully! Styles applied immediately.'
-        });
-        
-        // Refresh the page to ensure all components get the new settings
-        // But styles are already applied, so there's no flash
-        setTimeout(() => {
-          // Use replace with cache-busting to ensure fresh data
-          const url = new URL(window.location.href);
-          url.searchParams.set('_t', Date.now().toString());
-          window.location.replace(url.toString());
-        }, 800);
-      } else {
-        throw new Error(response.data.message || 'Save failed');
+        if (error) throw error;
       }
+      
+      // Immediately apply styles
+      updateDashboardStyles(settings);
+      
+      showNotification({
+        type: 'success',
+        title: 'Success',
+        message: 'Dashboard settings saved successfully!'
+      });
+      
+      // Refresh after a delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
     } catch (error: any) {
       console.error('Error saving dashboard settings:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          'Failed to save dashboard settings';
-      
       showNotification({
         type: 'error',
         title: 'Error',
-        message: errorMessage
+        message: error.message || 'Failed to save dashboard settings'
       });
     } finally {
       setSaving(false);

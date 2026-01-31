@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../../Common/Modal';
 import { FormInput, FormTextarea, FormSelect, FormCheckbox } from '../../Common/FormInput';
 import { ImageUpload } from '../../Common/ImageUpload';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Loader2 } from 'lucide-react';
 
@@ -59,14 +59,12 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onClose, o
 
   const fetchCategories = async () => {
     try {
-      const response = await apiClient.get('/categories');
-      if (response.success) {
-        // Filter out current category and its children to prevent circular references
-        const availableCategories = category
-          ? response.data.filter((cat: any) => cat.id !== category.id)
-          : response.data;
-        setCategories(availableCategories);
-      }
+      const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+      if (error) throw error;
+      const availableCategories = category
+        ? (data || []).filter((cat: any) => cat.id !== category.id)
+        : (data || []);
+      setCategories(availableCategories);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
@@ -127,17 +125,19 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ category, onClose, o
         name: formData.name,
         slug: formData.slug,
         description: formData.description || null,
-        imageUrl: formData.image_url || null,
-        parentId: formData.parent_id || null,
-        sortOrder: parseInt(formData.sort_order),
-        isActive: formData.is_active
+        image_url: formData.image_url || null,
+        parent_id: formData.parent_id || null,
+        sort_order: parseInt(formData.sort_order) || 0,
+        is_active: formData.is_active
       };
 
       if (category) {
-        await apiClient.put(`/categories/${category.id}`, payload);
+        const { error } = await supabase.from('categories').update(payload).eq('id', category.id);
+        if (error) throw error;
         showSuccess('Category updated successfully');
       } else {
-        await apiClient.post('/categories', payload);
+        const { error } = await supabase.from('categories').insert(payload);
+        if (error) throw error;
         showSuccess('Category created successfully');
       }
 

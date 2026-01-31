@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Edit2, Trash2, Phone, Mail, MapPin, MessageCircle, Eye, EyeOff, Star } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { ContactInfoForm } from './ContactInfoForm';
 
@@ -32,11 +32,12 @@ export const ContactInfoList: React.FC = () => {
   const fetchContacts = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/admin/settings/contact-info');
-
-      if (response.success) {
-        setContacts(response.data);
-      }
+      const { data, error } = await supabase
+        .from('contact_information')
+        .select('*')
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      setContacts(data || []);
     } catch (error: any) {
       showError(error.message || 'Failed to fetch contact information');
     } finally {
@@ -50,12 +51,10 @@ export const ContactInfoList: React.FC = () => {
     }
 
     try {
-      const response = await apiClient.delete(`/admin/settings/contact-info/${id}`);
-
-      if (response.success) {
-        showSuccess('Contact information deleted successfully');
-        fetchContacts();
-      }
+      const { error } = await supabase.from('contact_information').delete().eq('id', id);
+      if (error) throw error;
+      showSuccess('Contact information deleted successfully');
+      fetchContacts();
     } catch (error: any) {
       showError(error.message || 'Failed to delete contact information');
     }
@@ -74,14 +73,13 @@ export const ContactInfoList: React.FC = () => {
 
   const toggleActive = async (contact: ContactInfo) => {
     try {
-      const response = await apiClient.put(`/admin/settings/contact-info/${contact.id}`, {
-        is_active: !contact.is_active
-      });
-
-      if (response.success) {
-        showSuccess(`Contact information ${!contact.is_active ? 'activated' : 'deactivated'}`);
-        fetchContacts();
-      }
+      const { error } = await supabase
+        .from('contact_information')
+        .update({ is_active: !contact.is_active })
+        .eq('id', contact.id);
+      if (error) throw error;
+      showSuccess(`Contact information ${!contact.is_active ? 'activated' : 'deactivated'}`);
+      fetchContacts();
     } catch (error: any) {
       showError(error.message || 'Failed to update contact information');
     }

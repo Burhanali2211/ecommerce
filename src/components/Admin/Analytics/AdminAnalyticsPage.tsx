@@ -16,7 +16,7 @@ import {
   Legend
 } from 'recharts';
 import { AdminDashboardLayout } from '../Layout/AdminDashboardLayout';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 interface AnalyticsMetrics {
@@ -70,13 +70,81 @@ export const AdminAnalyticsPage: React.FC = () => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/admin/analytics/overview?period=${selectedPeriod}`);
-      
-      if (response.success && response.data) {
-        setData(response.data);
-      } else {
-        showError('Failed to load analytics data');
-      }
+      const days = selectedPeriod === '7days' ? 7 : selectedPeriod === '30days' ? 30 : selectedPeriod === '90days' ? 90 : 365;
+      const periodStart = new Date();
+      periodStart.setDate(periodStart.getDate() - days);
+      periodStart.setHours(0, 0, 0, 0);
+      const periodStartIso = periodStart.toISOString();
+
+      const [ordersRes, profilesRes] = await Promise.all([
+        supabase.from('orders').select('id, total_amount, status, created_at').gte('created_at', periodStartIso),
+        supabase.from('profiles').select('id, created_at').gte('created_at', periodStartIso)
+      ]);
+
+      const orders = ordersRes.data || [];
+      const profiles = profilesRes.data || [];
+      const orderIds = orders.map((o: any) => o.id);
+      const orderItems = orderIds.length > 0
+        ? (await supabase.from('order_items').select('product_id, quantity, unit_price').in('order_id', orderIds)).data || []
+        : [];
+
+      const completedOrders = orders.filter((o: any) => o.status === 'delivered' || o.status === 'shipped');
+      const totalRevenue = completedOrders.reduce((sum: number, o: any) => sum + parseFloat(o.total_amount || '0'), 0);
+      const totalOrdersCount = orders.length;
+      const avgOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0;
+      const newUsersCount = profiles.length;
+
+      const revenueByDate: Record<string, { revenue: number; orders: number }> = {};
+      completedOrders.forEach((o: any) => {
+        const d = (o.created_at || '').split('T')[0];
+        if (!revenueByDate[d]) revenueByDate[d] = { revenue: 0, orders: 0 };
+        revenueByDate[d].revenue += parseFloat(o.total_amount || '0');
+        revenueByDate[d].orders += 1;
+      });
+      const revenueTrend: RevenueTrend[] = Object.entries(revenueByDate)
+        .map(([date, v]) => ({ date, revenue: v.revenue, orders: v.orders }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const productRevenue: Record<string, { revenue: number; orders: number; name: string; images?: string[] }> = {};
+      orderItems.forEach((oi: any) => {
+        const id = oi.product_id;
+        const rev = (oi.quantity || 0) * parseFloat(oi.unit_price || '0');
+        if (!productRevenue[id]) productRevenue[id] = { revenue: 0, orders: 0, name: '' };
+        productRevenue[id].revenue += rev;
+        productRevenue[id].orders += 1;
+      });
+      const productIds = Object.keys(productRevenue).slice(0, 10);
+      const topProductsData = productIds.length > 0
+        ? await supabase.from('products').select('id, name, images').in('id', productIds)
+        : { data: [] };
+      const productMap = Object.fromEntries((topProductsData.data || []).map((p: any) => [p.id, p]));
+      const topProducts: TopProduct[] = productIds.map((id) => {
+        const pr = productRevenue[id];
+        const p = productMap[id];
+        return {
+          id,
+          name: p?.name || 'Product',
+          revenue: pr.revenue,
+          orders: pr.orders,
+          growth: 0,
+          price: undefined,
+          images: p?.images
+        };
+      }).sort((a, b) => b.revenue - a.revenue);
+
+      setData({
+        metrics: {
+          totalRevenue: { value: totalRevenue, change: 0, trend: 'up' as const },
+          totalOrders: { value: totalOrdersCount, change: 0, trend: totalOrdersCount > 0 ? 'up' as const : 'neutral' as const },
+          pageViews: { value: 0, change: 0, trend: 'neutral' as const },
+          conversionRate: { value: 0, change: 0, trend: 'neutral' as const },
+          avgOrderValue: { value: avgOrderValue, change: 0, trend: 'up' as const },
+          newUsers: { value: newUsersCount, change: 0, trend: newUsersCount > 0 ? 'up' as const : 'neutral' as const }
+        },
+        topProducts,
+        revenueTrend,
+        trafficSources: []
+      });
     } catch (error: any) {
       showError(error.message || 'Failed to load analytics data');
     } finally {

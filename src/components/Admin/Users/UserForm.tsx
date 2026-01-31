@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../../Common/Modal';
 import { FormInput, FormSelect, FormCheckbox } from '../../Common/FormInput';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 
@@ -130,14 +130,20 @@ export const UserForm: React.FC<UserFormProps> = ({ user, onClose, onSuccess }) 
       }
 
       if (user) {
-        await apiClient.put(`/admin/users/${user.id}`, payload);
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            full_name: payload.full_name,
+            role: payload.role,
+            is_active: payload.is_active
+          })
+          .eq('id', user.id);
+        if (error) throw error;
         showSuccess('Success', 'User updated successfully');
+        onSuccess();
       } else {
-        await apiClient.post('/admin/users', payload);
-        showSuccess('Success', 'User created successfully');
+        showError('Add user is not available from the dashboard. New users can sign up via the website, or create users in Supabase Dashboard → Authentication.');
       }
-
-      onSuccess();
     } catch (error: any) {
       showError('Error', error.message || 'Failed to save user');
     } finally {

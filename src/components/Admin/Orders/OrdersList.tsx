@@ -5,7 +5,7 @@ import {
   Package, Truck, CheckCircle, AlertCircle, Loader2, ChevronLeft, ChevronRight,
   BarChart3, RefreshCw
 } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { OrderDetails } from './OrderDetails';
 import {
@@ -66,40 +66,36 @@ export const OrdersList: React.FC = () => {
   const fetchStats = async () => {
     try {
       setStatsLoading(true);
-      const [dashboardResponse, ordersResponse] = await Promise.all([
-        apiClient.get('/admin/analytics/dashboard'),
-        apiClient.get('/admin/orders?limit=100')
-      ]);
-      
-      if (dashboardResponse.success && dashboardResponse.data) {
-        const metrics = dashboardResponse.data.metrics;
-        
-        // Calculate status breakdown from recent orders
-        const statusBreakdown: Record<string, number> = {};
-        if (ordersResponse.success && ordersResponse.data) {
-          ordersResponse.data.forEach((order: Order) => {
-            statusBreakdown[order.status] = (statusBreakdown[order.status] || 0) + 1;
-          });
-        }
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('status, total_amount, payment_status, created_at')
+        .limit(200);
+      const orders = ordersData || [];
+      const statusBreakdown: Record<string, number> = {};
+      orders.forEach((o: Order) => {
+        statusBreakdown[o.status] = (statusBreakdown[o.status] || 0) + 1;
+      });
+      const paidOrders = orders.filter((o: Order) => o.payment_status === 'paid');
+      const totalPaidAmount = paidOrders.reduce((sum: number, o: Order) => sum + parseFloat(o.total_amount || '0'), 0);
+      const avgOrderValue = paidOrders.length > 0 ? totalPaidAmount / paidOrders.length : 0;
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const ordersToday = orders.filter((o: any) => o.created_at && new Date(o.created_at) >= todayStart).length;
+      const revenueToday = orders
+        .filter((o: any) => o.created_at && new Date(o.created_at) >= todayStart && (o.status === 'delivered' || o.status === 'shipped'))
+        .reduce((s: number, o: Order) => s + parseFloat(o.total_amount || '0'), 0);
+      const totalRevenue = orders
+        .filter((o: Order) => o.status === 'delivered' || o.status === 'shipped')
+        .reduce((s: number, o: Order) => s + parseFloat(o.total_amount || '0'), 0);
 
-        // Calculate average order value from recent paid orders
-        const paidOrders = ordersResponse.success && ordersResponse.data 
-          ? ordersResponse.data.filter((o: Order) => o.payment_status === 'paid')
-          : [];
-        const totalPaidAmount = paidOrders.reduce((sum: number, o: Order) => 
-          sum + parseFloat(o.total_amount || '0'), 0);
-        const avgOrderValue = paidOrders.length > 0 ? totalPaidAmount / paidOrders.length : 0;
-
-        setStats({
-          totalOrders: metrics.totalOrders || 0,
-          totalRevenue: metrics.totalRevenue || 0,
-          pendingOrders: metrics.pendingOrders || 0,
-          ordersToday: metrics.ordersToday || 0,
-          revenueToday: metrics.revenueToday || 0,
-          avgOrderValue,
-          statusBreakdown
-        });
-      }
+      setStats({
+        totalOrders: orders.length,
+        totalRevenue,
+        pendingOrders: statusBreakdown['pending'] || 0,
+        ordersToday,
+        revenueToday,
+        avgOrderValue,
+        statusBreakdown
+      });
     } catch (error: any) {
       console.error('Failed to load stats:', error);
     } finally {
@@ -110,21 +106,38 @@ export const OrdersList: React.FC = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: pageSize.toString(),
-        ...(searchTerm && { search: searchTerm }),
-        ...(statusFilter && { status: statusFilter }),
-        ...(paymentStatusFilter && { paymentStatus: paymentStatusFilter })
-      });
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-      const response = await apiClient.get(`/admin/orders?${params}`);
+      let query = supabase
+        .from('orders')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
-      if (response.success) {
-        setOrders(response.data);
-        setTotalPages(response.pagination.totalPages);
-        setTotalItems(response.pagination.total);
+      if (statusFilter) query = query.eq('status', statusFilter);
+      if (paymentStatusFilter) query = query.eq('payment_status', paymentStatusFilter);
+      if (searchTerm) query = query.or(`order_number.ilike.%${searchTerm}%,id.ilike.%${searchTerm}%`);
+
+      const { data, error, count } = await query.range(from, to);
+      if (error) throw error;
+
+      const ordersRaw = data || [];
+      const userIds = [...new Set(ordersRaw.map((o: any) => o.user_id).filter(Boolean))];
+      const profileMap: Record<string, { full_name?: string; email?: string }> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase.from('profiles').select('id, full_name, email').in('id', userIds);
+        (profiles || []).forEach((p: any) => { profileMap[p.id] = p; });
       }
+
+      const ordersWithCustomer = ordersRaw.map((o: any) => ({
+        ...o,
+        customer_name: profileMap[o.user_id]?.full_name || 'Guest',
+        customer_email: profileMap[o.user_id]?.email || ''
+      }));
+
+      setOrders(ordersWithCustomer);
+      setTotalItems(count ?? 0);
+      setTotalPages(Math.max(1, Math.ceil((count ?? 0) / pageSize)));
     } catch (error: any) {
       showNotification({
         type: 'error',

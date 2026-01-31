@@ -11,7 +11,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { ConfirmModal } from '../../Common/Modal';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { normalizeImageUrl, isValidImageUrl, getSafeImageUrl } from '../../../utils/imageUrlUtils';
 
@@ -49,11 +49,9 @@ export const CategoriesList: React.FC = () => {
   const fetchCategories = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/categories');
-
-      if (response.success) {
-        setCategories(response.data);
-      }
+      const { data, error } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
+      if (error) throw error;
+      setCategories((data || []).map((c: any) => ({ ...c, parent_name: null, product_count: c.product_count ?? 0 })));
     } catch (error: any) {
       showError('Error', error.message || 'Failed to load categories');
     } finally {
@@ -66,7 +64,8 @@ export const CategoriesList: React.FC = () => {
 
     try {
       setDeleteLoading(true);
-      await apiClient.delete(`/categories/${selectedCategory.id}`);
+      const { error } = await supabase.from('categories').delete().eq('id', selectedCategory.id);
+      if (error) throw error;
       showSuccess('Success', 'Category deleted successfully');
       setShowDeleteModal(false);
       setSelectedCategory(null);

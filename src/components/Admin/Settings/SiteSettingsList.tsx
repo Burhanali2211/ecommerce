@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Save, RefreshCw, Upload, X, Plus, Globe, Mail, Phone, DollarSign, Truck, FileText, Palette, Settings } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
 
@@ -18,8 +18,8 @@ interface SiteSetting {
 const ESSENTIAL_SETTINGS = [
   { key: 'site_name', type: 'text', category: 'general', description: 'Website name', is_public: true, icon: Globe, defaultValue: 'HimalayanSpicesExports' },
   { key: 'logo_url', type: 'text', category: 'general', description: 'Website logo URL', is_public: true, icon: Upload, defaultValue: '/logo.png' },
-  { key: 'site_description', type: 'text', category: 'general', description: 'Website description/meta description', is_public: true, icon: FileText, defaultValue: 'Premium Kashmir Perfumes & Attars' },
-  { key: 'contact_email', type: 'email', category: 'contact', description: 'Contact email address', is_public: true, icon: Mail, defaultValue: 'admin@perfumes.com' },
+  { key: 'site_description', type: 'text', category: 'general', description: 'Website description/meta description', is_public: true, icon: FileText, defaultValue: 'Premium Kashmir & Himalayan Spices – Saffron, Whole Spices, Teas & Dry Fruits' },
+  { key: 'contact_email', type: 'email', category: 'contact', description: 'Contact email address', is_public: true, icon: Mail, defaultValue: 'support@himalayanspicesexports.com' },
   { key: 'contact_phone', type: 'text', category: 'contact', description: 'Contact phone number', is_public: true, icon: Phone, defaultValue: '+91-XXXXXXXXXX' },
   { key: 'currency', type: 'text', category: 'general', description: 'Default currency code (e.g., INR, USD)', is_public: true, icon: DollarSign, defaultValue: 'INR' },
   { key: 'free_shipping_threshold', type: 'number', category: 'shipping', description: 'Free shipping above this amount', is_public: true, icon: Truck, defaultValue: '2000' },
@@ -43,13 +43,31 @@ export const SiteSettingsList: React.FC = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      console.log('Fetching site settings...');
-      const response = await apiClient.get('/admin/settings/site-settings');
-      console.log('Site settings response:', response);
-
-      if (response.success) {
-        setSettings(response.data);
-        setOriginalSettings(JSON.parse(JSON.stringify(response.data))); // Deep copy for comparison
+      
+      // Fetch all site settings from Supabase
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('*')
+        .order('category', { ascending: true });
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        setSettings(data);
+        setOriginalSettings(JSON.parse(JSON.stringify(data)));
+      } else {
+        // If no settings, create essential ones
+        const essentialSettings = ESSENTIAL_SETTINGS.map((s, idx) => ({
+          id: `temp-${idx}`,
+          setting_key: s.key,
+          setting_value: s.defaultValue,
+          setting_type: s.type,
+          category: s.category,
+          description: s.description,
+          is_public: s.is_public
+        }));
+        setSettings(essentialSettings);
+        setOriginalSettings([]);
       }
     } catch (error: any) {
       console.error('Error fetching site settings:', error);
@@ -99,39 +117,26 @@ export const SiteSettingsList: React.FC = () => {
 
     try {
       setSaving(true);
-      const promises = modified.map(async ({ key, value, isNew }) => {
-        if (isNew) {
-          // Create new setting
-          const essentialSetting = ESSENTIAL_SETTINGS.find(s => s.key === key);
-          if (essentialSetting) {
-            return apiClient.post('/admin/settings/site-settings', {
-              setting_key: key,
-              setting_value: value,
-              setting_type: essentialSetting.type,
-              category: essentialSetting.category,
-              description: essentialSetting.description,
-              is_public: essentialSetting.is_public
-            });
-          }
-        } else {
-          // Update existing setting
-          return apiClient.put(`/admin/settings/site-settings/${key}`, {
-            setting_value: value
-          });
-        }
-      });
-
-      const results = await Promise.all(promises);
-      const allSuccess = results.every(r => r && r.success);
-
-      if (allSuccess) {
-        showSuccess('Settings Saved', `${modified.length} setting(s) saved successfully`);
-        // Fetch fresh settings from server to get updated IDs and values
-        await fetchSettings();
-        window.dispatchEvent(new Event('settingsUpdated'));
-      } else {
-        throw new Error('Some settings failed to save');
+      
+      for (const { key, value } of modified) {
+        const essentialSetting = ESSENTIAL_SETTINGS.find(s => s.key === key);
+        const { error } = await supabase
+          .from('site_settings')
+          .upsert({
+            setting_key: key,
+            setting_value: value,
+            setting_type: essentialSetting?.type || 'text',
+            category: essentialSetting?.category || 'general',
+            description: essentialSetting?.description || '',
+            is_public: essentialSetting?.is_public ?? true
+          }, { onConflict: 'setting_key' });
+        
+        if (error) throw error;
       }
+
+      showSuccess('Settings Saved', `${modified.length} setting(s) saved successfully`);
+      await fetchSettings();
+      window.dispatchEvent(new Event('settingsUpdated'));
     } catch (error: any) {
       console.error('Error saving settings:', error);
       showError('Error Saving Settings', error.message || 'Failed to save settings');
@@ -184,71 +189,59 @@ export const SiteSettingsList: React.FC = () => {
     try {
       setUploading(key);
 
-      // Convert file to base64
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64String = reader.result as string;
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${key}-${Date.now()}.${fileExt}`;
+      const filePath = `settings/${fileName}`;
 
-          // Upload file to backend using dedicated upload endpoint
-          const response = await apiClient.post('/upload/image', {
-            file: base64String,
-            folder: 'settings'
-          });
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('public')
+        .upload(filePath, file, { upsert: true });
 
-          if (response.success && response.data?.url) {
-            // Update the setting with the new URL immediately (file uploads save immediately)
-            try {
-              const existingSetting = settings.find(s => s.setting_key === key);
-              if (existingSetting) {
-                await apiClient.put(`/admin/settings/site-settings/${key}`, {
-                  setting_value: response.data.url
-                });
-              } else {
-                const essentialSetting = ESSENTIAL_SETTINGS.find(s => s.key === key);
-                if (essentialSetting) {
-                  await apiClient.post('/admin/settings/site-settings', {
-                    setting_key: key,
-                    setting_value: response.data.url,
-                    setting_type: essentialSetting.type,
-                    category: essentialSetting.category,
-                    description: essentialSetting.description,
-                    is_public: essentialSetting.is_public
-                  });
-                }
-              }
-              // Update local state
-              handleChange(key, response.data.url);
-              await fetchSettings(); // Refresh to get updated original
-              showSuccess('Upload Successful', 'Logo uploaded and saved successfully');
-              window.dispatchEvent(new Event('settingsUpdated'));
-            } catch (error: any) {
-              showError('Save Failed', 'Logo uploaded but failed to save');
-            }
-          } else {
-            showError('Upload Failed', response.message || 'Failed to upload file');
-          }
-        } catch (error: any) {
-          console.error('Error uploading file:', error);
-          showError('Upload Error', error.message || 'Failed to upload file');
-        } finally {
-          setUploading(null);
-          // Reset file input
-          const fileInput = e.target;
-          if (fileInput) {
-            fileInput.value = '';
-          }
-        }
-      };
-      reader.onerror = () => {
-        showError('Read Error', 'Failed to read file');
-        setUploading(null);
-      };
-      reader.readAsDataURL(file);
+      if (uploadError) {
+        // If storage bucket doesn't exist, just use local path
+        console.warn('Storage upload failed, using local reference:', uploadError);
+        // Convert to base64 as fallback
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = reader.result as string;
+          handleChange(key, base64);
+          showSuccess('File Loaded', 'Image loaded. Click Save to apply changes.');
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('public')
+        .getPublicUrl(filePath);
+
+      // Update the setting
+      const essentialSetting = ESSENTIAL_SETTINGS.find(s => s.key === key);
+      const { error } = await supabase
+        .from('site_settings')
+        .upsert({
+          setting_key: key,
+          setting_value: publicUrl,
+          setting_type: essentialSetting?.type || 'text',
+          category: essentialSetting?.category || 'general',
+          description: essentialSetting?.description || '',
+          is_public: true
+        }, { onConflict: 'setting_key' });
+
+      if (error) throw error;
+
+      handleChange(key, publicUrl);
+      await fetchSettings();
+      showSuccess('Upload Successful', 'Logo uploaded and saved successfully');
+      window.dispatchEvent(new Event('settingsUpdated'));
     } catch (error: any) {
       console.error('Error uploading file:', error);
       showError('Upload Error', error.message || 'Failed to upload file');
+    } finally {
       setUploading(null);
+      e.target.value = '';
     }
   };
 

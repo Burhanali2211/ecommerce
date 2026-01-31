@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, Package } from 'lucide-react';
 import { FormInput, FormTextarea, FormSelect, FormCheckbox } from '../../Common/FormInput';
 import { ImageUpload } from '../../Common/ImageUpload';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
 import { AdminDashboardLayout } from '../Layout/AdminDashboardLayout';
@@ -83,10 +83,9 @@ export const ProductFormPage: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await apiClient.get('/categories');
-      if (response.success) {
-        setCategories(response.data);
-      }
+      const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+      if (error) throw error;
+      setCategories(data || []);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
@@ -95,9 +94,9 @@ export const ProductFormPage: React.FC = () => {
   const fetchProduct = async (productId: string) => {
     try {
       setFetching(true);
-      const response = await apiClient.get(`/admin/products/${productId}`);
-      if (response.success && response.data) {
-        const product = response.data;
+      const { data: product, error } = await supabase.from('products').select('*').eq('id', productId).single();
+      if (error) throw error;
+      if (product) {
         const dimensions = product.dimensions || {};
         
         setFormData({
@@ -250,10 +249,12 @@ export const ProductFormPage: React.FC = () => {
       };
 
       if (isEditMode && id) {
-        await apiClient.put(`/admin/products/${id}`, payload);
+        const { error } = await supabase.from('products').update(payload).eq('id', id);
+        if (error) throw error;
         showSuccess('Success', 'Product updated successfully');
       } else {
-        await apiClient.post('/admin/products', payload);
+        const { error } = await supabase.from('products').insert(payload);
+        if (error) throw error;
         showSuccess('Success', 'Product created successfully');
       }
 

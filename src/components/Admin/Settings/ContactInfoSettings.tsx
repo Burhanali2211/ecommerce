@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, Plus, Edit2, Trash2, Save, X, RefreshCw, Mail, MapPin, MessageCircle, Star, Eye, EyeOff, CheckSquare, Square, Loader2, Filter, Search } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 interface ContactInfo {
@@ -43,10 +43,12 @@ export const ContactInfoSettings: React.FC = () => {
   const fetchContacts = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/admin/settings/contact-info');
-      if (response.success) {
-        setContacts(response.data.sort((a: ContactInfo, b: ContactInfo) => a.display_order - b.display_order));
-      }
+      const { data, error } = await supabase
+        .from('contact_information')
+        .select('*')
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      setContacts((data || []).sort((a: ContactInfo, b: ContactInfo) => (a.display_order ?? 0) - (b.display_order ?? 0)));
     } catch (error: any) {
       showError(error.message || 'Failed to fetch contact information');
     } finally {
@@ -99,7 +101,7 @@ export const ContactInfoSettings: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         contact_type: type,
-        icon_name: selected.icon.name || type
+        icon_name: type
       }));
     }
   };
@@ -107,15 +109,28 @@ export const ContactInfoSettings: React.FC = () => {
   // Save contact
   const handleSave = async () => {
     try {
-      const response = editingContact
-        ? await apiClient.put(`/admin/settings/contact-info/${editingContact.id}`, formData)
-        : await apiClient.post('/admin/settings/contact-info', formData);
-
-      if (response.success) {
-        showSuccess(`Contact ${editingContact ? 'updated' : 'added'} successfully!`);
-        await fetchContacts();
-        closeModal();
+      const payload = {
+        contact_type: formData.contact_type,
+        label: formData.label,
+        value: formData.value,
+        icon_name: formData.icon_name || formData.contact_type
+      };
+      if (editingContact) {
+        const { error } = await supabase
+          .from('contact_information')
+          .update(payload)
+          .eq('id', editingContact.id);
+        if (error) throw error;
+      } else {
+        const maxOrder = contacts.length > 0 ? Math.max(...contacts.map(c => c.display_order ?? 0)) + 1 : 1;
+        const { error } = await supabase
+          .from('contact_information')
+          .insert({ ...payload, display_order: maxOrder, is_active: true, is_primary: false });
+        if (error) throw error;
       }
+      showSuccess(`Contact ${editingContact ? 'updated' : 'added'} successfully!`);
+      await fetchContacts();
+      closeModal();
     } catch (error: any) {
       showError(error.message || 'Error saving contact');
     }
@@ -126,11 +141,10 @@ export const ContactInfoSettings: React.FC = () => {
     if (!confirm('Are you sure you want to delete this contact information?')) return;
 
     try {
-      const response = await apiClient.delete(`/admin/settings/contact-info/${id}`);
-      if (response.success) {
-        showSuccess('Contact deleted successfully!');
-        await fetchContacts();
-      }
+      const { error } = await supabase.from('contact_information').delete().eq('id', id);
+      if (error) throw error;
+      showSuccess('Contact deleted successfully!');
+      await fetchContacts();
     } catch (error: any) {
       showError(error.message || 'Error deleting contact');
     }
@@ -144,16 +158,12 @@ export const ContactInfoSettings: React.FC = () => {
     if (!confirm(`Are you sure you want to delete ${count} contact information entry/entries?`)) return;
 
     try {
-      const response = await apiClient.post('/admin/settings/contact-info/bulk-delete', {
-        ids: Array.from(selectedIds)
-      });
-
-      if (response.success) {
-        showSuccess(response.message || `${count} contact(s) deleted successfully!`);
-        setSelectedIds(new Set());
-        setSelectionMode(false);
-        await fetchContacts();
-      }
+      const { error } = await supabase.from('contact_information').delete().in('id', Array.from(selectedIds));
+      if (error) throw error;
+      showSuccess(`${count} contact(s) deleted successfully!`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      await fetchContacts();
     } catch (error: any) {
       showError(error.message || 'Error deleting contacts');
     }
@@ -191,18 +201,13 @@ export const ContactInfoSettings: React.FC = () => {
   // Toggle active
   const toggleActive = async (id: string, currentStatus: boolean) => {
     try {
-      const contact = contacts.find(c => c.id === id);
-      if (!contact) return;
-
-      const response = await apiClient.put(`/admin/settings/contact-info/${id}`, {
-        ...contact,
-        is_active: !currentStatus
-      });
-
-      if (response.success) {
-        showSuccess(`Contact ${!currentStatus ? 'activated' : 'deactivated'}`);
-        await fetchContacts();
-      }
+      const { error } = await supabase
+        .from('contact_information')
+        .update({ is_active: !currentStatus })
+        .eq('id', id);
+      if (error) throw error;
+      showSuccess(`Contact ${!currentStatus ? 'activated' : 'deactivated'}`);
+      await fetchContacts();
     } catch (error: any) {
       showError(error.message || 'Error updating contact status');
     }
@@ -211,18 +216,19 @@ export const ContactInfoSettings: React.FC = () => {
   // Set as primary
   const setPrimary = async (id: string) => {
     try {
-      const contact = contacts.find(c => c.id === id);
-      if (!contact) return;
-
-      const response = await apiClient.put(`/admin/settings/contact-info/${id}`, {
-        ...contact,
-        is_primary: true
-      });
-
-      if (response.success) {
-        showSuccess('Contact set as primary');
-        await fetchContacts();
-      }
+      // Clear other primary flags then set this one
+      const { error: clearError } = await supabase
+        .from('contact_information')
+        .update({ is_primary: false })
+        .neq('id', id);
+      if (clearError) throw clearError;
+      const { error } = await supabase
+        .from('contact_information')
+        .update({ is_primary: true })
+        .eq('id', id);
+      if (error) throw error;
+      showSuccess('Contact set as primary');
+      await fetchContacts();
     } catch (error: any) {
       showError(error.message || 'Error setting primary contact');
     }

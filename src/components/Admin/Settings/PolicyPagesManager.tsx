@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, ExternalLink, Plus, Edit2, Globe, AlertCircle, Loader2, RefreshCw, X } from 'lucide-react';
-import { api, API_ENDPOINTS } from '@/config/api';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 interface PolicyPage {
@@ -88,12 +88,14 @@ export const PolicyPagesManager: React.FC = () => {
 
   const fetchFooterLinks = async () => {
     try {
-      const response = await api.get(API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS);
-      const data = response.data;
-      if (data.success) {
-        setFooterLinks(data.data);
-        updatePolicyPagesStatus(data.data);
-      }
+      const { data, error } = await supabase
+        .from('footer_links')
+        .select('*')
+        .order('display_order', { ascending: true });
+      
+      if (error) throw error;
+      setFooterLinks(data || []);
+      updatePolicyPagesStatus(data || []);
     } catch (error: any) {
       console.error('Error fetching footer links:', error);
     }
@@ -198,22 +200,21 @@ export const PolicyPagesManager: React.FC = () => {
       const newLink = {
         section_name: formData.section_name,
         link_text: formData.link_text,
-        link_url: selectedPage.route, // Use the route, not the Razorpay URL
+        link_url: selectedPage.route,
         display_order: maxOrder + 1,
         is_active: true,
         opens_new_tab: formData.opens_new_tab,
       };
 
-      const response = await api.post(API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS, newLink);
-      const data = response.data;
+      const { error } = await supabase
+        .from('footer_links')
+        .insert(newLink);
 
-      if (data.success) {
-        showSuccess(`${formData.link_text} added to footer links successfully!`);
-        await fetchFooterLinks();
-        closeAddModal();
-      } else {
-        showError(data.message || 'Failed to add link');
-      }
+      if (error) throw error;
+      
+      showSuccess(`${formData.link_text} added to footer links successfully!`);
+      await fetchFooterLinks();
+      closeAddModal();
     } catch (error: any) {
       showError(error.message || 'Error adding link to footer');
     }

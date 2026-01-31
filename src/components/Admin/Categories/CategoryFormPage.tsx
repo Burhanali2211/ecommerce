@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2, Tag } from 'lucide-react';
 import { FormInput, FormTextarea, FormSelect, FormCheckbox } from '../../Common/FormInput';
 import { ImageUpload } from '../../Common/ImageUpload';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
 import { AdminDashboardLayout } from '../Layout/AdminDashboardLayout';
@@ -53,14 +53,12 @@ export const CategoryFormPage: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await apiClient.get('/categories');
-      if (response.success) {
-        // Filter out current category and its children to prevent circular references
-        const availableCategories = isEditMode && id
-          ? response.data.filter((cat: any) => cat.id !== id)
-          : response.data;
-        setCategories(availableCategories);
-      }
+      const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+      if (error) throw error;
+      const availableCategories = isEditMode && id
+        ? (data || []).filter((cat: any) => cat.id !== id)
+        : (data || []);
+      setCategories(availableCategories);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
@@ -69,30 +67,17 @@ export const CategoryFormPage: React.FC = () => {
   const fetchCategory = async (categoryId: string) => {
     try {
       setFetching(true);
-      const response = await apiClient.get(`/categories/${categoryId}`);
-      if (response.success && response.category) {
-        const category = response.category;
-        // Handle both camelCase and snake_case from API
+      const { data: category, error } = await supabase.from('categories').select('*').eq('id', categoryId).single();
+      if (error) throw error;
+      if (category) {
         setFormData({
           name: category.name || '',
           slug: category.slug || '',
           description: category.description || '',
-          image_url: category.image_url || category.imageUrl || '',
-          parent_id: category.parent_id || category.parentId || '',
-          sort_order: (category.sort_order || category.sortOrder)?.toString() || '0',
-          is_active: category.is_active !== undefined ? category.is_active : (category.isActive !== undefined ? category.isActive : true)
-        });
-      } else if (response.success && response.data) {
-        // Fallback to response.data if category is not available
-        const category = response.data;
-        setFormData({
-          name: category.name || '',
-          slug: category.slug || '',
-          description: category.description || '',
-          image_url: category.image_url || category.imageUrl || '',
-          parent_id: category.parent_id || category.parentId || '',
-          sort_order: (category.sort_order || category.sortOrder)?.toString() || '0',
-          is_active: category.is_active !== undefined ? category.is_active : (category.isActive !== undefined ? category.isActive : true)
+          image_url: category.image_url || '',
+          parent_id: category.parent_id || '',
+          sort_order: (category.sort_order != null ? category.sort_order : 0).toString(),
+          is_active: category.is_active !== undefined ? category.is_active : true
         });
       }
     } catch (error: any) {
@@ -158,17 +143,19 @@ export const CategoryFormPage: React.FC = () => {
         name: formData.name,
         slug: formData.slug,
         description: formData.description || null,
-        imageUrl: formData.image_url || null,
-        parentId: formData.parent_id || null,
-        sortOrder: parseInt(formData.sort_order),
-        isActive: formData.is_active
+        image_url: formData.image_url || null,
+        parent_id: formData.parent_id || null,
+        sort_order: parseInt(formData.sort_order) || 0,
+        is_active: formData.is_active
       };
 
       if (isEditMode && id) {
-        await apiClient.put(`/categories/${id}`, payload);
+        const { error } = await supabase.from('categories').update(payload).eq('id', id);
+        if (error) throw error;
         showSuccess('Success', 'Category updated successfully');
       } else {
-        await apiClient.post('/categories', payload);
+        const { error } = await supabase.from('categories').insert(payload);
+        if (error) throw error;
         showSuccess('Success', 'Category created successfully');
       }
 

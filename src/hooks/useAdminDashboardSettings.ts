@@ -53,18 +53,18 @@ export const useAdminDashboardSettings = () => {
         // Try to fetch dashboard settings from site_settings table
         const { data, error } = await supabase
           .from('site_settings')
-          .select('key, value')
-          .like('key', 'dashboard_%');
+          .select('setting_key, setting_value')
+          .like('setting_key', 'dashboard_%');
         
         if (error) throw error;
         
         if (data && data.length > 0) {
           // Convert the key-value pairs to our settings format
           const settingsObj: Partial<DashboardSettings> = {};
-          data.forEach((item: { key: string; value: string }) => {
-            const settingKey = item.key as keyof DashboardSettings;
+          data.forEach((item: { setting_key: string; setting_value: string }) => {
+            const settingKey = item.setting_key as keyof DashboardSettings;
             if (settingKey in defaultSettings) {
-              settingsObj[settingKey] = item.value || defaultSettings[settingKey];
+              settingsObj[settingKey] = item.setting_value || defaultSettings[settingKey];
             }
           });
           

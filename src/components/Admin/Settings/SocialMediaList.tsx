@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Edit2, Trash2, ExternalLink, Eye, EyeOff } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { SocialMediaForm } from './SocialMediaForm';
 
@@ -33,11 +33,12 @@ export const SocialMediaList: React.FC = () => {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/admin/settings/social-media');
-
-      if (response.success) {
-        setAccounts(response.data);
-      }
+      const { data, error } = await supabase
+        .from('social_media_accounts')
+        .select('*')
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      setAccounts(data || []);
     } catch (error: any) {
       showError(error.message || 'Failed to fetch social media accounts');
     } finally {
@@ -51,12 +52,10 @@ export const SocialMediaList: React.FC = () => {
     }
 
     try {
-      const response = await apiClient.delete(`/admin/settings/social-media/${id}`);
-
-      if (response.success) {
-        showSuccess('Social media account deleted successfully');
-        fetchAccounts();
-      }
+      const { error } = await supabase.from('social_media_accounts').delete().eq('id', id);
+      if (error) throw error;
+      showSuccess('Social media account deleted successfully');
+      fetchAccounts();
     } catch (error: any) {
       showError(error.message || 'Failed to delete social media account');
     }
@@ -75,14 +74,13 @@ export const SocialMediaList: React.FC = () => {
 
   const toggleActive = async (account: SocialMediaAccount) => {
     try {
-      const response = await apiClient.put(`/admin/settings/social-media/${account.id}`, {
-        is_active: !account.is_active
-      });
-
-      if (response.success) {
-        showSuccess(`Social media account ${!account.is_active ? 'activated' : 'deactivated'}`);
-        fetchAccounts();
-      }
+      const { error } = await supabase
+        .from('social_media_accounts')
+        .update({ is_active: !account.is_active })
+        .eq('id', account.id);
+      if (error) throw error;
+      showSuccess(`Social media account ${!account.is_active ? 'activated' : 'deactivated'}`);
+      fetchAccounts();
     } catch (error: any) {
       showError(error.message || 'Failed to update social media account');
     }

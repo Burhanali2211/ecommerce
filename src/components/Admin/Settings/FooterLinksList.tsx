@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Edit2, Trash2, Eye, EyeOff, ExternalLink } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { FooterLinkForm } from './FooterLinkForm';
 
@@ -30,11 +30,12 @@ export const FooterLinksList: React.FC = () => {
   const fetchLinks = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/admin/settings/footer-links');
-
-      if (response.success) {
-        setLinks(response.data);
-      }
+      const { data, error } = await supabase
+        .from('footer_links')
+        .select('*')
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      setLinks(data || []);
     } catch (error: any) {
       showError(error.message || 'Failed to fetch footer links');
     } finally {
@@ -48,12 +49,10 @@ export const FooterLinksList: React.FC = () => {
     }
 
     try {
-      const response = await apiClient.delete(`/admin/settings/footer-links/${id}`);
-
-      if (response.success) {
-        showSuccess('Footer link deleted successfully');
-        fetchLinks();
-      }
+      const { error } = await supabase.from('footer_links').delete().eq('id', id);
+      if (error) throw error;
+      showSuccess('Footer link deleted successfully');
+      fetchLinks();
     } catch (error: any) {
       showError(error.message || 'Failed to delete footer link');
     }
@@ -72,14 +71,13 @@ export const FooterLinksList: React.FC = () => {
 
   const toggleActive = async (link: FooterLink) => {
     try {
-      const response = await apiClient.put(`/admin/settings/footer-links/${link.id}`, {
-        is_active: !link.is_active
-      });
-
-      if (response.success) {
-        showSuccess(`Footer link ${!link.is_active ? 'activated' : 'deactivated'}`);
-        fetchLinks();
-      }
+      const { error } = await supabase
+        .from('footer_links')
+        .update({ is_active: !link.is_active })
+        .eq('id', link.id);
+      if (error) throw error;
+      showSuccess(`Footer link ${!link.is_active ? 'activated' : 'deactivated'}`);
+      fetchLinks();
     } catch (error: any) {
       showError(error.message || 'Failed to update footer link');
     }

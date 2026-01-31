@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 interface ContactInfo {
@@ -64,14 +64,25 @@ export const ContactInfoForm: React.FC<ContactInfoFormProps> = ({ contact, onClo
     setLoading(true);
 
     try {
-      const response = contact?.id
-        ? await apiClient.put(`/admin/settings/contact-info/${contact.id}`, formData)
-        : await apiClient.post('/admin/settings/contact-info', formData);
-
-      if (response.success) {
-        showSuccess(contact?.id ? 'Contact information updated successfully' : 'Contact information created successfully');
-        onClose();
+      const payload = {
+        contact_type: formData.contact_type,
+        label: formData.label,
+        value: formData.value,
+        is_primary: formData.is_primary,
+        is_active: formData.is_active,
+        display_order: formData.display_order ?? 0,
+        icon_name: formData.icon_name,
+        additional_info: formData.additional_info || {}
+      };
+      if (contact?.id) {
+        const { error } = await supabase.from('contact_information').update(payload).eq('id', contact.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('contact_information').insert(payload);
+        if (error) throw error;
       }
+      showSuccess(contact?.id ? 'Contact information updated successfully' : 'Contact information created successfully');
+      onClose();
     } catch (error: any) {
       showError(error.message || 'Failed to save contact information');
     } finally {

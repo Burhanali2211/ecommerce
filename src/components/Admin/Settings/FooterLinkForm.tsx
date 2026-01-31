@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 interface FooterLink {
@@ -50,14 +50,23 @@ export const FooterLinkForm: React.FC<FooterLinkFormProps> = ({ link, onClose })
     setLoading(true);
 
     try {
-      const response = link?.id
-        ? await apiClient.put(`/admin/settings/footer-links/${link.id}`, formData)
-        : await apiClient.post('/admin/settings/footer-links', formData);
-
-      if (response.success) {
-        showSuccess(link?.id ? 'Footer link updated successfully' : 'Footer link created successfully');
-        onClose();
+      const payload = {
+        section_name: formData.section_name,
+        link_text: formData.link_text,
+        link_url: formData.link_url,
+        display_order: formData.display_order ?? 0,
+        is_active: formData.is_active,
+        opens_new_tab: formData.opens_new_tab
+      };
+      if (link?.id) {
+        const { error } = await supabase.from('footer_links').update(payload).eq('id', link.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('footer_links').insert(payload);
+        if (error) throw error;
       }
+      showSuccess(link?.id ? 'Footer link updated successfully' : 'Footer link created successfully');
+      onClose();
     } catch (error: any) {
       showError(error.message || 'Failed to save footer link');
     } finally {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 interface SocialMediaAccount {
@@ -75,17 +75,29 @@ export const SocialMediaForm: React.FC<SocialMediaFormProps> = ({ account, onClo
     setLoading(true);
 
     try {
-      const response = account?.id
-        ? await apiClient.put(`/admin/settings/social-media/${account.id}`, formData)
-        : await apiClient.post('/admin/settings/social-media', formData);
-
-      if (response.success) {
-        showSuccess(
-          account?.id ? 'Social Media Account Updated' : 'Social Media Account Created',
-          account?.id ? 'Social media account updated successfully' : 'Social media account created successfully'
-        );
-        onClose();
+      const payload = {
+        platform: formData.platform,
+        platform_name: formData.platform_name,
+        url: formData.url,
+        username: formData.username,
+        icon_name: formData.icon_name,
+        is_active: formData.is_active,
+        display_order: formData.display_order ?? 0,
+        follower_count: formData.follower_count ?? 0,
+        description: formData.description || ''
+      };
+      if (account?.id) {
+        const { error } = await supabase.from('social_media_accounts').update(payload).eq('id', account.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('social_media_accounts').insert(payload);
+        if (error) throw error;
       }
+      showSuccess(
+        account?.id ? 'Social Media Account Updated' : 'Social Media Account Created',
+        account?.id ? 'Social media account updated successfully' : 'Social media account created successfully'
+      );
+      onClose();
     } catch (error: any) {
       showError('Error Saving Account', error.message || 'Failed to save social media account');
     } finally {

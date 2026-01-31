@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Share2, Plus, Edit2, Trash2, Save, X, RefreshCw, ChevronUp, ChevronDown, Eye, EyeOff, CheckSquare, Square, Loader2, Filter, Search, ExternalLink } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 interface SocialMediaAccount {
@@ -51,10 +51,12 @@ export const SocialMediaSettings: React.FC = () => {
   const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/admin/settings/social-media');
-      if (response.success) {
-        setAccounts(response.data.sort((a: SocialMediaAccount, b: SocialMediaAccount) => a.display_order - b.display_order));
-      }
+      const { data, error } = await supabase
+        .from('social_media_accounts')
+        .select('*')
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      setAccounts((data || []).sort((a: SocialMediaAccount, b: SocialMediaAccount) => (a.display_order ?? 0) - (b.display_order ?? 0)));
     } catch (error: any) {
       showError(error.message || 'Failed to fetch social media accounts');
     } finally {
@@ -126,19 +128,31 @@ export const SocialMediaSettings: React.FC = () => {
   const handleSave = async () => {
     try {
       const payload = {
-        ...formData,
-        follower_count: formData.follower_count ? parseInt(formData.follower_count) : null
+        platform: formData.platform,
+        platform_name: formData.platform_name,
+        url: formData.url,
+        username: formData.username || null,
+        icon_name: formData.icon_name,
+        follower_count: formData.follower_count ? parseInt(formData.follower_count, 10) : null,
+        description: formData.description || null
       };
 
-      const response = editingAccount
-        ? await apiClient.put(`/admin/settings/social-media/${editingAccount.id}`, payload)
-        : await apiClient.post('/admin/settings/social-media', payload);
-
-      if (response.success) {
-        showSuccess(`Account ${editingAccount ? 'updated' : 'added'} successfully!`);
-        await fetchAccounts();
-        closeModal();
+      if (editingAccount) {
+        const { error } = await supabase
+          .from('social_media_accounts')
+          .update(payload)
+          .eq('id', editingAccount.id);
+        if (error) throw error;
+      } else {
+        const maxOrder = accounts.length > 0 ? Math.max(...accounts.map(a => a.display_order ?? 0)) + 1 : 1;
+        const { error } = await supabase
+          .from('social_media_accounts')
+          .insert({ ...payload, display_order: maxOrder, is_active: true });
+        if (error) throw error;
       }
+      showSuccess(`Account ${editingAccount ? 'updated' : 'added'} successfully!`);
+      await fetchAccounts();
+      closeModal();
     } catch (error: any) {
       showError(error.message || 'Error saving account');
     }
@@ -149,11 +163,10 @@ export const SocialMediaSettings: React.FC = () => {
     if (!confirm('Are you sure you want to delete this social media account?')) return;
 
     try {
-      const response = await apiClient.delete(`/admin/settings/social-media/${id}`);
-      if (response.success) {
-        showSuccess('Account deleted successfully!');
-        await fetchAccounts();
-      }
+      const { error } = await supabase.from('social_media_accounts').delete().eq('id', id);
+      if (error) throw error;
+      showSuccess('Account deleted successfully!');
+      await fetchAccounts();
     } catch (error: any) {
       showError(error.message || 'Error deleting account');
     }
@@ -167,16 +180,12 @@ export const SocialMediaSettings: React.FC = () => {
     if (!confirm(`Are you sure you want to delete ${count} social media account(s)?`)) return;
 
     try {
-      const response = await apiClient.post('/admin/settings/social-media/bulk-delete', {
-        ids: Array.from(selectedIds)
-      });
-
-      if (response.success) {
-        showSuccess(response.message || `${count} account(s) deleted successfully!`);
-        setSelectedIds(new Set());
-        setSelectionMode(false);
-        await fetchAccounts();
-      }
+      const { error } = await supabase.from('social_media_accounts').delete().in('id', Array.from(selectedIds));
+      if (error) throw error;
+      showSuccess(`${count} account(s) deleted successfully!`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      await fetchAccounts();
     } catch (error: any) {
       showError(error.message || 'Error deleting accounts');
     }
@@ -214,18 +223,13 @@ export const SocialMediaSettings: React.FC = () => {
   // Toggle active status
   const toggleActive = async (id: string, currentStatus: boolean) => {
     try {
-      const account = accounts.find(a => a.id === id);
-      if (!account) return;
-
-      const response = await apiClient.put(`/admin/settings/social-media/${id}`, {
-        ...account,
-        is_active: !currentStatus
-      });
-
-      if (response.success) {
-        showSuccess(`Account ${!currentStatus ? 'activated' : 'deactivated'}`);
-        await fetchAccounts();
-      }
+      const { error } = await supabase
+        .from('social_media_accounts')
+        .update({ is_active: !currentStatus })
+        .eq('id', id);
+      if (error) throw error;
+      showSuccess(`Account ${!currentStatus ? 'activated' : 'deactivated'}`);
+      await fetchAccounts();
     } catch (error: any) {
       showError(error.message || 'Error updating account status');
     }
@@ -251,11 +255,13 @@ export const SocialMediaSettings: React.FC = () => {
 
     // Save to backend
     try {
-      await Promise.all(
-        newAccounts.map(account =>
-          apiClient.put(`/admin/settings/social-media/${account.id}`, account)
-        )
-      );
+      for (const account of newAccounts) {
+        const { error } = await supabase
+          .from('social_media_accounts')
+          .update({ display_order: account.display_order })
+          .eq('id', account.id);
+        if (error) throw error;
+      }
     } catch (error: any) {
       showError(error.message || 'Error updating order');
       await fetchAccounts();

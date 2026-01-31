@@ -3,7 +3,7 @@ import {
   ArrowLeft, Package, Truck, Printer, Loader2, AlertCircle, CheckCircle,
   DollarSign, User, MapPin, Calendar, CreditCard, Edit, Save, X
 } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { ConfirmModal } from '../../Common/Modal';
 import {
@@ -71,14 +71,59 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
   const fetchOrderDetails = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/admin/orders/${orderId}`);
-
-      if (response.success) {
-        setOrder(response.data);
-        setNewStatus(response.data.status);
-        setNewPaymentStatus(response.data.payment_status);
-        setTrackingNumber(response.data.tracking_number || '');
+      const { data: orderRow, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+      if (error) throw error;
+      if (!orderRow) {
+        setOrder(null);
+        return;
       }
+      const { data: items } = await supabase
+        .from('order_items')
+        .select('*, products(name, images)')
+        .eq('order_id', orderId);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', orderRow.user_id)
+        .single();
+      const orderData: OrderData = {
+        id: orderRow.id,
+        order_number: orderRow.order_number || orderRow.id,
+        customer_name: profile?.full_name || 'Guest',
+        customer_email: profile?.email || '',
+        status: orderRow.status,
+        payment_status: orderRow.payment_status || 'pending',
+        payment_method: orderRow.payment_method || 'cod',
+        razorpay_payment_id: orderRow.razorpay_payment_id,
+        razorpay_order_id: orderRow.razorpay_order_id,
+        payment_method_details: orderRow.payment_method_details,
+        subtotal: orderRow.subtotal != null ? String(orderRow.subtotal) : '0',
+        tax_amount: orderRow.tax_amount != null ? String(orderRow.tax_amount) : '0',
+        shipping_amount: orderRow.shipping_amount != null ? String(orderRow.shipping_amount) : '0',
+        discount_amount: orderRow.discount_amount != null ? String(orderRow.discount_amount) : '0',
+        total_amount: orderRow.total_amount != null ? String(orderRow.total_amount) : '0',
+        shipping_address: orderRow.shipping_address || {},
+        billing_address: orderRow.billing_address || {},
+        tracking_number: orderRow.tracking_number || '',
+        created_at: orderRow.created_at,
+        items: (items || []).map((i: any) => ({
+          id: i.id,
+          product_id: i.product_id,
+          product_name: i.products?.name || 'Product',
+          product_image: Array.isArray(i.products?.images) ? i.products.images[0] : '',
+          quantity: i.quantity,
+          unit_price: String(i.unit_price || 0),
+          total_price: String((i.quantity || 0) * parseFloat(i.unit_price || '0'))
+        }))
+      };
+      setOrder(orderData);
+      setNewStatus(orderData.status);
+      setNewPaymentStatus(orderData.payment_status);
+      setTrackingNumber(orderData.tracking_number || '');
     } catch (error: any) {
       showError(error.message || 'Failed to load order details');
     } finally {
@@ -94,7 +139,8 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
 
     try {
       setUpdating(true);
-      await apiClient.patch(`/admin/orders/${orderId}/status`, { status: newStatus });
+      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+      if (error) throw error;
       showSuccess('Order status updated successfully');
       setShowStatusModal(false);
       fetchOrderDetails();
@@ -110,16 +156,10 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
 
     try {
       setUpdating(true);
-      const response = await apiClient.patch(`/admin/orders/${orderId}/payment-status`, { 
-        payment_status: newPaymentStatus 
-      });
-      
-      if (response.success) {
-        showSuccess('Payment status updated successfully');
-        await fetchOrderDetails();
-      } else {
-        showError(response.message || 'Failed to update payment status');
-      }
+      const { error } = await supabase.from('orders').update({ payment_status: newPaymentStatus }).eq('id', orderId);
+      if (error) throw error;
+      showSuccess('Payment status updated successfully');
+      await fetchOrderDetails();
     } catch (error: any) {
       showError(error.message || 'Failed to update payment status');
     } finally {
@@ -137,16 +177,10 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
 
     try {
       setUpdating(true);
-      const response = await apiClient.patch(`/admin/orders/${orderId}/tracking`, { 
-        tracking_number: trimmedTracking || null 
-      });
-      
-      if (response.success) {
-        showSuccess(trimmedTracking ? 'Tracking number updated successfully' : 'Tracking number cleared');
-        await fetchOrderDetails();
-      } else {
-        showError(response.message || 'Failed to update tracking number');
-      }
+      const { error } = await supabase.from('orders').update({ tracking_number: trimmedTracking || null }).eq('id', orderId);
+      if (error) throw error;
+      showSuccess(trimmedTracking ? 'Tracking number updated successfully' : 'Tracking number cleared');
+      await fetchOrderDetails();
     } catch (error: any) {
       showError(error.message || 'Failed to update tracking number');
     } finally {
@@ -155,13 +189,8 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
   };
 
   const handlePrintInvoice = async () => {
-    try {
-      const response = await apiClient.get(`/admin/orders/${orderId}/invoice`);
-      if (response.success) {
-        showSuccess('Invoice data retrieved. Print functionality coming soon.');
-      }
-    } catch (error: any) {
-      showError(error.message || 'Failed to retrieve invoice');
+    if (order) {
+      window.print();
     }
   };
 

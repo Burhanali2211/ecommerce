@@ -22,7 +22,7 @@ import {
   PieChart,
   RefreshCw
 } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { AdminDashboardLayout } from '../Layout/AdminDashboardLayout';
 
@@ -82,13 +82,93 @@ export const AdminDashboardHome: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/admin/analytics/dashboard');
 
-      if (response.success) {
-        setMetrics(response.data.metrics);
-        setTopProducts(response.data.topProducts || []);
-        setRecentOrders(response.data.recentOrders || []);
-        setLowStockProducts(response.data.lowStockProductsList || []);
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayIso = todayStart.toISOString();
+
+      const [
+        { count: totalUsers },
+        { count: newUsersToday },
+        { count: totalProducts },
+        { count: totalOrders },
+        { count: pendingOrders },
+        ordersRes,
+        profilesRes,
+        productsAllRes,
+        lowStockRes
+      ] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', todayIso),
+        supabase.from('products').select('*', { count: 'exact', head: true }),
+        supabase.from('orders').select('*', { count: 'exact', head: true }),
+        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('orders').select('id, order_number, total_amount, status, created_at, user_id').order('created_at', { ascending: false }).limit(10),
+        supabase.from('profiles').select('id, full_name, email'),
+        supabase.from('products').select('id, name, price, images, stock, min_stock_level'),
+        supabase.from('products').select('id, name, price, images, stock, min_stock_level').lte('stock', 20).limit(10)
+      ]);
+
+      const orders = ordersRes.data || [];
+      const profiles = profilesRes.data || [];
+      const profileMap = Object.fromEntries(profiles.map((p: any) => [p.id, p]));
+      const ordersToday = orders.filter((o: any) => o.created_at >= todayIso).length;
+      const revenueToday = orders
+        .filter((o: any) => o.created_at >= todayIso && (o.status === 'delivered' || o.status === 'shipped'))
+        .reduce((sum: number, o: any) => sum + parseFloat(o.total_amount || '0'), 0);
+      const allOrdersForRevenue = await supabase.from('orders').select('total_amount, status').in('status', ['delivered', 'shipped']);
+      const totalRevenue = (allOrdersForRevenue.data || []).reduce((sum: number, o: any) => sum + parseFloat(o.total_amount || '0'), 0);
+      const lowStockProductsCount = (productsAllRes.data || []).filter((p: any) => (p.min_stock_level != null ? p.stock <= p.min_stock_level : p.stock <= 20)).length;
+
+      setMetrics({
+        totalUsers: totalUsers ?? 0,
+        totalProducts: totalProducts ?? 0,
+        totalOrders: totalOrders ?? 0,
+        totalRevenue,
+        pendingOrders: pendingOrders ?? 0,
+        lowStockProducts: lowStockProductsCount,
+        newUsersToday: newUsersToday ?? 0,
+        ordersToday,
+        revenueToday
+      });
+
+      setRecentOrders(orders.map((o: any) => ({
+        id: o.id,
+        order_number: o.order_number || o.id,
+        total_amount: o.total_amount,
+        status: o.status,
+        created_at: o.created_at,
+        customer_name: profileMap[o.user_id]?.full_name || 'Guest',
+        customer_email: profileMap[o.user_id]?.email || ''
+      })));
+
+      const lowStockList = (lowStockRes.data || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        stock: p.stock,
+        min_stock_level: p.min_stock_level ?? 20,
+        price: String(p.price),
+        images: p.images || []
+      }));
+      setLowStockProducts(lowStockList);
+
+      const orderItemsRes = await supabase.from('order_items').select('product_id, quantity').limit(500);
+      const orderItems = orderItemsRes.data || [];
+      const soldByProduct: Record<string, number> = {};
+      orderItems.forEach((oi: any) => {
+        soldByProduct[oi.product_id] = (soldByProduct[oi.product_id] || 0) + (oi.quantity || 0);
+      });
+      const productIds = Object.entries(soldByProduct).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id]) => id);
+      if (productIds.length > 0) {
+        const topProdsRes = await supabase.from('products').select('id, name, price, images, stock').in('id', productIds);
+        const topProds = (topProdsRes.data || []).map((p: any) => ({
+          ...p,
+          total_sold: String(soldByProduct[p.id] || 0)
+        })).sort((a, b) => parseInt(b.total_sold, 10) - parseInt(a.total_sold, 10));
+        setTopProducts(topProds);
+      } else {
+        const fallback = (productsAllRes.data || []).slice(0, 5).map((p: any) => ({ ...p, total_sold: '0' }));
+        setTopProducts(fallback);
       }
     } catch (error: any) {
       showError(error.message || 'Failed to load dashboard data');

@@ -69,7 +69,7 @@ const TermsOfServicePage: React.FC = () => {
         },
         {
           subtitle: 'Authenticity',
-          text: 'All our perfumes and attars are 100% authentic and sourced directly from Kashmir. We guarantee the quality and authenticity of all products sold.'
+          text: 'All our spices and products are 100% authentic and sourced directly from Kashmir and the Himalayas. We guarantee the quality and authenticity of all products sold.'
         },
         {
           subtitle: 'Variations',

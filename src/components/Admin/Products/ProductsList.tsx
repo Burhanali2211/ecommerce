@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Edit, Trash2, Package } from 'lucide-react';
 import { DataTable, Column } from '../../Common/DataTable';
 import { ConfirmModal } from '../../Common/Modal';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
 import { isValidImageUrl, getFirstValidImage } from '../../../utils/imageUrlUtils';
@@ -45,21 +45,45 @@ export const ProductsList: React.FC = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: pageSize.toString(),
-        ...(searchTerm && { search: searchTerm }),
-        ...(categoryFilter && { category: categoryFilter }),
-        ...(statusFilter && { status: statusFilter })
-      });
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-      const response = await apiClient.get(`/admin/products?${params}`);
+      let query = supabase
+        .from('products')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
-      if (response.success) {
-        setProducts(response.data);
-        setTotalPages(response.pagination.totalPages);
-        setTotalItems(response.pagination.total);
+      if (categoryFilter) query = query.eq('category_id', categoryFilter);
+      if (statusFilter === 'active') query = query.eq('is_active', true);
+      if (statusFilter === 'inactive') query = query.eq('is_active', false);
+      if (searchTerm) query = query.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
+
+      const { data: productsData, error, count } = await query.range(from, to);
+      if (error) throw error;
+
+      const rows = productsData || [];
+      const categoryIds = [...new Set(rows.map((p: any) => p.category_id).filter(Boolean))];
+      const categoryMap: Record<string, string> = {};
+      if (categoryIds.length > 0) {
+        const { data: cats } = await supabase.from('categories').select('id, name').in('id', categoryIds);
+        (cats || []).forEach((c: any) => { categoryMap[c.id] = c.name; });
       }
+
+      const list = rows.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price: String(p.price),
+        original_price: p.original_price != null ? String(p.original_price) : '',
+        stock: p.stock ?? 0,
+        category_name: categoryMap[p.category_id] || '—',
+        is_active: p.is_active ?? true,
+        images: p.images || [],
+        created_at: p.created_at
+      }));
+
+      setProducts(list);
+      setTotalItems(count ?? 0);
+      setTotalPages(Math.max(1, Math.ceil((count ?? 0) / pageSize)));
     } catch (error: any) {
       showError('Error', error.message || 'Failed to load products');
     } finally {
@@ -72,7 +96,8 @@ export const ProductsList: React.FC = () => {
 
     try {
       setDeleteLoading(true);
-      await apiClient.delete(`/admin/products/${selectedProduct.id}`);
+      const { error } = await supabase.from('products').delete().eq('id', selectedProduct.id);
+      if (error) throw error;
       showSuccess('Success', 'Product deleted successfully');
       setShowDeleteModal(false);
       setSelectedProduct(null);

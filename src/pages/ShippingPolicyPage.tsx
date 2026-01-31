@@ -35,7 +35,7 @@ const ShippingPolicyPage: React.FC = () => {
             transition={{ delay: 0.4 }}
             className="text-xl text-orange-100"
           >
-            Fast, secure delivery of authentic Kashmir perfumes
+            Fast, secure delivery of authentic Kashmir & Himalayan spices
           </motion.p>
           <motion.p
             initial={{ y: 20, opacity: 0 }}
@@ -59,7 +59,7 @@ const ShippingPolicyPage: React.FC = () => {
         >
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Shipping Overview</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            We ship our authentic Kashmir perfumes and attars across India and select international locations. 
+            We ship our authentic Kashmir and Himalayan spices across India and select international locations. 
             All orders are carefully packaged to ensure your products arrive in perfect condition.
           </p>
           <p className="text-gray-600 leading-relaxed">
@@ -195,7 +195,7 @@ const ShippingPolicyPage: React.FC = () => {
             <div className="flex items-start">
               <div className="w-2 h-2 bg-orange-600 rounded-full mt-2 mr-3"></div>
               <p className="text-gray-600">
-                <strong>Secure Packaging:</strong> All perfume bottles are wrapped in bubble wrap and placed in sturdy boxes 
+                <strong>Secure Packaging:</strong> All products are wrapped in bubble wrap and placed in sturdy boxes 
                 to prevent breakage during transit.
               </p>
             </div>

@@ -11,7 +11,8 @@ import {
   X,
   CheckCircle2
 } from 'lucide-react';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { AdminLayout } from '../Layout/AdminLayout';
 
@@ -43,6 +44,7 @@ export const AdminPOSPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [successOrder, setSuccessOrder] = useState<any>(null);
   const { showSuccess, showError } = useNotification();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (search.length >= 2) {
@@ -53,10 +55,21 @@ export const AdminPOSPage: React.FC = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/products?search=${search}&limit=10`);
-      if (response.success) {
-        setProducts(response.data);
-      }
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, price, stock, images, sku')
+        .or(`name.ilike.%${search}%,description.ilike.%${search}%,sku.ilike.%${search}%`)
+        .eq('is_active', true)
+        .limit(10);
+      if (error) throw error;
+      setProducts((data || []).map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        price: Number(p.price),
+        stock: p.stock ?? 0,
+        images: p.images || [],
+        sku: p.sku || ''
+      })));
     } catch (error) {
       console.error('Failed to fetch products', error);
     } finally {
@@ -110,29 +123,57 @@ export const AdminPOSPage: React.FC = () => {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return;
+    const userId = user?.id;
+    if (!userId) {
+      showError('Please log in to create orders');
+      return;
+    }
 
     try {
       setSubmitting(true);
-      const response = await apiClient.post('/admin/pos/orders', {
-        items: cart.map(item => ({
-          product_id: item.id,
-          quantity: item.quantity,
-          price: item.price
-        })),
-        customer_name: customer.name,
-        customer_email: customer.email,
-        customer_phone: customer.phone,
-        payment_method: paymentMethod,
-        discount_amount: discount
-      });
+      const orderNumber = `POS-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const shippingAddress = {
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone
+      };
 
-      if (response.success) {
-        showSuccess('Order created successfully');
-        setSuccessOrder(response.data);
-        setCart([]);
-        setCustomer({ name: '', email: '', phone: '' });
-        setDiscount(0);
-      }
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          user_id: userId,
+          order_number: orderNumber,
+          total_amount: total,
+          subtotal,
+          tax_amount: 0,
+          shipping_amount: 0,
+          status: 'confirmed',
+          payment_status: 'paid',
+          payment_method: paymentMethod,
+          shipping_address: shippingAddress,
+          billing_address: shippingAddress
+        }])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderItems = cart.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+      if (itemsError) throw itemsError;
+
+      showSuccess('Order created successfully');
+      setSuccessOrder({ id: order.id, order_number: orderNumber, total_amount: total, payment_method: paymentMethod });
+      setCart([]);
+      setCustomer({ name: '', email: '', phone: '' });
+      setDiscount(0);
     } catch (error: any) {
       showError(error.message || 'Failed to create order');
     } finally {

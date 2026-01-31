@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Palette, Save, RefreshCw, Sun, Moon, Monitor } from 'lucide-react';
-import { api, API_ENDPOINTS } from '@/config/api';
+import { supabase } from '../../../lib/supabase';
 
 interface ThemeSetting {
   mode: 'light' | 'dark' | 'system';
@@ -37,41 +37,29 @@ export const ThemeSettings: React.FC = () => {
     try {
       setLoading(true);
       setMessage(null);
-      const response = await api.get(API_ENDPOINTS.ADMIN.SETTINGS.THEME);
-      const data = response.data;
-      if (data.success && data.data) {
-        setTheme({ ...defaultTheme, ...data.data });
+      
+      // Fetch theme settings from site_settings table
+      const { data, error } = await supabase
+        .from('site_settings')
+        .select('setting_key, setting_value')
+        .like('setting_key', 'theme_%');
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const themeSettings: Partial<ThemeSetting> = {};
+        data.forEach((item) => {
+          const key = item.setting_key.replace('theme_', '') as keyof ThemeSetting;
+          if (key in defaultTheme) {
+            (themeSettings as any)[key] = item.setting_value;
+          }
+        });
+        setTheme({ ...defaultTheme, ...themeSettings });
       } else {
-        // If no data but success, use defaults
-        if (data.success) {
-          setTheme(defaultTheme);
-        } else {
-          setMessage({ type: 'error', text: data.message || 'Failed to load theme settings' });
-        }
+        setTheme(defaultTheme);
       }
     } catch (error: any) {
       console.error('Error fetching theme:', error);
-      
-      // Check if it's a real authentication error (401)
-      const isAuthError = error.response?.status === 401;
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message;
-      
-      if (isAuthError && (errorMessage?.includes('token') || errorMessage?.includes('authentication') || errorMessage?.includes('unauthorized'))) {
-        // Real auth error - let the interceptor handle it
-        setMessage({ 
-          type: 'error', 
-          text: 'Your session has expired. Please log in again.' 
-        });
-        return;
-      }
-      
-      // For other errors (network, server errors, etc.), show error but don't logout
-      setMessage({ 
-        type: 'error', 
-        text: errorMessage || 'Failed to load theme settings. Using default settings.' 
-      });
-      
-      // Use default theme if fetch fails
       setTheme(defaultTheme);
     } finally {
       setLoading(false);
@@ -88,48 +76,29 @@ export const ThemeSettings: React.FC = () => {
       setSaving(true);
       setMessage(null);
       
-      console.log('Saving theme settings:', theme);
-      console.log('API endpoint:', API_ENDPOINTS.ADMIN.SETTINGS.THEME);
-      
-      const response = await api.put(API_ENDPOINTS.ADMIN.SETTINGS.THEME, theme);
-      console.log('Save response:', response);
-      
-      const data = response.data;
-      if (data.success) {
-        setMessage({ type: 'success', text: 'Theme settings saved successfully!' });
-        setTimeout(() => setMessage(null), 3000);
-        // Optionally refresh the theme to confirm it was saved
-        setTimeout(() => {
-          fetchTheme();
-        }, 1000);
-      } else {
-        setMessage({ type: 'error', text: data.message || 'Failed to save theme settings' });
+      // Save each theme setting to site_settings table
+      const entries = Object.entries(theme);
+      for (const [key, value] of entries) {
+        const { error } = await supabase
+          .from('site_settings')
+          .upsert({
+            setting_key: `theme_${key}`,
+            setting_value: String(value),
+            setting_type: 'string',
+            category: 'theme',
+            is_public: true
+          }, { onConflict: 'setting_key' });
+        
+        if (error) throw error;
       }
+      
+      setMessage({ type: 'success', text: 'Theme settings saved successfully!' });
+      setTimeout(() => setMessage(null), 3000);
     } catch (error: any) {
       console.error('Error saving theme:', error);
-      console.error('Error response:', error.response);
-      console.error('Error data:', error.response?.data);
-      
-      // Check if it's a real authentication error (401)
-      const isAuthError = error.response?.status === 401;
-      const errorMessage = error.response?.data?.error?.message || 
-                          error.response?.data?.message || 
-                          error.message ||
-                          'Failed to save theme settings';
-      
-      if (isAuthError && (errorMessage?.includes('token') || errorMessage?.includes('authentication') || errorMessage?.includes('unauthorized'))) {
-        // Real auth error - let the interceptor handle it
-        setMessage({ 
-          type: 'error', 
-          text: 'Your session has expired. Please log in again.' 
-        });
-        return;
-      }
-      
-      // For other errors, show error message with more details
       setMessage({ 
         type: 'error', 
-        text: errorMessage || 'Error saving theme settings. Please try again.' 
+        text: error.message || 'Error saving theme settings. Please try again.' 
       });
     } finally {
       setSaving(false);

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Search, Edit, Trash2, Power, Users as UsersIcon, Filter, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DataTable, Column } from '../../Common/DataTable';
 import { ConfirmModal } from '../../Common/Modal';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { UserForm } from './UserForm';
 
@@ -42,21 +42,36 @@ export const UsersList: React.FC = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: pageSize.toString(),
-        ...(searchTerm && { search: searchTerm }),
-        ...(roleFilter && { role: roleFilter }),
-        ...(statusFilter && { status: statusFilter })
-      });
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-      const response = await apiClient.get(`/admin/users?${params}`);
+      let query = supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
-      if (response.success) {
-        setUsers(response.data);
-        setTotalPages(response.pagination.totalPages);
-        setTotalItems(response.pagination.total);
-      }
+      if (roleFilter) query = query.eq('role', roleFilter);
+      if (statusFilter === 'active') query = query.eq('is_active', true);
+      if (statusFilter === 'inactive') query = query.eq('is_active', false);
+      if (searchTerm) query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+
+      const { data, error, count } = await query.range(from, to);
+      if (error) throw error;
+
+      const rows = (data || []).map((p: any) => ({
+        id: p.id,
+        email: p.email || '',
+        full_name: p.full_name || '',
+        role: p.role || 'customer',
+        is_active: p.is_active !== false,
+        email_verified: true,
+        created_at: p.created_at,
+        order_count: 0,
+        total_spent: '0'
+      }));
+      setUsers(rows);
+      setTotalItems(count ?? 0);
+      setTotalPages(Math.max(1, Math.ceil((count ?? 0) / pageSize)));
     } catch (error: any) {
       showError(error.message || 'Failed to load users');
     } finally {
@@ -69,13 +84,14 @@ export const UsersList: React.FC = () => {
 
     try {
       setDeleteLoading(true);
-      await apiClient.delete(`/admin/users/${selectedUser.id}`);
-      showSuccess('User deleted successfully');
+      const { error } = await supabase.from('profiles').update({ is_active: false }).eq('id', selectedUser.id);
+      if (error) throw error;
+      showSuccess('User deactivated successfully');
       setShowDeleteModal(false);
       setSelectedUser(null);
       fetchUsers();
     } catch (error: any) {
-      showError(error.message || 'Failed to delete user');
+      showError(error.message || 'Failed to deactivate user');
     } finally {
       setDeleteLoading(false);
     }
@@ -83,7 +99,8 @@ export const UsersList: React.FC = () => {
 
   const handleToggleStatus = async (user: User) => {
     try {
-      await apiClient.patch(`/admin/users/${user.id}/toggle-status`);
+      const { error } = await supabase.from('profiles').update({ is_active: !user.is_active }).eq('id', user.id);
+      if (error) throw error;
       showSuccess(`User ${user.is_active ? 'deactivated' : 'activated'} successfully`);
       fetchUsers();
     } catch (error: any) {

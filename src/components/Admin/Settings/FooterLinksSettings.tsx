@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link2, Plus, Edit2, Trash2, Save, X, RefreshCw, ChevronUp, ChevronDown, Eye, EyeOff, ExternalLink, CheckSquare, Square, Loader2, Filter, Search } from 'lucide-react';
-import { api, API_ENDPOINTS } from '@/config/api';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
 interface FooterLink {
@@ -34,11 +34,13 @@ export const FooterLinksSettings: React.FC = () => {
   const fetchLinks = async () => {
     try {
       setLoading(true);
-      const response = await api.get(API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS);
-      const data = response.data;
-      if (data.success) {
-        setLinks(data.data.sort((a: FooterLink, b: FooterLink) => a.display_order - b.display_order));
-      }
+      const { data, error } = await supabase
+        .from('footer_links')
+        .select('*')
+        .order('display_order', { ascending: true });
+      
+      if (error) throw error;
+      setLinks(data || []);
     } catch (error: any) {
       showError(error.message || 'Failed to fetch footer links');
     } finally {
@@ -87,22 +89,27 @@ export const FooterLinksSettings: React.FC = () => {
   // Save link
   const handleSave = async () => {
     try {
-      const url = editingLink
-        ? `${API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS}/${editingLink.id}`
-        : API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS;
-
-      const response = editingLink 
-        ? await api.put(url, formData)
-        : await api.post(url, formData);
-
-      const data = response.data;
-      if (data.success) {
-        showSuccess(`Link ${editingLink ? 'updated' : 'added'} successfully!`);
-        await fetchLinks();
-        closeModal();
+      if (editingLink) {
+        // Update existing link
+        const { error } = await supabase
+          .from('footer_links')
+          .update(formData)
+          .eq('id', editingLink.id);
+        
+        if (error) throw error;
       } else {
-        showError(data.message || 'Failed to save link');
+        // Create new link
+        const maxOrder = links.length > 0 ? Math.max(...links.map(l => l.display_order)) + 1 : 1;
+        const { error } = await supabase
+          .from('footer_links')
+          .insert({ ...formData, display_order: maxOrder, is_active: true });
+        
+        if (error) throw error;
       }
+      
+      showSuccess(`Link ${editingLink ? 'updated' : 'added'} successfully!`);
+      await fetchLinks();
+      closeModal();
     } catch (error: any) {
       showError(error.message || 'Error saving link');
     }
@@ -113,12 +120,14 @@ export const FooterLinksSettings: React.FC = () => {
     if (!confirm('Are you sure you want to delete this footer link?')) return;
 
     try {
-      const response = await api.delete(`${API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS}/${id}`);
-      const data = response.data;
-      if (data.success) {
-        showSuccess('Link deleted successfully!');
-        await fetchLinks();
-      }
+      const { error } = await supabase
+        .from('footer_links')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      showSuccess('Link deleted successfully!');
+      await fetchLinks();
     } catch (error: any) {
       showError(error.message || 'Error deleting link');
     }
@@ -132,16 +141,16 @@ export const FooterLinksSettings: React.FC = () => {
     if (!confirm(`Are you sure you want to delete ${count} footer link(s)?`)) return;
 
     try {
-      const response = await api.post(`${API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS}/bulk-delete`, {
-        ids: Array.from(selectedIds)
-      });
-      const data = response.data;
-      if (data.success) {
-        showSuccess(data.message || `${count} link(s) deleted successfully!`);
-        setSelectedIds(new Set());
-        setSelectionMode(false);
-        await fetchLinks();
-      }
+      const { error } = await supabase
+        .from('footer_links')
+        .delete()
+        .in('id', Array.from(selectedIds));
+      
+      if (error) throw error;
+      showSuccess(`${count} link(s) deleted successfully!`);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      await fetchLinks();
     } catch (error: any) {
       showError(error.message || 'Error deleting links');
     }
@@ -179,17 +188,13 @@ export const FooterLinksSettings: React.FC = () => {
   // Toggle active
   const toggleActive = async (id: string, currentStatus: boolean) => {
     try {
-      const link = links.find(l => l.id === id);
-      if (!link) return;
-
-      const response = await api.put(`${API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS}/${id}`, { 
-        ...link, 
-        is_active: !currentStatus 
-      });
-      const data = response.data;
-      if (data.success) {
-        await fetchLinks();
-      }
+      const { error } = await supabase
+        .from('footer_links')
+        .update({ is_active: !currentStatus })
+        .eq('id', id);
+      
+      if (error) throw error;
+      await fetchLinks();
     } catch (error) {
       console.error('Error toggling status:', error);
     }
@@ -225,11 +230,12 @@ export const FooterLinksSettings: React.FC = () => {
 
     // Save to backend
     try {
-      await Promise.all(
-        sectionLinks.map(link =>
-          api.put(`${API_ENDPOINTS.ADMIN.SETTINGS.FOOTER_LINKS}/${link.id}`, link)
-        )
-      );
+      for (const link of sectionLinks) {
+        await supabase
+          .from('footer_links')
+          .update({ display_order: link.display_order })
+          .eq('id', link.id);
+      }
     } catch (error) {
       console.error('Error updating order:', error);
       await fetchLinks();

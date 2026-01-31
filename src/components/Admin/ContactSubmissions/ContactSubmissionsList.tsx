@@ -4,7 +4,7 @@ import {
   CheckCircle, AlertCircle, Loader2, ChevronLeft, ChevronRight,
   RefreshCw, Archive, MessageSquare, User, Phone
 } from 'lucide-react';
-import { apiClient } from '../../../config/api';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { ContactSubmissionDetails } from './ContactSubmissionDetails';
 import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
@@ -49,25 +49,44 @@ export const ContactSubmissionsList: React.FC = () => {
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: pageSize.toString(),
-        ...(searchTerm && { search: searchTerm }),
-        ...(statusFilter && { status: statusFilter })
-      });
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
 
-      const response = await apiClient.get(`/admin/contact-submissions?${params}`);
+      let query = supabase
+        .from('contact_submissions')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false });
 
-      if (response.data.success) {
-        setSubmissions(response.data.data.submissions);
-        setTotalPages(response.data.data.pagination.totalPages);
-        setTotalItems(response.data.data.pagination.total);
-      }
+      if (statusFilter) query = query.eq('status', statusFilter);
+      if (searchTerm) query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,subject.ilike.%${searchTerm}%,message.ilike.%${searchTerm}%`);
+
+      const { data, error, count } = await query.range(from, to);
+      if (error) throw error;
+
+      const rows = (data || []).map((r: any) => ({
+        id: r.id,
+        name: r.name || '',
+        email: r.email || '',
+        phone: r.phone,
+        subject: r.subject || '',
+        message: r.message || '',
+        status: r.status || 'new',
+        admin_notes: r.admin_notes,
+        user_id: r.user_id,
+        replied_at: r.replied_at,
+        replied_by: r.replied_by,
+        replied_by_name: r.replied_by_name,
+        created_at: r.created_at,
+        updated_at: r.updated_at || r.created_at
+      }));
+      setSubmissions(rows);
+      setTotalItems(count ?? 0);
+      setTotalPages(Math.max(1, Math.ceil((count ?? 0) / pageSize)));
     } catch (error: any) {
       showNotification({
         type: 'error',
         title: 'Error',
-        message: error.response?.data?.error?.userMessage || error.message || 'Failed to load contact submissions'
+        message: error.message || 'Failed to load contact submissions'
       });
     } finally {
       setLoading(false);
@@ -76,27 +95,24 @@ export const ContactSubmissionsList: React.FC = () => {
 
   const updateStatus = async (id: string, status: string, adminNotes?: string) => {
     try {
-      const response = await apiClient.patch(`/admin/contact-submissions/${id}`, {
-        status,
-        admin_notes: adminNotes
+      const updates: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+      if (adminNotes !== undefined) updates.admin_notes = adminNotes;
+      const { error } = await supabase.from('contact_submissions').update(updates).eq('id', id);
+      if (error) throw error;
+      showNotification({
+        type: 'success',
+        title: 'Success',
+        message: 'Contact submission updated successfully'
       });
-
-      if (response.data.success) {
-        showNotification({
-          type: 'success',
-          title: 'Success',
-          message: 'Contact submission updated successfully'
-        });
-        fetchSubmissions();
-        if (selectedSubmissionId === id) {
-          setSelectedSubmissionId(null);
-        }
+      fetchSubmissions();
+      if (selectedSubmissionId === id) {
+        setSelectedSubmissionId(null);
       }
     } catch (error: any) {
       showNotification({
         type: 'error',
         title: 'Error',
-        message: error.response?.data?.error?.userMessage || error.message || 'Failed to update submission'
+        message: error.message || 'Failed to update submission'
       });
     }
   };

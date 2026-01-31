@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../../Common/Modal';
 import { FormInput, FormTextarea, FormSelect, FormCheckbox } from '../../Common/FormInput';
 import { ImageUpload } from '../../Common/ImageUpload';
-import { apiClient } from '../../../lib/apiClient';
+import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { Loader2 } from 'lucide-react';
 
@@ -78,10 +78,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onClose, onSu
 
   const fetchCategories = async () => {
     try {
-      const response = await apiClient.get('/categories');
-      if (response.success) {
-        setCategories(response.data);
-      }
+      const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
+      if (error) throw error;
+      setCategories(data || []);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
@@ -147,21 +146,29 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, onClose, onSu
       setLoading(true);
 
       const payload = {
-        ...formData,
+        name: formData.name,
+        slug: formData.slug || undefined,
+        description: formData.description || undefined,
+        short_description: formData.short_description || undefined,
         price: parseFloat(formData.price),
         original_price: formData.original_price ? parseFloat(formData.original_price) : null,
-        stock: parseInt(formData.stock),
-        min_stock_level: parseInt(formData.min_stock_level),
-        images: Array.isArray(formData.images) ? formData.images : (formData.images ? [formData.images] : []),
+        category_id: formData.category_id || null,
+        stock: parseInt(formData.stock) || 0,
+        min_stock_level: parseInt(formData.min_stock_level) || 0,
+        sku: formData.sku || undefined,
+        is_featured: formData.is_featured ?? false,
         is_active: formData.is_active !== undefined ? formData.is_active : true,
-        show_on_homepage: true // Ensure products show on homepage by default
+        show_on_homepage: true,
+        images: Array.isArray(formData.images) ? formData.images : (formData.images ? [formData.images] : [])
       };
 
       if (product) {
-        await apiClient.put(`${endpointPrefix}/products/${product.id}`, payload);
+        const { error } = await supabase.from('products').update(payload).eq('id', product.id);
+        if (error) throw error;
         showSuccess('Success', 'Product updated successfully');
       } else {
-        await apiClient.post(`${endpointPrefix}/products`, payload);
+        const { error } = await supabase.from('products').insert(payload);
+        if (error) throw error;
         showSuccess('Success', 'Product created successfully');
       }
 
