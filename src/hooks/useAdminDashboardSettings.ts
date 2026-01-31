@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api, API_ENDPOINTS } from '@/config/api';
+import { supabase } from '@/lib/supabase';
 import { 
   loadSettingsFromCache, 
   saveSettingsToCache, 
@@ -50,31 +50,21 @@ export const useAdminDashboardSettings = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        // Add cache-busting parameter to ensure fresh data
-        const response = await api.get(
-          `${API_ENDPOINTS.ADMIN.SETTINGS.DASHBOARD}?t=${Date.now()}`
-        );
-        const data = response.data;
+        // Try to fetch dashboard settings from site_settings table
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('key, value')
+          .like('key', 'dashboard_%');
         
-        if (data.success && data.data) {
-          // Use flat format if available, otherwise use nested format
-          const sourceData = data.flat || data.data;
-          
-          // Convert the key-value object to our settings format
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          // Convert the key-value pairs to our settings format
           const settingsObj: Partial<DashboardSettings> = {};
-          Object.keys(defaultSettings).forEach(key => {
-            const settingKey = key as keyof DashboardSettings;
-            if (sourceData[settingKey] !== undefined && sourceData[settingKey] !== null) {
-              // Handle both object format {value: ...} and direct value
-              let value: string;
-              if (typeof sourceData[settingKey] === 'object' && sourceData[settingKey] !== null) {
-                value = sourceData[settingKey].value || sourceData[settingKey];
-              } else {
-                value = sourceData[settingKey];
-              }
-              settingsObj[settingKey] = value || defaultSettings[settingKey];
-            } else {
-              settingsObj[settingKey] = defaultSettings[settingKey];
+          data.forEach((item: { key: string; value: string }) => {
+            const settingKey = item.key as keyof DashboardSettings;
+            if (settingKey in defaultSettings) {
+              settingsObj[settingKey] = item.value || defaultSettings[settingKey];
             }
           });
           
@@ -86,6 +76,10 @@ export const useAdminDashboardSettings = () => {
           // Save to cache and apply styles
           saveSettingsToCache(loadedSettings);
           applyDashboardStyles(loadedSettings);
+        } else {
+          // No settings found, use defaults
+          setSettings(defaultSettings);
+          applyDashboardStyles(defaultSettings);
         }
       } catch (error) {
         console.error('Error fetching dashboard settings:', error);
@@ -95,6 +89,7 @@ export const useAdminDashboardSettings = () => {
           applyDashboardStyles(cachedSettings);
         } else {
           setSettings(defaultSettings);
+          applyDashboardStyles(defaultSettings);
         }
       } finally {
         setLoading(false);
