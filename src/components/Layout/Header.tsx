@@ -157,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
               onClick={() => window.scrollTo(0, 0)}
             >
               <SiteLogo size="md" />
-              <span className="font-semibold text-lg text-gray-900 tracking-tight hidden sm:block">
+              <span className="font-semibold text-base sm:text-lg text-gray-900 tracking-tight">
                 {siteName.split(' ').slice(0, 2).join(' ')}
               </span>
             </Link>
