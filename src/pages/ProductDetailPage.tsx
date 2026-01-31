@@ -67,8 +67,8 @@ export const ProductDetailPage: React.FC = () => {
       setLoading(true);
       try {
         const productData = await getProductById(id);
-        if (productData && productData.data) {
-          setProduct(productData.data);
+        if (productData) {
+          setProduct(productData);
         } else {
           setProduct(null);
         }

@@ -237,27 +237,27 @@ export const Hero: React.FC = () => {
       {/* Bottom: Slide Navigation */}
       <div className="relative z-10 pb-8 md:pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center lg:justify-start gap-4">
+          <div className="flex items-center justify-center lg:justify-start gap-3 sm:gap-4">
             {/* Prev/Next Arrows */}
             <button
               onClick={prevSlide}
               disabled={isTransitioning}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white transition-all disabled:opacity-50"
+              className="p-2.5 sm:p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white transition-all disabled:opacity-50"
               aria-label="Previous slide"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
 
             {/* Slide Indicators */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 sm:gap-2">
               {slides.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => goToSlide(index)}
                   className={`transition-all duration-300 rounded-full ${
                     index === currentSlide 
-                      ? 'w-8 h-2 bg-amber-500' 
-                      : 'w-2 h-2 bg-white/40 hover:bg-white/60'
+                      ? 'w-10 sm:w-8 h-3 sm:h-2 bg-amber-500' 
+                      : 'w-3 sm:w-2 h-3 sm:h-2 bg-white/40 hover:bg-white/60'
                   }`}
                   aria-label={`Go to slide ${index + 1}`}
                 />
@@ -267,7 +267,7 @@ export const Hero: React.FC = () => {
             <button
               onClick={nextSlide}
               disabled={isTransitioning}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white transition-all disabled:opacity-50"
+              className="p-2.5 sm:p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white transition-all disabled:opacity-50"
               aria-label="Next slide"
             >
               <ChevronRight className="h-5 w-5" />

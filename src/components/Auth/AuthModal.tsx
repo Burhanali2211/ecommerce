@@ -28,7 +28,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login, signup } = useAuth();
+  const { login, signUp } = useAuth();
   const { showSuccess, showError } = useNotification();
 
   // Form states
@@ -48,9 +48,13 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      await login(loginData.email, loginData.password);
-      showSuccess('Success', 'Logged in successfully!');
-      onClose();
+      const error = await login(loginData.email, loginData.password);
+      if (error) {
+        showError('Login Failed', error);
+      } else {
+        showSuccess('Success', 'Logged in successfully!');
+        onClose();
+      }
     } catch (error: any) {
       showError('Login Failed', error.message || 'Invalid credentials');
     } finally {
@@ -85,9 +89,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
       // Combine firstName and lastName into fullName
       const fullName = `${signupData.firstName || ''} ${signupData.lastName || ''}`.trim() || 'User';
       
-      await signup({
-        email: signupData.email,
-        password: signupData.password,
+      await signUp(signupData.email, signupData.password, {
         fullName: fullName,
         phone: signupData.phone,
       });

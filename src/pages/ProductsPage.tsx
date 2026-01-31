@@ -34,12 +34,13 @@ const ProductsPage: React.FC = () => {
     // UI State
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [comparingIds, setComparingIds] = useState<string[]>([]);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [expandedFilters, setExpandedFilters] = useState({
-        category: true,
-        price: true,
-        rating: true,
+        category: false,
+        price: false,
+        rating: false,
         discount: false,
-        availability: true
+        availability: false
     });
 
     // Filter State
@@ -162,17 +163,44 @@ const ProductsPage: React.FC = () => {
             </div>
 
             <div className="max-w-[1600px] mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
-                {/* Faceted Sidebar */}
-                <aside className="w-full lg:w-64 flex-shrink-0">
-                    <div className="sticky top-28 space-y-6">
-                        <div className="flex items-center justify-between mb-2">
+                {/* Mobile Filter Toggle */}
+                <div className="lg:hidden">
+                    <button
+                        onClick={() => setIsFilterOpen(!isFilterOpen)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 shadow-sm"
+                    >
+                        <div className="flex items-center gap-2">
+                            <SlidersHorizontal className="h-4 w-4 text-gray-600" />
+                            <span className="text-sm font-semibold text-gray-900">Filters</span>
+                            {(filters.category || filters.rating > 0 || filters.discount > 0 || filters.availability !== 'all') && (
+                                <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                    Active
+                                </span>
+                            )}
+                        </div>
+                        <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                </div>
+
+                {/* Faceted Sidebar - Hidden on mobile unless open */}
+                <aside className={`w-full lg:w-64 flex-shrink-0 ${isFilterOpen ? 'block' : 'hidden lg:block'}`}>
+                    <div className="lg:sticky lg:top-28 space-y-4 bg-white lg:bg-transparent rounded-xl lg:rounded-none p-4 lg:p-0 border border-gray-200 lg:border-0 mt-4 lg:mt-0">
+                        <div className="flex items-center justify-between">
                            <h2 className="text-xs font-black text-[#131921] uppercase tracking-widest">Filters</h2>
-                           <button 
-                              onClick={() => setFilters({ category: '', search: '', priceRange: [0, 100000], rating: 0, brand: '', discount: 0, availability: 'all', sortBy: 'newest' })}
-                              className="text-[10px] font-bold text-purple-600 hover:underline"
-                           >
-                              Clear All
-                           </button>
+                           <div className="flex items-center gap-3">
+                               <button 
+                                  onClick={() => setFilters({ category: '', search: '', priceRange: [0, 100000], rating: 0, brand: '', discount: 0, availability: 'all', sortBy: 'newest' })}
+                                  className="text-[10px] font-bold text-amber-600 hover:underline"
+                               >
+                                  Clear All
+                               </button>
+                               <button 
+                                  onClick={() => setIsFilterOpen(false)}
+                                  className="lg:hidden p-1 hover:bg-gray-100 rounded"
+                               >
+                                  <X className="h-4 w-4 text-gray-500" />
+                               </button>
+                           </div>
                         </div>
 
                         <FilterSection 

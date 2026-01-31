@@ -57,86 +57,94 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   if (isListView) {
     return (
-      <div className="group flex flex-col md:flex-row gap-6 p-4 bg-white rounded-2xl border border-gray-100 hover:border-purple-200 transition-all duration-300 shadow-sm hover:shadow-xl relative">
-        <div className="relative w-full md:w-64 aspect-[4/3] flex-shrink-0 overflow-hidden rounded-xl bg-gray-50">
+      <div className="group flex flex-row gap-3 sm:gap-6 p-3 sm:p-4 bg-white rounded-2xl border border-gray-100 hover:border-amber-200 transition-all duration-300 shadow-sm hover:shadow-xl relative">
+        {/* Image Section - Fixed width on all screens */}
+        <div className="relative w-28 sm:w-40 md:w-52 lg:w-64 flex-shrink-0 overflow-hidden rounded-xl bg-gray-50">
           <Link to={`/products/${product.id}`} className="block h-full">
             <ProductImage
               product={product}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 aspect-square"
               alt={product.name}
             />
           </Link>
           {discount > 0 && (
-            <span className="absolute top-3 left-3 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded uppercase shadow-lg z-10">
+            <span className="absolute top-2 left-2 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shadow-lg z-10">
               -{discount}%
             </span>
           )}
           
-          {/* Comparison Checkbox */}
-          <div className="absolute top-3 right-3 z-10">
+          {/* Comparison Checkbox - Hidden on mobile for cleaner look */}
+          <div className="absolute top-2 right-2 z-10 hidden sm:block">
             <label className="flex items-center gap-1.5 bg-white/90 backdrop-blur px-2 py-1 rounded border border-gray-200 cursor-pointer shadow-sm hover:bg-white transition-colors">
               <input 
                 type="checkbox" 
                 checked={isComparing}
                 onChange={() => onCompareToggle && onCompareToggle(product.id)}
-                className="w-3 h-3 text-purple-600 rounded focus:ring-purple-500"
+                className="w-3 h-3 text-amber-600 rounded focus:ring-amber-500"
               />
               <span className="text-[10px] font-bold text-gray-700 uppercase">Compare</span>
             </label>
           </div>
         </div>
         
-        <div className="flex flex-col flex-1 justify-between py-2">
+        {/* Content Section */}
+        <div className="flex flex-col flex-1 min-w-0 justify-between py-0 sm:py-2">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                isTech ? 'bg-blue-50 text-blue-600' : isFashion ? 'bg-pink-50 text-pink-600' : 'bg-gray-50 text-gray-600'
-              }`}>
+            {/* Category & Rating Row */}
+            <div className="flex items-center gap-2 mb-1 sm:mb-2">
+              <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded bg-amber-50 text-amber-700 truncate max-w-[80px] sm:max-w-none">
                 {product.categoryName || product.category || 'Discovery'}
               </span>
-              <div className="flex items-center text-amber-400 ml-auto">
-                <Star className="h-3.5 w-3.5 fill-current" />
-                <span className="text-sm font-bold text-gray-700 ml-1">{product.rating || '4.5'}</span>
-                <span className="text-xs text-gray-400 ml-1 font-medium">(2.4k)</span>
+              <div className="flex items-center text-amber-400 ml-auto flex-shrink-0">
+                <Star className="h-3 sm:h-3.5 w-3 sm:w-3.5 fill-current" />
+                <span className="text-xs sm:text-sm font-bold text-gray-700 ml-0.5 sm:ml-1">{product.rating || '4.5'}</span>
+                <span className="text-[10px] sm:text-xs text-gray-400 ml-0.5 sm:ml-1 font-medium hidden sm:inline">(2.4k)</span>
               </div>
             </div>
+            
+            {/* Product Name */}
             <Link to={`/products/${product.id}`}>
-              <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-purple-600 transition-colors line-clamp-1">
+              <h3 className="text-sm sm:text-lg md:text-xl font-bold text-gray-900 mb-1 sm:mb-2 group-hover:text-amber-600 transition-colors line-clamp-2 sm:line-clamp-1">
                 {product.name}
               </h3>
             </Link>
-            <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mb-4 font-normal">
+            
+            {/* Description - Hidden on very small screens */}
+            <p className="hidden sm:block text-xs sm:text-sm text-gray-500 line-clamp-2 leading-relaxed mb-2 sm:mb-4 font-normal">
               {product.shortDescription || product.description}
             </p>
-            <div className="flex flex-wrap items-center gap-4 text-[11px] text-gray-500 font-medium">
+            
+            {/* Trust Badges - Simplified on mobile */}
+            <div className="hidden md:flex flex-wrap items-center gap-4 text-[11px] text-gray-500 font-medium">
               <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-green-500" /> Free Returns</span>
               <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-amber-500" /> Get it by <b>Tomorrow</b></span>
               <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-green-500" /> Cash on Delivery</span>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-6 gap-4">
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-black text-[#131921]">₹{product.price.toLocaleString('en-IN')}</span>
+          {/* Price & Actions Row */}
+          <div className="flex items-center justify-between mt-2 sm:mt-4 gap-2 sm:gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-baseline gap-0 sm:gap-2">
+              <span className="text-lg sm:text-2xl md:text-3xl font-black text-[#131921]">₹{product.price.toLocaleString('en-IN')}</span>
               {product.originalPrice && (
-                <span className="text-sm text-gray-400 line-through font-medium">₹{product.originalPrice.toLocaleString('en-IN')}</span>
+                <span className="text-[10px] sm:text-sm text-gray-400 line-through font-medium">₹{product.originalPrice.toLocaleString('en-IN')}</span>
               )}
             </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={handleWishlistToggle}
-                  className={`p-3 rounded-xl border transition-all ${
-                    isInWishlist(product.id) ? 'bg-red-50 text-red-500 border-red-100' : 'bg-white border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-100'
-                  }`}
-                >
-                  <Heart className="h-5 w-5" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} />
-                </button>
-                <AddToCartButton 
-                  product={product} 
-                  className="flex-1 md:flex-none h-12 px-8"
-                  size="lg"
-                />
-              </div>
+            <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
+              <button 
+                onClick={handleWishlistToggle}
+                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all ${
+                  isInWishlist(product.id) ? 'bg-red-50 text-red-500 border-red-100' : 'bg-white border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-100'
+                }`}
+              >
+                <Heart className="h-4 w-4 sm:h-5 sm:w-5" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} />
+              </button>
+              <AddToCartButton 
+                product={product} 
+                className="h-9 sm:h-12 px-3 sm:px-6 text-xs sm:text-sm"
+                size="sm"
+              />
+            </div>
           </div>
         </div>
       </div>

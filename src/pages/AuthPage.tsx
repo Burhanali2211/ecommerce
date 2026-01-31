@@ -138,16 +138,7 @@ const AuthPage: React.FC = () => {
           title: 'Welcome back!',
           message: 'Successfully logged in.'
         });
-
-        setTimeout(() => {
-          if (user?.role === 'admin') {
-            navigate('/admin');
-          } else if (user?.role === 'seller') {
-            navigate('/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
-        }, 100);
+        // Navigation is handled by useEffect when user state changes
       } else if (mode === 'signup') {
         await signUp(formData.email, formData.password, {
           fullName: formData.fullName
@@ -157,10 +148,7 @@ const AuthPage: React.FC = () => {
           title: 'Account created!',
           message: 'Welcome to Himalayan Spices!'
         });
-
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 100);
+        // Navigation is handled by useEffect when user state changes
       } else if (mode === 'forgot') {
         showNotification({
           type: 'success',
