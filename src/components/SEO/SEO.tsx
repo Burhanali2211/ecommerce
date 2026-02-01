@@ -22,11 +22,11 @@ interface SEOProps {
   canonical?: string;
 }
 
-const DEFAULT_TITLE = 'HimalayanSpicesExports - Authentic Kashmir Perfumes & Attars Online';
-const DEFAULT_DESCRIPTION = 'Shop authentic Kashmir perfumes, attars, and fragrances online. Premium quality, traditional scents from Kashmir. Free shipping on orders above ₹2,000. Fast delivery across India.';
-const DEFAULT_IMAGE = 'https://yourdomain.com/og-image.jpg';
-const DEFAULT_URL = 'https://yourdomain.com';
-const SITE_NAME = 'HimalayanSpicesExports';
+const DEFAULT_TITLE = 'Himalayan Spices Exports - Premium Himalayan Spices, Saffron & Herbs Online';
+const DEFAULT_DESCRIPTION = 'Shop authentic Himalayan spices, Kashmiri saffron, herbs & teas at HimalayanSpicesExports. Premium quality sourced from mountain farmers. Free shipping on orders above ₹999. India & worldwide delivery.';
+const DEFAULT_IMAGE = 'https://himalayanspicesexports.com/og-image.jpg';
+const DEFAULT_URL = 'https://himalayanspicesexports.com';
+const SITE_NAME = 'Himalayan Spices Exports';
 
 export const SEO: React.FC<SEOProps> = ({
   title,
@@ -99,8 +99,8 @@ export const ProductSEO: React.FC<{
   availability?: string;
 }> = ({ productName, description, price, image, category, availability }) => {
   const title = `${productName} - Buy Online`;
-  const desc = `${description.substring(0, 150)}... Price: ₹${price}. ${availability === 'InStock' ? 'In Stock' : 'Out of Stock'}. Free shipping on orders above ₹2,000.`;
-  const keywords = `${productName}, ${category || 'perfume'}, attar, buy ${productName} online, ${productName} price`;
+  const desc = `${description.substring(0, 150)}... Price: ₹${price}. ${availability === 'InStock' ? 'In Stock' : 'Out of Stock'}. HimalayanSpicesExports - Free shipping on orders above ₹999.`;
+  const keywords = `${productName}, ${category || 'spice'}, himalayan spices, buy ${productName} online, himalayanspicesexports`;
 
   return (
     <SEO
@@ -121,9 +121,9 @@ export const CategorySEO: React.FC<{
   description?: string;
   productCount?: number;
 }> = ({ categoryName, description, productCount }) => {
-  const title = `${categoryName} - Shop Online`;
-  const desc = description || `Browse our collection of ${categoryName.toLowerCase()}. ${productCount ? `${productCount} products available.` : ''} Premium quality, authentic products. Free shipping on orders above ₹2,000.`;
-  const keywords = `${categoryName}, ${categoryName} online, buy ${categoryName}, ${categoryName} shop`;
+  const title = `${categoryName} - Himalayan Spices Exports`;
+  const desc = description || `Browse premium ${categoryName.toLowerCase()} at HimalayanSpicesExports. ${productCount ? `${productCount} products available.` : ''} Authentic Himalayan spices. Free shipping on orders above ₹999.`;
+  const keywords = `${categoryName}, himalayanspicesexports, buy ${categoryName} online, ${categoryName} shop, himalayan spices`;
 
   return (
     <SEO

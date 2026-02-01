@@ -1,4 +1,4 @@
-# robots.txt for Kashmir Perfume E-Commerce
+# robots.txt for Himalayan Spices Exports
 # https://www.robotstxt.org/robotstxt.html
 
 # Allow all search engines to crawl the site
@@ -32,7 +32,7 @@ Allow: /refund-policy
 Allow: /shipping-policy
 
 # Sitemap location
-Sitemap: https://yourdomain.com/sitemap.xml
+Sitemap: https://himalayanspicesexports.com/sitemap.xml
 
 # Crawl delay (optional, helps prevent server overload)
 Crawl-delay: 1

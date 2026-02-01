@@ -31,7 +31,7 @@ export const PerfectPair: React.FC<PerfectPairProps> = ({ currentProduct }) => {
           </p>
           <div className="flex items-center gap-4 pt-4">
             <div className="h-px w-12 bg-stone-200" />
-            <span className="text-xs text-stone-400 italic">Recommended by our Master Perfumer</span>
+            <span className="text-xs text-stone-400 italic">Recommended by our Spice Experts</span>
           </div>
         </div>
 

@@ -35,7 +35,7 @@ const AuthPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const siteName = getSiteSetting('site_name') || 'Himalayan Spices';
+  const siteName = getSiteSetting('site_name') || 'Himalayan Spices Exports';
 
   const [formData, setFormData] = useState<FormData>({
     email: '',

@@ -1,7 +1,7 @@
 {
-  "short_name": "Sufi Essences",
-  "name": "Sufi Essences - Premium Attars & Perfumes",
-  "description": "Discover premium quality attars, perfumes, and fragrances from Sufi Essences. Authentic, natural, and luxurious scents for every occasion.",
+  "short_name": "HimalayanSpices",
+  "name": "Himalayan Spices Exports - Premium Spices & Saffron",
+  "description": "Discover premium Himalayan spices, Kashmiri saffron, herbs and teas from HimalayanSpicesExports. Authentic, organic spices sourced from mountain farmers.",
   "icons": [
     {
       "src": "src/assets/images/logo.png",
@@ -72,7 +72,7 @@
     {
       "name": "Products",
       "short_name": "Products",
-      "description": "Browse and shop premium attars and perfumes",
+      "description": "Browse and shop premium spices and saffron",
       "url": "/products",
       "icons": [
         {

@@ -49,7 +49,7 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
   const shopDropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const siteName = getSiteSetting('site_name') || 'Himalayan Spices';
+  const siteName = getSiteSetting('site_name') || 'Himalayan Spices Exports';
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -353,19 +353,6 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
               >
                 <Menu className="h-5 w-5" />
               </button>
-            </div>
-          </div>
-
-          {/* Announcement Bar - Shows only when not scrolled */}
-          <div
-            className={`overflow-hidden transition-all duration-300 ${
-              isScrolled ? 'max-h-0 opacity-0' : 'max-h-10 opacity-100'
-            }`}
-          >
-            <div className="bg-amber-50 border-t border-amber-100">
-              <p className="text-center text-xs sm:text-sm py-2 px-4 text-amber-800 font-medium">
-                Free shipping on orders over ₹999 | Use code <span className="font-bold">SPICE10</span> for 10% off
-              </p>
             </div>
           </div>
         </div>

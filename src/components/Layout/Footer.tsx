@@ -28,7 +28,7 @@ export const Footer: React.FC = () => {
     settings: { footerLinks, socialMedia, contactInfo }
   } = useSettings();
 
-  const siteName = getSiteSetting('site_name') || 'ZenMart';
+  const siteName = getSiteSetting('site_name') || 'Himalayan Spices Exports';
   const copyrightText = getSiteSetting('copyright_text');
 
   const groupedFooterLinks = footerLinks.reduce((acc, link) => {

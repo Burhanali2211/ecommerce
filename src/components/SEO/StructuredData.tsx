@@ -43,7 +43,7 @@ export const ProductStructuredData: React.FC<{ product: Product }> = ({ product 
     },
     offers: {
       '@type': 'Offer',
-      url: `https://yourdomain.com/products/${product.id}`,
+      url: `https://himalayanspicesexports.com/products/${product.id}`,
       priceCurrency: 'INR',
       price: product.price,
       availability: `https://schema.org/${product.availability || 'InStock'}`,
@@ -198,7 +198,7 @@ export const ArticleStructuredData: React.FC<{
       name: 'HimalayanSpicesExports',
       logo: {
         '@type': 'ImageObject',
-        url: 'https://yourdomain.com/logo.png'
+        url: 'https://himalayanspicesexports.com/logo.png'
       }
     }
   };
@@ -220,9 +220,9 @@ export const LocalBusinessStructuredData: React.FC = () => {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
     name: 'HimalayanSpicesExports',
-    image: 'https://yourdomain.com/logo.png',
-    '@id': 'https://yourdomain.com',
-    url: 'https://yourdomain.com',
+    image: 'https://himalayanspicesexports.com/logo.png',
+    '@id': 'https://himalayanspicesexports.com',
+    url: 'https://himalayanspicesexports.com',
     telephone: '+91-XXXXXXXXXX',
     priceRange: '₹₹',
     address: {

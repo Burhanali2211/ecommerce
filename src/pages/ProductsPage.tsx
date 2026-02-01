@@ -325,7 +325,7 @@ const ProductsPage: React.FC = () => {
                 <main className="flex-1">
                     <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                         <div className="flex items-center gap-4 text-xs font-bold text-gray-500">
-                           <span className="bg-amber-100 text-[#131921] px-2 py-0.5 rounded">ZenMart Best Sellers</span>
+                           <span className="bg-amber-100 text-[#131921] px-2 py-0.5 rounded">Himalayan Spices Exports Best Sellers</span>
                            <span>Featured Brands</span>
                         </div>
                         <div className="flex items-center gap-2">

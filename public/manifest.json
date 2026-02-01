@@ -1,11 +1,11 @@
 {
-  "name": "Perfumes Store",
-  "short_name": "Perfumes",
-  "description": "Premium perfumes and fragrances online store",
+  "name": "Himalayan Spices Exports",
+  "short_name": "HimalayanSpices",
+  "description": "Premium Himalayan spices, Kashmiri saffron, herbs & teas. Authentic spices from mountain farmers.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#3b82f6",
+  "theme_color": "#b45309",
   "orientation": "portrait-primary",
   "categories": [
     "shopping",

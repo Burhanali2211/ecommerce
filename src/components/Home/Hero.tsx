@@ -180,55 +180,59 @@ export const Hero: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Featured Card (Desktop) */}
+            {/* Right: Featured Bestseller Card (Desktop) */}
             <div 
               className={`hidden lg:block transition-all duration-500 delay-300 ${
                 isLoaded ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'
               }`}
             >
-              <div className="relative">
-                {/* Decorative elements */}
-                <div className="absolute -top-4 -right-4 w-72 h-72 bg-amber-500/20 rounded-full blur-3xl" />
-                <div className="absolute -bottom-8 -left-8 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl" />
-                
-                {/* Featured Product Card */}
-                <div className="relative bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/20">
-                  <div className="flex items-start justify-between mb-4">
-                    <span className="px-3 py-1 bg-amber-500 text-white text-xs font-bold rounded-full">
-                      BESTSELLER
-                    </span>
-                    <div className="flex items-center gap-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="h-4 w-4 text-amber-400 fill-amber-400" />
-                      ))}
+              <Link to="/products" className="group block">
+                <div className="relative bg-white rounded-2xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.1)] overflow-hidden hover:shadow-[0_35px_60px_-15px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1">
+                  {/* Premium accent bar */}
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-amber-400 to-orange-500" />
+                  
+                  <div className="flex flex-col sm:flex-row">
+                    {/* Product Image - Clean showcase */}
+                    <div className="flex-1 min-h-[220px] bg-gradient-to-br from-amber-50 to-orange-50 relative overflow-hidden">
+                      <img 
+                        src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=500&q=85"
+                        alt="Premium Kashmiri Saffron"
+                        className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+                      />
+                      <div className="absolute top-3 left-3">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 text-white text-[10px] font-bold tracking-widest rounded-md shadow-sm">
+                          <Star className="h-3 w-3 fill-white" />
+                          BESTSELLER
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="aspect-square rounded-2xl overflow-hidden mb-4 bg-gradient-to-br from-amber-100 to-orange-100">
-                    <img 
-                      src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400&q=80"
-                      alt="Premium Kashmiri Saffron"
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                  
-                  <h3 className="text-xl font-bold text-white mb-2">Premium Kashmiri Saffron</h3>
-                  <p className="text-white/70 text-sm mb-4">Hand-picked from Pampore, the saffron capital of India</p>
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-2xl font-bold text-white">₹899</span>
-                      <span className="text-white/50 line-through ml-2">₹1,199</span>
+                    
+                    {/* Product Info */}
+                    <div className="flex-1 p-6 flex flex-col justify-between min-w-0">
+                      <div>
+                        <div className="flex items-center gap-1 mb-2">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className="h-4 w-4 text-amber-500 fill-amber-500" />
+                          ))}
+                          <span className="text-xs text-gray-500 ml-1 font-medium">(2.4k reviews)</span>
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-amber-700 transition-colors">Premium Kashmiri Saffron</h3>
+                        <p className="text-gray-500 text-sm leading-snug">Hand-picked from Pampore, the saffron capital of India</p>
+                      </div>
+                      <div className="flex items-end justify-between gap-4 mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-gray-900">₹899</span>
+                          <span className="text-sm text-gray-400 line-through">₹1,199</span>
+                        </div>
+                        <span className="inline-flex items-center gap-1.5 text-amber-600 font-semibold text-sm group-hover:gap-2.5 transition-all">
+                          Shop now
+                          <ArrowRight className="h-4 w-4" />
+                        </span>
+                      </div>
                     </div>
-                    <Link 
-                      to="/products"
-                      className="px-5 py-2.5 bg-white text-amber-600 font-semibold rounded-full hover:bg-amber-50 transition-colors"
-                    >
-                      View
-                    </Link>
                   </div>
                 </div>
-              </div>
+              </Link>
             </div>
           </div>
         </div>

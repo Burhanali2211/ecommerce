@@ -161,7 +161,7 @@ export default function HomePage() {
               </h2>
               
               <p className="text-gray-400 text-lg md:text-xl max-w-xl mb-12 leading-relaxed">
-                Join over 50,000 satisfied customers who have upgraded their lifestyle with ZenMart's premium curated collections.
+                Join over 50,000 satisfied customers who have upgraded their lifestyle with Himalayan Spices Exports' premium curated collections.
               </p>
               
               <div className="flex flex-wrap gap-6 mb-16">
@@ -247,14 +247,14 @@ export default function HomePage() {
                   </div>
                   
                   <p className="text-white text-xl font-medium leading-relaxed italic">
-                    "ZenMart has completely changed how I shop. The quality is unmatched and delivery is lightning fast!"
+                    "Himalayan Spices Exports has completely changed how I shop. The quality is unmatched and delivery is lightning fast!"
                   </p>
                   
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
                       <ShieldCheck className="w-5 h-5 text-white" />
                     </div>
-                    <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">Verified ZenMart Customer</span>
+                    <span className="text-emerald-400 font-bold uppercase tracking-widest text-xs">Verified Himalayan Spices Exports Customer</span>
                   </div>
                 </div>
               </div>

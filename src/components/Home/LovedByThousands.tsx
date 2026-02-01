@@ -12,22 +12,22 @@ const stats = [
 const features = [
   {
     title: "Express Delivery",
-    description: "Get your luxury fragrances delivered within 24-48 hours across major cities.",
+    description: "Get your premium spices and herbs delivered within 24-48 hours across major cities.",
     icon: Zap,
   },
   {
     title: "Global Sourcing",
-    description: "Authentic ingredients sourced directly from the world's most renowned distillers.",
+    description: "Authentic spices sourced directly from Himalayan farmers and renowned growers worldwide.",
     icon: Globe,
   },
   {
     title: "Expert Curation",
-    description: "Every scent in our collection is handpicked by master perfumers for its unique profile.",
+    description: "Every product in our collection is handpicked by spice experts for premium quality.",
     icon: Star,
   },
   {
     title: "Timeless Quality",
-    description: "Crafted using heritage techniques that ensure lasting presence and sillage.",
+    description: "Sourced using traditional methods that ensure authentic flavor and aroma.",
     icon: Clock,
   }
 ];
@@ -66,7 +66,7 @@ export const LovedByThousands: React.FC = () => {
             className="inline-flex items-center gap-2 bg-gray-100 px-4 py-1.5 rounded-full mb-6"
           >
             <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
-            <span className="text-gray-600 font-bold text-xs tracking-widest uppercase">The ZenMart Advantage</span>
+            <span className="text-gray-600 font-bold text-xs tracking-widest uppercase">The Himalayan Spices Exports Advantage</span>
           </motion.div>
           
           <motion.h2
@@ -86,7 +86,7 @@ export const LovedByThousands: React.FC = () => {
             transition={{ delay: 0.2 }}
             className="text-gray-500 text-lg md:text-xl max-w-3xl mx-auto leading-relaxed"
           >
-            We've redefined the luxury shopping experience by combining traditional craftsmanship with modern efficiency.
+            We've redefined the spice shopping experience by combining traditional sourcing with modern efficiency.
           </motion.p>
         </div>
 

@@ -299,7 +299,7 @@ export const SellerSettingsPage: React.FC = () => {
                     rows={4}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 resize-none"
                     placeholder="Tell customers about your store..."
-                    defaultValue="Authentic attars and perfumes from himalayanspicesexports. Premium quality, handcrafted fragrances."
+                    defaultValue="Authentic Himalayan spices and saffron from HimalayanSpicesExports. Premium quality, sourced from mountain farmers."
                   />
                 </div>
 
