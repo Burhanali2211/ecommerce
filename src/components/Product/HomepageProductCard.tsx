@@ -49,7 +49,7 @@ export const HomepageProductCard: React.FC<HomepageProductCardProps> = ({ produc
 
   return (
     <div
-      className="product-card group flex flex-col bg-white shadow-md hover:shadow-xl transition-all duration-300 touch-manipulation h-full rounded-lg sm:rounded-xl overflow-hidden border border-gray-100 hover:border-amber-200"
+      className="product-card group flex flex-col bg-white shadow-md hover:shadow-xl transition-all duration-300 touch-manipulation h-full rounded-md sm:rounded-xl overflow-hidden border border-gray-100 hover:border-amber-200"
     >
       {/* Image Container - Enhanced for homepage */}
       <div className="relative overflow-hidden group/image bg-gradient-to-br from-gray-50 to-gray-100 flex-shrink-0">
@@ -142,7 +142,7 @@ export const HomepageProductCard: React.FC<HomepageProductCardProps> = ({ produc
       </div>
 
       {/* Product Information - Compact and organized */}
-      <div className="flex flex-col flex-1 min-w-0 p-2.5 sm:p-4">
+      <div className="flex flex-col flex-1 min-w-0 p-2 sm:p-4">
         {/* Category Tag - Compact */}
         {product.category && (
           <span className="inline-flex items-center w-fit text-[10px] sm:text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded mb-1.5 uppercase tracking-wide">
@@ -183,7 +183,7 @@ export const HomepageProductCard: React.FC<HomepageProductCardProps> = ({ produc
 
         {/* Price - Compact and prominent */}
         <div className="flex items-baseline gap-1.5 mb-2 flex-wrap">
-          <span className="text-base sm:text-lg font-bold text-gray-900">
+          <span className="text-sm sm:text-lg font-bold text-gray-900">
             ₹{product.price.toLocaleString('en-IN')}
           </span>
           {product.originalPrice && (

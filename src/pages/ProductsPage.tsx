@@ -147,22 +147,22 @@ const ProductsPage: React.FC = () => {
                                 placeholder="Filter within results..."
                                 value={filters.search}
                                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                                className="w-full h-10 pl-10 pr-4 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                                className="w-full h-8 sm:h-10 pl-9 sm:pl-10 pr-3 sm:pr-4 bg-gray-50 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 outline-none"
                              />
                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                          </div>
-                         <div className="flex border border-gray-200 rounded-lg overflow-hidden h-10">
+                         <div className="flex border border-gray-200 rounded-lg overflow-hidden h-8 sm:h-10">
                             <button 
                                 onClick={() => setViewMode('grid')}
-                                className={`px-3 flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-[#131921] text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
+                                className={`px-2.5 sm:px-3 flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-[#131921] text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
                             >
-                                <Grid3X3 className="h-4 w-4" />
+                                <Grid3X3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </button>
                             <button 
                                 onClick={() => setViewMode('list')}
-                                className={`px-3 flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-[#131921] text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
+                                className={`px-2.5 sm:px-3 flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-[#131921] text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
                             >
-                                <LayoutList className="h-4 w-4" />
+                                <LayoutList className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </button>
                          </div>
                       </div>
@@ -175,11 +175,11 @@ const ProductsPage: React.FC = () => {
                 <div className="lg:hidden">
                     <button
                         onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className="w-full flex items-center justify-between px-4 py-2.5 bg-white rounded-xl border border-gray-200 shadow-sm"
+                        className="w-full flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 bg-white rounded-lg sm:rounded-xl border border-gray-200 shadow-sm"
                     >
                         <div className="flex items-center gap-2">
-                            <SlidersHorizontal className="h-4 w-4 text-gray-600" />
-                            <span className="text-sm font-semibold text-gray-900">Filters</span>
+                            <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-600" />
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900">Filters</span>
                             {(filters.category || filters.rating > 0 || filters.discount > 0 || filters.availability !== 'all') && (
                                 <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                                     Active
@@ -341,7 +341,7 @@ const ProductsPage: React.FC = () => {
                             <select 
                                 value={filters.sortBy}
                                 onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                                className="h-9 bg-white border border-gray-200 rounded-lg text-xs font-bold px-3 focus:ring-2 focus:ring-amber-500 outline-none cursor-pointer"
+                                className="h-8 sm:h-9 bg-white border border-gray-200 rounded-lg text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 focus:ring-2 focus:ring-amber-500 outline-none cursor-pointer"
                             >
                                 <option value="newest">Newest Arrivals</option>
                                 <option value="price-low-high">Price: Low to High</option>
@@ -368,7 +368,7 @@ const ProductsPage: React.FC = () => {
                             </button>
                         </div>
                     ) : (
-                        <div className={viewMode === 'grid' ? "grid grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-4"}>
+                        <div className={viewMode === 'grid' ? "grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4" : "space-y-3 sm:space-y-4"}>
                             {sortedProducts.map((product, index) => (
                                 <motion.div
                                     key={product.id}

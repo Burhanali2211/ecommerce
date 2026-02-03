@@ -133,15 +133,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
               <button 
                 onClick={handleWishlistToggle}
-                className={`p-2 rounded-lg sm:rounded-xl border transition-all ${
+                className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl border transition-all shrink-0 ${
                   isInWishlist(product.id) ? 'bg-red-50 text-red-500 border-red-100' : 'bg-white border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-100'
                 }`}
               >
-                <Heart className="h-4 w-4 sm:h-5 sm:w-5" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} />
+                <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} />
               </button>
               <AddToCartButton 
                 product={product} 
-                className="h-9 sm:h-12 px-3 sm:px-6 text-xs sm:text-sm"
+                className="h-7 sm:h-10 px-2.5 sm:px-4 text-[11px] sm:text-xs"
                 size="sm"
               />
             </div>
@@ -155,7 +155,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <motion.div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative flex flex-col h-full bg-white rounded-lg sm:rounded-xl border border-gray-200 hover:border-amber-400 transition-all duration-300 shadow-sm hover:shadow-md overflow-hidden"
+      className="group relative flex flex-col h-full bg-white rounded-md sm:rounded-xl border border-gray-200 hover:border-amber-400 transition-all duration-300 shadow-sm hover:shadow-md overflow-hidden"
     >
       <Link to={`/products/${product.id}`} className="block relative aspect-[1/1] overflow-hidden bg-white">
         <ProductImage
@@ -191,7 +191,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       </Link>
 
-      <div className="p-2.5 sm:p-3.5 flex flex-col flex-1">
+      <div className="p-2 sm:p-3.5 flex flex-col flex-1">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
             isTech ? 'bg-blue-50 text-blue-600' : isFashion ? 'bg-pink-50 text-pink-600' : 'bg-gray-50 text-gray-600'
@@ -205,33 +205,33 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         </div>
         
-        <Link to={`/products/${product.id}`} className="mb-2">
-          <h3 className="font-bold text-gray-900 line-clamp-2 text-sm leading-tight hover:text-purple-600 transition-colors">
+        <Link to={`/products/${product.id}`} className="mb-1.5 sm:mb-2">
+          <h3 className="font-bold text-gray-900 line-clamp-2 text-xs sm:text-sm leading-tight hover:text-purple-600 transition-colors">
             {product.name}
           </h3>
         </Link>
 
         <div className="mt-auto">
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-xl font-black text-[#131921]">₹{product.price.toLocaleString('en-IN')}</span>
+          <div className="flex items-baseline gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+            <span className="text-base sm:text-xl font-black text-[#131921]">₹{product.price.toLocaleString('en-IN')}</span>
             {product.originalPrice && (
               <span className="text-[11px] text-gray-400 line-through font-bold">₹{product.originalPrice.toLocaleString('en-IN')}</span>
             )}
           </div>
           
-            <div className="flex items-center gap-2 pt-1.5 sm:pt-2 border-t border-gray-50">
+            <div className="flex items-center gap-1.5 sm:gap-2 pt-1 sm:pt-1.5 border-t border-gray-50">
                <AddToCartButton 
                  product={product} 
-                 className="flex-1"
+                 className="flex-1 min-w-0"
                  size="sm"
                />
                <button 
                  onClick={handleWishlistToggle}
-                 className={`w-8 h-8 sm:w-9 sm:h-9 rounded border flex items-center justify-center transition-colors ${
+                 className={`w-7 h-7 sm:w-8 sm:h-8 rounded border flex items-center justify-center transition-colors shrink-0 ${
                    isInWishlist(product.id) ? 'text-red-500 border-red-100 bg-red-50' : 'text-gray-400 border-gray-200 hover:text-red-500'
                  }`}
                >
-                 <Heart className="h-4 w-4" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} />
+                 <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill={isInWishlist(product.id) ? 'currentColor' : 'none'} />
                </button>
             </div>
         </div>

@@ -325,7 +325,7 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
               {/* Cart */}
               <button
                 onClick={onCartClick}
-                className="relative p-2 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
+                className="relative p-1.5 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
                 aria-label="Cart"
               >
                 <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -339,7 +339,7 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
               {/* Mobile: Search Button */}
               <button
                 onClick={() => setIsSearchOpen(true)}
-                className="p-2 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all md:hidden"
+                className="p-1.5 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all md:hidden"
                 aria-label="Search"
               >
                 <Search className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -348,7 +348,7 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
               {/* Mobile: Menu Button */}
               <button
                 onClick={() => setIsMenuOpen(true)}
-                className="p-2 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all lg:hidden"
+                className="p-1.5 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all lg:hidden"
                 aria-label="Menu"
               >
                 <Menu className="h-4 w-4 sm:h-5 sm:w-5" />

@@ -43,16 +43,16 @@ export const AddToCartButton: React.FC<AddToCartButtonProps> = ({
   const isOutOfStock = product.stock === 0;
   const isAdded = buttonState === 'added' || buttonState === 'in-cart';
 
-  // Dynamic sizing
+  // Dynamic sizing - compact on mobile to prevent bulge
   const sizeClasses = {
-    sm: 'h-8 px-3 text-xs',
-    md: 'h-10 px-4 text-sm',
-    lg: 'h-12 px-6 text-base',
+    sm: 'h-7 sm:h-8 px-2.5 sm:px-3 text-[11px] sm:text-xs gap-1 sm:gap-2 rounded-md sm:rounded-lg',
+    md: 'h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm gap-1.5 sm:gap-2 rounded-md sm:rounded-lg',
+    lg: 'h-10 sm:h-12 px-4 sm:px-6 text-sm sm:text-base gap-2 rounded-lg',
   };
 
   const iconSize = {
-    sm: 14,
-    md: 16,
+    sm: 12,
+    md: 14,
     lg: 18,
   };
 
