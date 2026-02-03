@@ -36,17 +36,21 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
   const { setError } = useError();
 
-  const mapDbProductToAppProduct = (dbProduct: any): Product => ({
+  const mapDbProductToAppProduct = (dbProduct: any): Product => {
+    const images = Array.isArray(dbProduct.images) ? dbProduct.images
+      : dbProduct.image_url ? [dbProduct.image_url]
+      : [];
+    return {
     id: dbProduct.id,
     name: dbProduct.name,
     slug: dbProduct.slug,
-    description: dbProduct.description,
+    description: dbProduct.description || '',
     shortDescription: dbProduct.short_description,
     price: dbProduct.price,
     originalPrice: dbProduct.original_price,
     categoryId: dbProduct.category_id,
-    images: dbProduct.images || [],
-    stock: dbProduct.stock,
+    images,
+    stock: dbProduct.stock ?? 0,
     minStockLevel: dbProduct.min_stock_level,
     sku: dbProduct.sku,
     weight: dbProduct.weight,
@@ -63,9 +67,10 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
     isActive: dbProduct.is_active,
     metaTitle: dbProduct.meta_title,
     metaDescription: dbProduct.meta_description,
-    createdAt: new Date(dbProduct.created_at),
+    createdAt: dbProduct.created_at ? new Date(dbProduct.created_at) : new Date(0),
     updatedAt: dbProduct.updated_at ? new Date(dbProduct.updated_at) : undefined,
-  });
+  };
+  };
 
   const mapDbCategoryToAppCategory = (dbCategory: any): Category => ({
     id: dbCategory.id,

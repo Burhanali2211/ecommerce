@@ -581,6 +581,7 @@ export class OfflineRequestQueue {
 }
 
 // Enhanced hook for graceful degradation with bandwidth awareness
+// Note: Only disable images when fully offline. Mobile often reports "2g" incorrectly on 4G.
 export const useGracefulDegradation = () => {
   const networkStatus = useNetworkStatus();
   const [degradationLevel, setDegradationLevel] = useState<'none' | 'partial' | 'full'>('none');
@@ -595,7 +596,8 @@ export const useGracefulDegradation = () => {
     }
   }, [networkStatus]);
 
-  const shouldLoadImages = degradationLevel !== 'full';
+  // Always load images when online - mobile "2g" detection is often false positive
+  const shouldLoadImages = networkStatus.isOnline;
   const shouldLoadAnimations = degradationLevel === 'none';
   const shouldUseOptimizedQueries = degradationLevel !== 'none';
   const shouldShowOfflineMessage = degradationLevel === 'full';

@@ -68,6 +68,14 @@ const ProductsPage: React.FC = () => {
         }
     }, [categories, searchParams, slug]);
 
+    // Fetch products with filters when page mounts or filters change (critical for mobile/direct links)
+    useEffect(() => {
+        fetchProducts(1, 20, {
+            categoryId: filters.category || undefined,
+            search: filters.search || undefined
+        });
+    }, [filters.category, filters.search, fetchProducts]);
+
     const filteredProducts = useMemo(() => {
         let filtered = [...products];
         
@@ -383,7 +391,7 @@ const ProductsPage: React.FC = () => {
                     {pagination.pages > 1 && (
                         <div className="mt-12 flex justify-center items-center gap-2">
                             <button 
-                                onClick={() => { fetchProducts(pagination.page - 1); window.scrollTo(0,0); }}
+                                onClick={() => { fetchProducts(pagination.page - 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo(0,0); }}
                                 disabled={pagination.page === 1}
                                 className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 transition-colors"
                             >
@@ -393,7 +401,7 @@ const ProductsPage: React.FC = () => {
                                 {Array.from({ length: pagination.pages }).map((_, i) => (
                                     <button 
                                         key={i}
-                                        onClick={() => { fetchProducts(i + 1); window.scrollTo(0,0); }}
+                                        onClick={() => { fetchProducts(i + 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo(0,0); }}
                                         className={`w-10 h-10 rounded-lg text-sm font-black transition-all ${pagination.page === i + 1 ? 'bg-[#131921] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
                                     >
                                         {i + 1}
@@ -401,7 +409,7 @@ const ProductsPage: React.FC = () => {
                                 ))}
                             </div>
                             <button 
-                                onClick={() => { fetchProducts(pagination.page + 1); window.scrollTo(0,0); }}
+                                onClick={() => { fetchProducts(pagination.page + 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo(0,0); }}
                                 disabled={pagination.page === pagination.pages}
                                 className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 transition-colors"
                             >
