@@ -49,7 +49,7 @@ export const HomepageProductCard: React.FC<HomepageProductCardProps> = ({ produc
 
   return (
     <div
-      className="product-card group flex flex-col bg-white shadow-md hover:shadow-xl transition-all duration-300 touch-manipulation h-full rounded-xl overflow-hidden border border-gray-100 hover:border-amber-200"
+      className="product-card group flex flex-col bg-white shadow-md hover:shadow-xl transition-all duration-300 touch-manipulation h-full rounded-lg sm:rounded-xl overflow-hidden border border-gray-100 hover:border-amber-200"
     >
       {/* Image Container - Enhanced for homepage */}
       <div className="relative overflow-hidden group/image bg-gradient-to-br from-gray-50 to-gray-100 flex-shrink-0">
@@ -120,7 +120,7 @@ export const HomepageProductCard: React.FC<HomepageProductCardProps> = ({ produc
         <div className="absolute top-3 right-3 z-10">
           <button
             onClick={handleWishlistToggle}
-            className={`p-2.5 rounded-full shadow-lg border-2 transition-all duration-300 ${
+            className={`p-2 rounded-full shadow-lg border-2 transition-all duration-300 ${
               isInWishlist(product.id)
                 ? 'bg-red-500 text-white border-red-500 scale-110'
                 : 'bg-white/95 backdrop-blur-sm text-gray-600 hover:text-red-500 border-white/50 hover:border-red-200 hover:scale-110'
@@ -142,7 +142,7 @@ export const HomepageProductCard: React.FC<HomepageProductCardProps> = ({ produc
       </div>
 
       {/* Product Information - Compact and organized */}
-      <div className="flex flex-col flex-1 min-w-0 p-3 sm:p-4">
+      <div className="flex flex-col flex-1 min-w-0 p-2.5 sm:p-4">
         {/* Category Tag - Compact */}
         {product.category && (
           <span className="inline-flex items-center w-fit text-[10px] sm:text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded mb-1.5 uppercase tracking-wide">

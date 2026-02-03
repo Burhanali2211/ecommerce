@@ -180,24 +180,17 @@
 /* Touch-friendly interactions */
 @media (hover: none) and (pointer: coarse) {
 
-  /* Larger touch targets */
+  /* Larger touch targets - opt-in only, components control their own sizing */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
   }
 
-  /* Button adjustments */
-  button,
-  .button {
-    min-height: 44px;
-    padding: 0.75rem 1rem;
-  }
-
-  /* Checkbox and radio adjustments */
+  /* Checkbox and radio - proportional size for mobile (was 20px, caused bulge) */
   input[type="checkbox"],
   input[type="radio"] {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
   }
 
   /* Hover states for touch devices */

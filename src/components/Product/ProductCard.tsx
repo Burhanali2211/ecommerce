@@ -57,7 +57,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   if (isListView) {
     return (
-      <div className="group flex flex-row gap-3 sm:gap-6 p-3 sm:p-4 bg-white rounded-2xl border border-gray-100 hover:border-amber-200 transition-all duration-300 shadow-sm hover:shadow-xl relative">
+      <div className="group flex flex-row gap-3 sm:gap-6 p-2.5 sm:p-4 bg-white rounded-xl sm:rounded-2xl border border-gray-100 hover:border-amber-200 transition-all duration-300 shadow-sm hover:shadow-xl relative">
         {/* Image Section - Fixed width on all screens */}
         <div className="relative w-28 sm:w-40 md:w-52 lg:w-64 flex-shrink-0 overflow-hidden rounded-xl bg-gray-50">
           <Link to={`/products/${product.id}`} className="block h-full">
@@ -133,7 +133,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
               <button 
                 onClick={handleWishlistToggle}
-                className={`p-2 sm:p-3 rounded-lg sm:rounded-xl border transition-all ${
+                className={`p-2 rounded-lg sm:rounded-xl border transition-all ${
                   isInWishlist(product.id) ? 'bg-red-50 text-red-500 border-red-100' : 'bg-white border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-100'
                 }`}
               >
@@ -155,7 +155,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <motion.div
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className="group relative flex flex-col h-full bg-white rounded-xl border border-gray-200 hover:border-amber-400 transition-all duration-300 shadow-sm hover:shadow-md overflow-hidden"
+      className="group relative flex flex-col h-full bg-white rounded-lg sm:rounded-xl border border-gray-200 hover:border-amber-400 transition-all duration-300 shadow-sm hover:shadow-md overflow-hidden"
     >
       <Link to={`/products/${product.id}`} className="block relative aspect-[1/1] overflow-hidden bg-white">
         <ProductImage
@@ -191,7 +191,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
       </Link>
 
-      <div className="p-3.5 flex flex-col flex-1">
+      <div className="p-2.5 sm:p-3.5 flex flex-col flex-1">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
             isTech ? 'bg-blue-50 text-blue-600' : isFashion ? 'bg-pink-50 text-pink-600' : 'bg-gray-50 text-gray-600'
@@ -219,7 +219,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             )}
           </div>
           
-            <div className="flex items-center gap-2 pt-2 border-t border-gray-50">
+            <div className="flex items-center gap-2 pt-1.5 sm:pt-2 border-t border-gray-50">
                <AddToCartButton 
                  product={product} 
                  className="flex-1"
@@ -227,7 +227,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                />
                <button 
                  onClick={handleWishlistToggle}
-                 className={`w-9 h-9 rounded border flex items-center justify-center transition-colors ${
+                 className={`w-8 h-8 sm:w-9 sm:h-9 rounded border flex items-center justify-center transition-colors ${
                    isInWishlist(product.id) ? 'text-red-500 border-red-100 bg-red-50' : 'text-gray-400 border-gray-200 hover:text-red-500'
                  }`}
                >

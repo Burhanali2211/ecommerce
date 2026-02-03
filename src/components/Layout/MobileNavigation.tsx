@@ -208,10 +208,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
                 onCartClick();
                 onClose();
               }}
-              className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+              className="flex flex-col items-center justify-center p-2.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
             >
               <div className="relative">
-                <ShoppingCart className="h-5 w-5 text-gray-600" />
+                <ShoppingCart className="h-4 w-4 text-gray-600" />
                 {itemCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                     {itemCount > 9 ? '9+' : itemCount}
@@ -224,10 +224,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
             <Link
               to="/wishlist"
               onClick={onClose}
-              className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+              className="flex flex-col items-center justify-center p-2.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
             >
               <div className="relative">
-                <Heart className="h-5 w-5 text-gray-600" />
+                <Heart className="h-4 w-4 text-gray-600" />
                 {wishlistItems.length > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                     {wishlistItems.length > 9 ? '9+' : wishlistItems.length}
@@ -240,9 +240,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
             <Link
               to="/orders"
               onClick={onClose}
-              className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+              className="flex flex-col items-center justify-center p-2.5 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
             >
-              <Package className="h-5 w-5 text-gray-600" />
+              <Package className="h-4 w-4 text-gray-600" />
               <span className="text-xs font-medium text-gray-600 mt-1.5">Orders</span>
             </Link>
           </div>

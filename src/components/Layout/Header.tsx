@@ -325,10 +325,10 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
               {/* Cart */}
               <button
                 onClick={onCartClick}
-                className="relative p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
+                className="relative p-2 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
                 aria-label="Cart"
               >
-                <ShoppingCart className="h-5 w-5" />
+                <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
                 {itemCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {itemCount > 9 ? '9+' : itemCount}
@@ -339,19 +339,19 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
               {/* Mobile: Search Button */}
               <button
                 onClick={() => setIsSearchOpen(true)}
-                className="p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all md:hidden"
+                className="p-2 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all md:hidden"
                 aria-label="Search"
               >
-                <Search className="h-5 w-5" />
+                <Search className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
 
               {/* Mobile: Menu Button */}
               <button
                 onClick={() => setIsMenuOpen(true)}
-                className="p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all lg:hidden"
+                className="p-2 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all lg:hidden"
                 aria-label="Menu"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </div>
           </div>

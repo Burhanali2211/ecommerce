@@ -42,11 +42,11 @@ export const Button: React.FC<ButtonProps> = ({
     ghost: 'text-purple-600 hover:text-purple-700 hover:bg-purple-50 focus:ring-purple-500',
   };
 
-  // Enhanced size classes with mobile-optimized touch targets
+  // Enhanced size classes with mobile-optimized touch targets (reduced from 44-56px to prevent mobile bulge)
   const sizeClasses = {
-    sm: mobileOptimized ? 'min-h-[44px] min-w-[44px] px-4 py-2 text-sm rounded-md' : 'px-3 py-1.5 text-sm rounded-md',
-    md: mobileOptimized ? 'min-h-[48px] min-w-[48px] px-5 py-3 text-sm rounded-lg' : 'px-4 py-2 text-sm rounded-lg',
-    lg: mobileOptimized ? 'min-h-[56px] min-w-[56px] px-6 py-4 text-base rounded-lg' : 'px-6 py-3 text-base rounded-lg',
+    sm: mobileOptimized ? 'min-h-[38px] min-w-[38px] px-3 py-1.5 text-sm rounded-md' : 'px-3 py-1.5 text-sm rounded-md',
+    md: mobileOptimized ? 'min-h-[42px] min-w-[42px] px-4 py-2 text-sm rounded-lg' : 'px-4 py-2 text-sm rounded-lg',
+    lg: mobileOptimized ? 'min-h-[48px] min-w-[48px] px-5 py-3 text-base rounded-lg' : 'px-6 py-3 text-base rounded-lg',
   };
 
   const iconSizeClasses = {

@@ -33,7 +33,7 @@ export const FlashSale: React.FC = () => {
   if (flashSaleProducts.length === 0) return null;
 
   return (
-    <section className="py-8 bg-gray-50 border-y border-gray-200">
+    <section className="py-5 sm:py-8 bg-gray-50 border-y border-gray-200">
       <div className="max-w-[1600px] mx-auto px-4">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -53,10 +53,10 @@ export const FlashSale: React.FC = () => {
                   { label: 'S', value: timeLeft.seconds }
                 ].map((unit, idx) => (
                   <div key={idx} className="flex items-center">
-                    <div className="bg-[#131921] text-white w-10 h-10 rounded flex items-center justify-center font-mono text-xl font-bold">
+                    <div className="bg-[#131921] text-white w-8 h-8 sm:w-10 sm:h-10 rounded flex items-center justify-center font-mono text-base sm:text-xl font-bold">
                       {unit.value.toString().padStart(2, '0')}
                     </div>
-                    {idx < 2 && <span className="mx-1 text-xl font-bold text-[#131921]">:</span>}
+                    {idx < 2 && <span className="mx-1 text-base sm:text-xl font-bold text-[#131921]">:</span>}
                   </div>
                 ))}
               </div>
@@ -69,9 +69,9 @@ export const FlashSale: React.FC = () => {
         </div>
 
         {/* Product Carousel (Simplified to Grid for now) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
           {flashSaleProducts.map((product) => (
-            <div key={product.id} className="bg-white p-3 rounded-lg border border-gray-100 hover:shadow-lg transition-shadow">
+            <div key={product.id} className="bg-white p-2 sm:p-3 rounded-lg border border-gray-100 hover:shadow-lg transition-shadow">
               <Link to={`/products/${product.slug || product.id}`} className="block relative aspect-square mb-3 overflow-hidden rounded">
                 <img 
                   src={product.imageUrl || 'https://via.placeholder.com/300'} 

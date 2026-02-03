@@ -67,7 +67,7 @@ export const AddToCartButton: React.FC<AddToCartButtonProps> = ({
       disabled={isOutOfStock || isAdding}
       className={`
         relative overflow-hidden flex items-center justify-center gap-2 font-bold rounded-lg
-        transition-all duration-300 select-none touch-manipulation
+        transition-all duration-300 select-none touch-manipulation min-h-0
         ${isOutOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : ''}
         ${isAdded ? 'bg-green-500 text-white hover:bg-green-600 shadow-lg' : ''}
         ${sizeClasses[size]}

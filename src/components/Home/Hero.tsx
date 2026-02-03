@@ -146,14 +146,14 @@ export const Hero: React.FC = () => {
               >
                 <Link
                   to="/products"
-                  className="group inline-flex items-center justify-center gap-2 px-8 py-4 bg-amber-500 hover:bg-amber-400 text-white font-semibold rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/25 active:scale-[0.98]"
+                  className="group inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:px-8 sm:py-4 bg-amber-500 hover:bg-amber-400 text-white font-semibold rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/25 active:scale-[0.98] text-sm sm:text-base"
                 >
                   <span>Shop Collection</span>
-                  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                  <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:translate-x-1" />
                 </Link>
                 <Link
                   to="/about"
-                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white font-semibold rounded-full border border-white/30 transition-all duration-300 active:scale-[0.98]"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 sm:px-8 sm:py-4 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white font-semibold rounded-full border border-white/30 transition-all duration-300 active:scale-[0.98] text-sm sm:text-base"
                 >
                   <span>Our Story</span>
                 </Link>

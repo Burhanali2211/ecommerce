@@ -56,15 +56,15 @@ export const MobileTouchButton: React.FC<MobileTouchButtonProps> = ({
   };
 
   const sizeClasses = {
-    minimum: `min-h-[44px] min-w-[44px] px-2.5 sm:px-3 py-1.5 text-xs rounded-md`,
-    comfortable: `min-h-[48px] min-w-[48px] px-3 sm:px-4 py-2 text-sm rounded-md`,
-    optimal: `min-h-[56px] min-w-[56px] px-4 sm:px-5 py-2.5 text-base rounded-lg`,
+    minimum: `min-h-[38px] min-w-[38px] px-2.5 sm:px-3 py-1.5 text-xs rounded-md`,
+    comfortable: `min-h-[42px] min-w-[42px] px-3 sm:px-4 py-2 text-sm rounded-md`,
+    optimal: `min-h-[48px] min-w-[48px] px-4 sm:px-5 py-2.5 text-base rounded-lg`,
   };
 
   const iconSizeClasses = {
-    minimum: 'h-3.5 w-3.5',
-    comfortable: 'h-4 w-4',
-    optimal: 'h-5 w-5',
+    minimum: 'h-3 w-3',
+    comfortable: 'h-3.5 w-3.5',
+    optimal: 'h-4 w-4',
   };
 
   const handleClick = (e: React.MouseEvent) => {
@@ -148,15 +148,15 @@ export const MobileIconButton: React.FC<MobileIconButtonProps> = ({
   };
 
   const sizeClasses = {
-    minimum: `h-[44px] w-[44px]`,
-    comfortable: `h-[48px] w-[48px]`,
-    optimal: `h-[56px] w-[56px]`,
+    minimum: `h-[38px] w-[38px]`,
+    comfortable: `h-[42px] w-[42px]`,
+    optimal: `h-[48px] w-[48px]`,
   };
 
   const iconSizeClasses = {
-    minimum: 'h-4 w-4',
-    comfortable: 'h-5 w-5',
-    optimal: 'h-6 w-6',
+    minimum: 'h-3.5 w-3.5',
+    comfortable: 'h-4 w-4',
+    optimal: 'h-5 w-5',
   };
 
   return (

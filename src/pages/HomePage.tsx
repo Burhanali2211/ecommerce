@@ -15,7 +15,7 @@ const LatestArrivals = lazy(() => import('@/components/Home/LatestArrivals'));
 
 // Loading fallback component
 const SectionLoader = memo(({ bgColor = 'bg-white' }: { bgColor?: string }) => (
-  <div className={`py-16 md:py-24 ${bgColor}`}>
+  <div className={`py-10 sm:py-14 md:py-24 ${bgColor}`}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <LoadingSpinner />
     </div>
@@ -57,7 +57,7 @@ export default function HomePage() {
         whileInView="visible"
         viewport={{ once: true, margin: "-100px" }}
         variants={sectionVariants}
-        className="py-20 md:py-32 bg-white relative overflow-hidden border-t border-gray-100"
+        className="py-12 sm:py-16 md:py-32 bg-white relative overflow-hidden border-t border-gray-100"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           {/* Section Header */}
@@ -91,7 +91,7 @@ export default function HomePage() {
           <div className="mt-12 text-center lg:hidden">
             <Link
               to="/categories"
-              className="inline-flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-full font-bold w-full justify-center"
+              className="inline-flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-full font-bold w-full justify-center text-sm"
             >
               View All Categories
               <ArrowRight className="w-4 h-4" />
@@ -137,7 +137,7 @@ export default function HomePage() {
       </motion.div>
 
       {/* Premium CTA Section - Massive Upgrade */}
-      <section className="py-24 md:py-40 relative overflow-hidden bg-gray-900">
+      <section className="py-12 sm:py-16 md:py-24 lg:py-40 relative overflow-hidden bg-gray-900">
         {/* Animated Background Gradients */}
         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-purple-600/20 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2" />

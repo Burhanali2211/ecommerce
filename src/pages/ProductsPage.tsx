@@ -127,7 +127,7 @@ const ProductsPage: React.FC = () => {
         <div className="min-h-screen bg-[#f7f8f8]">
             {/* Marketplace Top Section */}
             <div className="bg-white border-b border-gray-200">
-                <div className="max-w-[1600px] mx-auto px-4 py-4 md:py-8">
+                <div className="max-w-[1600px] mx-auto px-4 py-3 sm:py-4 md:py-8">
                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
                       <Link to="/" className="hover:text-[#131921]">Home</Link>
                       <ChevronRight className="h-3 w-3" />
@@ -170,12 +170,12 @@ const ProductsPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="max-w-[1600px] mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
+            <div className="max-w-[1600px] mx-auto px-4 py-4 sm:py-6 lg:py-8 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
                 {/* Mobile Filter Toggle */}
                 <div className="lg:hidden">
                     <button
                         onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 shadow-sm"
+                        className="w-full flex items-center justify-between px-4 py-2.5 bg-white rounded-xl border border-gray-200 shadow-sm"
                     >
                         <div className="flex items-center gap-2">
                             <SlidersHorizontal className="h-4 w-4 text-gray-600" />
@@ -186,13 +186,13 @@ const ProductsPage: React.FC = () => {
                                 </span>
                             )}
                         </div>
-                        <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
                     </button>
                 </div>
 
                 {/* Faceted Sidebar - Hidden on mobile unless open */}
                 <aside className={`w-full lg:w-64 flex-shrink-0 ${isFilterOpen ? 'block' : 'hidden lg:block'}`}>
-                    <div className="lg:sticky lg:top-28 space-y-4 bg-white lg:bg-transparent rounded-xl lg:rounded-none p-4 lg:p-0 border border-gray-200 lg:border-0 mt-4 lg:mt-0">
+                    <div className="lg:sticky lg:top-28 space-y-4 bg-white lg:bg-transparent rounded-xl lg:rounded-none p-3 sm:p-4 lg:p-0 border border-gray-200 lg:border-0 mt-4 lg:mt-0">
                         <div className="flex items-center justify-between">
                            <h2 className="text-xs font-black text-[#131921] uppercase tracking-widest">Filters</h2>
                            <div className="flex items-center gap-3">

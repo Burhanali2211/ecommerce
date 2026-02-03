@@ -18,7 +18,7 @@ export const FeaturedProducts: React.FC = memo(() => {
     }, [fetchFeaturedProducts]);
 
     return (
-        <section className="py-16 md:py-24 bg-gradient-to-b from-white via-amber-50/30 to-white relative overflow-hidden">
+        <section className="py-10 sm:py-14 md:py-24 bg-gradient-to-b from-white via-amber-50/30 to-white relative overflow-hidden">
             {/* Subtle decorative elements */}
             <div className="absolute top-0 left-0 w-96 h-96 bg-amber-100/40 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
             <div className="absolute bottom-0 right-0 w-80 h-80 bg-purple-100/30 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
@@ -66,7 +66,7 @@ export const FeaturedProducts: React.FC = memo(() => {
                     <div className="relative">
                         {/* Products Grid - 2 per row on mobile, 4 on desktop */}
                         <div 
-                            className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 md:gap-6"
+                            className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 md:gap-6"
                         >
                             {featuredProducts.map((product, index) => (
                                 <div 
@@ -93,7 +93,7 @@ export const FeaturedProducts: React.FC = memo(() => {
                 <div className="mt-10 text-center lg:hidden">
                     <Link
                         to="/products?featured=true"
-                        className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                        className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm"
                     >
                         View All Featured
                         <ArrowRight className="h-4 w-4" />

@@ -305,7 +305,7 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
               type="checkbox"
               checked={filters.inStock}
               onChange={(e) => updateFilter('inStock', e.target.checked)}
-              className="form-checkbox h-5 w-5 text-primary-600 rounded focus:ring-primary-500"
+              className="form-checkbox h-4 w-4 text-primary-600 rounded focus:ring-primary-500"
             />
             <span className="text-neutral-700 group-hover:text-neutral-900 transition-colors">
               In Stock Only

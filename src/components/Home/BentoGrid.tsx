@@ -62,7 +62,7 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ categories, loading }) => 
                   TOP CATEGORY
                </div>
             </div>
-            <div className="absolute bottom-0 left-0 p-3 sm:p-6 w-full">
+            <div className="absolute bottom-0 left-0 p-2 sm:p-4 md:p-6 w-full">
               <h3 className="text-lg sm:text-2xl md:text-3xl font-black text-white mb-0.5 sm:mb-1 drop-shadow-md">{featuredCat.name}</h3>
               <p className="text-gray-100 text-[10px] sm:text-sm mb-2 sm:mb-4 line-clamp-2 max-w-xs drop-shadow-sm hidden sm:block">{featuredCat.description}</p>
               <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-white text-[#131921] px-2.5 py-1 sm:px-4 sm:py-2 rounded-lg text-[10px] sm:text-sm font-bold shadow-lg group/btn">

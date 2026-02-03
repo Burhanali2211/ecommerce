@@ -49,7 +49,7 @@ export const LovedByThousands: React.FC = () => {
   };
 
   return (
-    <section className="py-20 md:py-32 bg-white relative overflow-hidden">
+    <section className="py-12 sm:py-16 md:py-32 bg-white relative overflow-hidden">
       {/* Abstract Background Decoration */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-full opacity-[0.03] pointer-events-none">
         <div className="absolute top-20 left-10 w-64 h-64 bg-purple-600 rounded-full blur-[100px]" />
@@ -96,7 +96,7 @@ export const LovedByThousands: React.FC = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-24"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-16 sm:mb-24"
         >
           {stats.map((stat, index) => (
             <motion.div
@@ -104,7 +104,7 @@ export const LovedByThousands: React.FC = () => {
               variants={itemVariants}
               className="text-center group"
             >
-              <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl ${stat.bg} ${stat.color} mb-6 transition-transform duration-300 group-hover:scale-110 shadow-sm`}>
+              <div className={`inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-2xl ${stat.bg} ${stat.color} mb-4 sm:mb-6 transition-transform duration-300 group-hover:scale-110 shadow-sm`}>
                 <stat.icon className="w-8 h-8" />
               </div>
               <h3 className="text-3xl md:text-4xl font-black text-gray-900 mb-2">{stat.value}</h3>
@@ -114,7 +114,7 @@ export const LovedByThousands: React.FC = () => {
         </motion.div>
 
         {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
           {features.map((feature, index) => (
             <motion.div
               key={index}
@@ -122,9 +122,9 @@ export const LovedByThousands: React.FC = () => {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="flex gap-6 p-8 rounded-3xl bg-gray-50/50 hover:bg-white border border-transparent hover:border-gray-100 transition-all duration-300 group"
+              className="flex gap-4 sm:gap-6 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-gray-50/50 hover:bg-white border border-transparent hover:border-gray-100 transition-all duration-300 group"
             >
-              <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-gray-900 transition-colors group-hover:bg-purple-600 group-hover:text-white">
+              <div className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-white shadow-sm flex items-center justify-center text-gray-900 transition-colors group-hover:bg-purple-600 group-hover:text-white">
                 <feature.icon className="w-7 h-7" />
               </div>
               <div>
