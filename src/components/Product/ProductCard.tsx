@@ -141,9 +141,9 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
   return (
     <div className="flex flex-col bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden border border-gray-100 h-full" style={{ minHeight: 0 }}>
 
-      {/* Image area */}
+      {/* Image area — 4:3 on mobile (shorter), square on sm+ */}
       <Link to={`/products/${product.id}`} className="block relative bg-gray-50">
-        <div className="aspect-square overflow-hidden">
+        <div className="aspect-[4/3] sm:aspect-square overflow-hidden">
           <img
             src={images[currentImageIndex] || ''}
             alt={product.name}
@@ -152,10 +152,10 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
           />
         </div>
 
-        {/* Best Seller badge — top left */}
+        {/* Best Seller badge */}
         {product.featured && (
-          <div className="absolute top-3 left-3">
-            <span className="bg-white text-gray-800 text-[11px] font-semibold px-3 py-1 rounded-full shadow-sm border border-gray-100">
+          <div className="absolute top-2 left-2">
+            <span className="bg-white text-gray-800 text-[10px] sm:text-[11px] font-semibold px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-sm border border-gray-100">
               Best Seller
             </span>
           </div>
@@ -163,33 +163,31 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
 
         {/* Discount badge */}
         {discount > 0 && !product.featured && (
-          <div className="absolute top-3 left-3">
-            <span className="bg-red-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+          <div className="absolute top-2 left-2">
+            <span className="bg-red-500 text-white text-[10px] sm:text-[11px] font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full shadow-sm">
               -{discount}%
             </span>
           </div>
         )}
 
-        {/* Wishlist — top right */}
+        {/* Wishlist */}
         <button
           onClick={handleWishlistToggle}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center transition-transform duration-200 hover:scale-110 touch-manipulation"
+          className="absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center transition-transform duration-200 hover:scale-110 touch-manipulation"
           aria-label={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
         >
-          <Heart
-            className={`h-4 w-4 ${isInWishlist(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}`}
-          />
+          <Heart className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isInWishlist(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
         </button>
       </Link>
 
-      {/* Image dots — always reserve height so all cards align */}
-      <div className="flex items-center justify-center gap-1.5 h-6 bg-white">
+      {/* Image dots */}
+      <div className="flex items-center justify-center gap-1 sm:gap-1.5 h-4 sm:h-6 bg-white">
         {hasMultipleImages && images.map((_, i) => (
           <button
             key={i}
             onClick={() => setCurrentImageIndex(i)}
             className={`rounded-full transition-all duration-200 cursor-pointer ${
-              i === currentImageIndex ? 'w-2 h-2 bg-gray-800' : 'w-1.5 h-1.5 bg-gray-300'
+              i === currentImageIndex ? 'w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gray-800' : 'w-1 h-1 sm:w-1.5 sm:h-1.5 bg-gray-300'
             }`}
             aria-label={`Image ${i + 1}`}
           />
@@ -197,10 +195,10 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
       </div>
 
       {/* Info */}
-      <div className="flex flex-col flex-1 px-3 sm:px-4 pt-3 pb-4 gap-1">
+      <div className="flex flex-col flex-1 px-2.5 sm:px-4 pt-2 sm:pt-3 pb-2.5 sm:pb-4 gap-0.5 sm:gap-1">
         {/* Category */}
         {(product.categoryName || product.category) && (
-          <span className="text-xs font-semibold text-green-600">
+          <span className="text-[10px] sm:text-xs font-semibold text-green-600 leading-tight">
             {product.categoryName || product.category}
           </span>
         )}
@@ -210,13 +208,10 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
           <div className="flex items-center gap-1">
             <div className="flex items-center gap-0.5">
               {[1,2,3,4,5].map(s => (
-                <Star
-                  key={s}
-                  className={`h-3 w-3 ${s <= Math.round(product.rating) ? 'fill-amber-400 text-amber-400' : 'fill-gray-200 text-gray-200'}`}
-                />
+                <Star key={s} className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${s <= Math.round(product.rating) ? 'fill-amber-400 text-amber-400' : 'fill-gray-200 text-gray-200'}`} />
               ))}
             </div>
-            <span className="text-[10px] text-gray-500 font-medium">
+            <span className="text-[9px] sm:text-[10px] text-gray-500 font-medium">
               {product.rating.toFixed(1)}{product.reviewCount ? ` (${product.reviewCount})` : ''}
             </span>
           </div>
@@ -224,18 +219,18 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
 
         {/* Product name */}
         <Link to={`/products/${product.id}`}>
-          <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 hover:text-gray-700 transition-colors">
+          <h3 className="font-bold text-gray-900 text-xs sm:text-sm leading-snug line-clamp-2 hover:text-gray-700 transition-colors">
             {product.name}
           </h3>
         </Link>
 
         {/* Price */}
-        <div className="flex items-baseline gap-2 mt-0.5">
-          <span className="text-sm sm:text-base font-bold text-gray-900">
+        <div className="flex items-baseline gap-1.5 sm:gap-2 mt-0.5">
+          <span className="text-xs sm:text-base font-bold text-gray-900">
             ₹{product.price.toLocaleString('en-IN')}
           </span>
           {product.originalPrice && product.originalPrice > product.price && (
-            <span className="text-xs text-gray-400 line-through">
+            <span className="text-[10px] sm:text-xs text-gray-400 line-through">
               ₹{product.originalPrice.toLocaleString('en-IN')}
             </span>
           )}
@@ -245,7 +240,7 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
         <BuyNowButton
           onClick={handleAddToCart}
           disabled={product.stock === 0}
-          className="mt-3"
+          className="mt-1.5 sm:mt-3"
         />
       </div>
     </div>

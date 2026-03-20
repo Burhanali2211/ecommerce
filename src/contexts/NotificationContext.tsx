@@ -83,9 +83,9 @@ const ToastStack: React.FC<{ notifications: Notification[]; onRemove: (id: strin
     <div
       style={{
         position: 'fixed',
-        // Mobile: bottom-center above bottom nav (64px) + gap. Desktop: top-right.
-        bottom: isMobile ? '76px' : 'auto',
+        bottom: isMobile ? '80px' : 'auto',
         top: isMobile ? 'auto' : '100px',
+        // Mobile: anchor left edge at 50% then pull back half the container width
         left: isMobile ? '50%' : 'auto',
         right: isMobile ? 'auto' : '20px',
         transform: isMobile ? 'translateX(-50%)' : 'none',
@@ -93,10 +93,10 @@ const ToastStack: React.FC<{ notifications: Notification[]; onRemove: (id: strin
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
-        alignItems: isMobile ? 'center' : 'flex-end',
+        alignItems: 'center',
         pointerEvents: 'none',
-        // Mobile: constrain width to pill; desktop: card width
-        width: isMobile ? 'auto' : '340px',
+        // Fixed container width on mobile so translateX(-50%) always lands dead-center
+        width: isMobile ? 'max-content' : '340px',
         maxWidth: isMobile ? 'calc(100vw - 32px)' : '340px',
       }}
     >
