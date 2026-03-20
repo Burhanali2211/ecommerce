@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useId } from 'react';
 import { Upload, X, Link, CheckCircle, Image as ImageIcon, Loader, Camera, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -59,6 +59,8 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const [urlInput, setUrlInput] = useState(stringValue);
   const [showUrlField, setShowUrlField] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadId = useId();
   const { showNotification, showSuccess, showError } = useNotification();
 
   const images = Array.isArray(value) ? value.filter(img => img && img.trim() !== '') : value ? [value] : [];
@@ -159,6 +161,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       showError('Upload Error', error instanceof Error ? error.message : 'Failed to upload image');
     } finally {
       setUploadProgress(null);
+      setIsUploading(false);
     }
   }, [useCloudStorage, folder, multiple, onChange, onMainImageChange, showError, showSuccess]);
 
@@ -274,26 +277,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     }
   };
 
-  const handleCameraCapture = () => {
-    try {
-      const cameraInput = document.createElement('input');
-      cameraInput.type = 'file';
-      cameraInput.accept = 'image/*';
-      cameraInput.capture = 'environment';
-      cameraInput.multiple = multiple;
-
-      cameraInput.onchange = (e) => {
-        const target = e.target as HTMLInputElement;
-        if (target.files) {
-          Array.from(target.files).forEach(file => handleFileUpload(file));
-        }
-      };
-
-      cameraInput.click();
-    } catch (error) {
-      showError('Camera Error', 'Failed to access camera');
+  const handleCameraCapture = useCallback(() => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
     }
-  };
+  }, []);
 
   const getAspectRatioClass = () => {
     switch (aspectRatio) {
@@ -467,23 +456,37 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             onDrop={handleDrop}
             className={`
               relative border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200
-              ${isDragging
-                ? 'border-indigo-400 bg-indigo-50'
-                : 'border-gray-300 hover:border-gray-400'
-              }
-              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+              ${isDragging ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300 hover:border-gray-400'}
+              ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
               ${getAspectRatioClass()}
             `}
-            onClick={() => !disabled && fileInputRef.current?.click()}
           >
+            {/* Hidden file inputs — kept in DOM so mobile browsers handle them correctly */}
             <input
               ref={fileInputRef}
+              id={`${uploadId}-file`}
               type="file"
               accept={accept}
               onChange={handleFileSelect}
               className="hidden"
               disabled={disabled}
               multiple={multiple}
+            />
+            <input
+              ref={cameraInputRef}
+              id={`${uploadId}-camera`}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => {
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  Array.from(files).forEach(file => handleFileUpload(file));
+                }
+                e.target.value = '';
+              }}
+              className="hidden"
+              disabled={disabled}
             />
 
             <div className="flex flex-col items-center justify-center h-full min-h-[120px]">
@@ -497,11 +500,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                         <div
                           className="bg-amber-500 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${uploadProgress.percentage}%` }}
-                        ></div>
+                        />
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {uploadProgress.percentage}%
-                      </p>
+                      <p className="text-xs text-gray-500 mt-1">{uploadProgress.percentage}%</p>
                     </div>
                   )}
                 </>
@@ -510,12 +511,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                   <ImageIcon className="h-12 w-12 text-gray-400 mb-3" />
                   <p className="text-sm text-gray-600 mb-4">{placeholder}</p>
 
-                  {/* Upload buttons */}
+                  {/* Upload buttons — stopPropagation prevents the outer div from re-triggering */}
                   <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
                     <button
                       type="button"
+                      disabled={disabled}
                       className="flex flex-col items-center justify-center cursor-pointer text-gray-700 hover:text-amber-600 px-4 py-2"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                     >
                       <div className="p-2 bg-gray-100 rounded-full mb-1">
                         <Upload className="h-5 w-5" />
@@ -525,8 +527,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 
                     <button
                       type="button"
+                      disabled={disabled}
                       className="flex flex-col items-center justify-center cursor-pointer text-gray-700 hover:text-amber-600 px-4 py-2"
-                      onClick={handleCameraCapture}
+                      onClick={(e) => { e.stopPropagation(); handleCameraCapture(); }}
                     >
                       <div className="p-2 bg-gray-100 rounded-full mb-1">
                         <Camera className="h-5 w-5" />
@@ -535,9 +538,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                     </button>
                   </div>
 
-                  <p className="text-xs text-gray-500 mt-3">
-                    PNG, JPG, WebP up to 5MB
-                  </p>
+                  <p className="text-xs text-gray-500 mt-3">PNG, JPG, WebP up to 5MB</p>
                 </>
               )}
             </div>

@@ -126,13 +126,13 @@ const PromoBanner: React.FC = memo(() => (
   <div className="mx-4 sm:mx-6 lg:mx-8 my-2 max-w-7xl xl:mx-auto">
     <Link
       to="/deals"
-      className="flex items-center justify-between bg-green-800 rounded-2xl px-4 sm:px-6 py-3 sm:py-4 group"
+      className="flex items-center justify-between bg-black/80 rounded-2xl px-4 sm:px-6 py-3 sm:py-4 group"
     >
       <div>
         <p className="text-white font-black text-sm sm:text-base">🎉 Limited-Time Offer</p>
         <p className="text-green-100 text-xs sm:text-sm">Free shipping on all orders above ₹999</p>
       </div>
-      <div className="flex items-center gap-1 bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full group-hover:bg-white/30 transition-colors">
+      <div className="flex items-center gap-1 bg-white text-black text-xs font-bold px-3 py-1.5 rounded-full group-hover:bg-white/30 transition-colors">
         Shop <ArrowRight className="h-3 w-3" />
       </div>
     </Link>
@@ -149,7 +149,7 @@ const TRUST_ITEMS = [
 ];
 
 const TrustBar: React.FC = memo(() => (
-  <section className="bg-white border-t border-gray-100 py-4">
+  <section className="bg-white border-t border-gray-100 pt-4 pb-0">
     <div className="max-w-7xl mx-auto px-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
@@ -203,20 +203,14 @@ export default function HomePage() {
       {/* 7. Best Sellers — horizontal scroll */}
       <BestSellers />
 
-      {/* 8. Shop by Price — horizontal chips */}
-      <ShopByPrice />
-
-      {/* 9. Trust Signals */}
-      <TrustBar />
-
-      {/* 10. New Arrivals — horizontal scroll */}
+      {/* 8. New Arrivals — horizontal scroll */}
       <div className="mt-1.5">
         <Suspense fallback={<SectionLoader />}>
           <LatestArrivals />
         </Suspense>
       </div>
 
-      {/* 11. CTA Banner */}
+      {/* 9. CTA Banner */}
       <section className="mt-1.5 bg-green-800 py-8 sm:py-10">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div>
@@ -231,6 +225,9 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* 10. Trust Signals */}
+      <TrustBar />
 
     </div>
   );

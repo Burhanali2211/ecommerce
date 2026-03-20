@@ -191,9 +191,20 @@ export const ProductsList: React.FC = () => {
     if (!selectedProduct) return;
     try {
       setDeleteLoading(true);
-      const { error } = await supabase.from('products').delete().eq('id', selectedProduct.id);
+      const pid = selectedProduct.id;
+
+      // Remove FK references before deleting the product to avoid 409 conflicts
+      await Promise.allSettled([
+        supabase.from('cart_items').delete().eq('product_id', pid),
+        supabase.from('wishlist_items').delete().eq('product_id', pid),
+        supabase.from('order_items').delete().eq('product_id', pid),
+        supabase.from('reviews').delete().eq('product_id', pid),
+      ]);
+
+      const { error } = await supabase.from('products').delete().eq('id', pid);
       if (error) throw error;
-      _productsCache = null; // Invalidate cache after mutation
+
+      _productsCache = null;
       showSuccess('Success', 'Product deleted successfully');
       setShowDeleteModal(false);
       setSelectedProduct(null);

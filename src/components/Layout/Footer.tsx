@@ -9,11 +9,7 @@ import {
   Phone,
   MapPin,
   Send,
-  ShieldCheck,
-  Truck,
-  CreditCard,
-  Award,
-  ArrowUpRight,
+ArrowUpRight,
   Globe,
   Zap
 } from 'lucide-react';
@@ -41,41 +37,8 @@ export const Footer: React.FC = () => {
   const phoneContact = contactInfo.find(c => c.contact_type === 'phone' && c.is_primary);
   const addressContact = contactInfo.find(c => c.contact_type === 'address' && c.is_primary);
 
-  const trustSignals = [
-    { icon: Truck, title: 'Fast Delivery', desc: 'Free over ₹999' },
-    { icon: ShieldCheck, title: 'Authentic', desc: '100% Guaranteed' },
-    { icon: CreditCard, title: 'Secure Pay', desc: 'Encrypted txn' },
-    { icon: Award, title: 'Premium', desc: 'Quality Check' },
-  ];
-
   return (
     <footer className="bg-white border-t border-gray-100 overflow-hidden">
-      {/* Trust Signals Bar */}
-      <div className="bg-gray-50/50 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            {trustSignals.map((signal, index) => (
-              <motion.div 
-                key={index}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-center gap-4"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-white shadow-sm border border-gray-100 flex items-center justify-center text-purple-600">
-                  <signal.icon className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{signal.title}</h4>
-                  <p className="text-xs text-gray-400 font-medium">{signal.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* Main Footer Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-16">

@@ -76,10 +76,10 @@ export const FlashSale: React.FC = memo(() => {
               <Link
                 key={product.id}
                 to={`/products/${product.id}`}
-                className="group block bg-gray-50 rounded-2xl overflow-hidden border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200"
+                className="group block bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
               >
-                {/* Image — wider than tall (4:3) so cards don't tower */}
-                <div className="relative aspect-[4/3] overflow-hidden rounded-t-2xl">
+                {/* Image */}
+                <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
                   <img
                     src={product.images?.[0] || ''}
                     alt={product.name}
@@ -88,18 +88,14 @@ export const FlashSale: React.FC = memo(() => {
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                   />
-
-                  {/* Price tag — top right, Gen Z label style */}
-                  <div className="absolute top-2 right-2">
-                    <span className="bg-gray-900 text-white text-[10px] font-black px-2 py-1 rounded-lg leading-none tracking-tight shadow">
-                      ₹{product.price.toLocaleString()}
-                    </span>
-                  </div>
                 </div>
 
-                {/* Name only — single line, clean */}
-                <div className="px-2.5 py-2">
-                  <p className="text-gray-900 text-xs sm:text-sm font-semibold leading-snug line-clamp-1 tracking-tight">
+                {/* Price + Name */}
+                <div className="px-3 pt-2.5 pb-3 border-t border-gray-100">
+                  <p className="text-gray-900 text-sm sm:text-base font-bold leading-none mb-1">
+                    ₹{product.price.toLocaleString()}
+                  </p>
+                  <p className="text-gray-500 text-[11px] sm:text-xs font-normal leading-snug line-clamp-1">
                     {shortName}
                   </p>
                 </div>
