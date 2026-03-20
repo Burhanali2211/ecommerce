@@ -67,8 +67,8 @@ export const FlashSale: React.FC = memo(() => {
           </Link>
         </div>
 
-        {/* Product grid — 2 cols mobile, 3 tablet, 6 desktop */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+        {/* Mobile: horizontal scroll carousel · sm+: grid */}
+        <div className="flex overflow-x-auto gap-2.5 pb-2 snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 lg:grid-cols-6 sm:gap-3 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
           {flashSaleProducts.map(product => {
             const shortName = product.name.split(' ').slice(0, 4).join(' ');
 
@@ -76,7 +76,7 @@ export const FlashSale: React.FC = memo(() => {
               <Link
                 key={product.id}
                 to={`/products/${product.id}`}
-                className="group block bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
+                className="group flex-shrink-0 w-[155px] sm:w-auto snap-start block bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200"
               >
                 {/* Image */}
                 <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">

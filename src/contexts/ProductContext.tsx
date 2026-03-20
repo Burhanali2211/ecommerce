@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { Product, ProductContextType, Category, Review } from '../types';
 import { supabase, db } from '../lib/supabase';
-import { useError } from './ErrorContext';
+import { useNotification } from './NotificationContext';
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
@@ -78,7 +78,7 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [bestSellersLoading, setBestSellersLoading] = useState(bestSellers.length === 0);
   const [latestLoading, setLatestLoading] = useState(latestProducts.length === 0);
   const [pagination, setPagination]       = useState<PaginationState>({ page: 1, limit: 20, total: 0, pages: 0 });
-  const { setError } = useError();
+  const { showError } = useNotification();
 
   // Track whether initial homepage fetch has been kicked off
   const initFetched = useRef(false);
@@ -142,9 +142,9 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       setCategories(mapped);
       cacheSet(CACHE_KEYS.categories, mapped);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to fetch categories');
+      showError('Failed to load categories', error instanceof Error ? error.message : undefined);
     }
-  }, [setError, mapDbCategoryToAppCategory]);
+  }, [showError, mapDbCategoryToAppCategory]);
 
   const fetchProducts = useCallback(async (page: number = 1, limit: number = 20, filters?: any) => {
     const filterKey = JSON.stringify(filters || {});
@@ -176,14 +176,13 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       const mapped = response.data.map(mapDbProductToAppProduct);
       setProducts(mapped);
       setPagination(response.pagination);
-      setError(null);
       if (isDefault) cacheSet(cacheKey, { products: mapped, pagination: response.pagination });
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to fetch products');
+      showError('Failed to load products', error instanceof Error ? error.message : undefined);
     } finally {
       setLoading(false);
     }
-  }, [setError, mapDbProductToAppProduct]);
+  }, [showError, mapDbProductToAppProduct]);
 
   const fetchFeaturedProducts = useCallback(async (limit: number = 8) => {
     const cached = cacheGet<Product[]>(CACHE_KEYS.featured);
@@ -208,11 +207,11 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       setFeaturedProducts(mapped);
       cacheSet(CACHE_KEYS.featured, mapped);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to fetch featured products');
+      showError('Failed to load featured products', error instanceof Error ? error.message : undefined);
     } finally {
       setFeaturedLoading(false);
     }
-  }, [setError, mapDbProductToAppProduct]);
+  }, [showError, mapDbProductToAppProduct]);
 
   const fetchBestSellers = useCallback(async (limit: number = 8) => {
     const cached = cacheGet<Product[]>(CACHE_KEYS.bestSellers);
@@ -236,11 +235,11 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       setBestSellers(mapped);
       cacheSet(CACHE_KEYS.bestSellers, mapped);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to fetch best sellers');
+      showError('Failed to load best sellers', error instanceof Error ? error.message : undefined);
     } finally {
       setBestSellersLoading(false);
     }
-  }, [setError, mapDbProductToAppProduct]);
+  }, [showError, mapDbProductToAppProduct]);
 
   const fetchLatestProducts = useCallback(async (limit: number = 8) => {
     const cached = cacheGet<Product[]>(CACHE_KEYS.latest);
@@ -264,11 +263,11 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       setLatestProducts(mapped);
       cacheSet(CACHE_KEYS.latest, mapped);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to fetch latest products');
+      showError('Failed to load latest products', error instanceof Error ? error.message : undefined);
     } finally {
       setLatestLoading(false);
     }
-  }, [setError, mapDbProductToAppProduct]);
+  }, [showError, mapDbProductToAppProduct]);
 
   const fetchReviewsForProduct = useCallback(async (productId: string) => {
     try {
@@ -281,10 +280,10 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (error) throw error;
       return data || [];
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to fetch reviews');
+      showError('Failed to load reviews', error instanceof Error ? error.message : undefined);
       return [];
     }
-  }, [setError]);
+  }, [showError]);
 
   const addProduct = useCallback(async (product: Omit<Product, 'id' | 'createdAt' | 'reviews' | 'rating' | 'reviewCount'>) => {
     try {
@@ -302,10 +301,10 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       await fetchProducts(1);
       return mapDbProductToAppProduct(data);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to create product');
+      showError('Failed to create product', error instanceof Error ? error.message : undefined);
       throw error;
     }
-  }, [setError, fetchProducts, mapDbProductToAppProduct]);
+  }, [showError, fetchProducts, mapDbProductToAppProduct]);
 
   const submitReview = useCallback(async (review: Omit<Review, 'id' | 'createdAt' | 'profiles'>) => {
     try {
@@ -314,20 +313,20 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
         .insert([{ product_id: review.productId, user_id: review.userId, rating: review.rating, comment: review.comment, title: review.title }]);
       if (error) throw error;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to submit review');
+      showError('Failed to submit review', error instanceof Error ? error.message : undefined);
       throw error;
     }
-  }, [setError]);
+  }, [showError]);
 
   const getProductById = useCallback(async (id: string) => {
     try {
       const data = await db.getProduct(id);
       return data ? mapDbProductToAppProduct(data) : null;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to fetch product');
+      showError('Failed to load product', error instanceof Error ? error.message : undefined);
       return null;
     }
-  }, [setError, mapDbProductToAppProduct]);
+  }, [showError, mapDbProductToAppProduct]);
 
   const searchProducts = useCallback(async (query: string) => {
     try {
@@ -336,11 +335,11 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       setProducts(response.data.map(mapDbProductToAppProduct));
       setPagination(response.pagination);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Search failed');
+      showError('Search failed', error instanceof Error ? error.message : undefined);
     } finally {
       setLoading(false);
     }
-  }, [setError, mapDbProductToAppProduct]);
+  }, [showError, mapDbProductToAppProduct]);
 
   const filterByCategory = useCallback(async (categoryId: string) => {
     try {
@@ -349,11 +348,11 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       setProducts(response.data.map(mapDbProductToAppProduct));
       setPagination(response.pagination);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Filter failed');
+      showError('Filter failed', error instanceof Error ? error.message : undefined);
     } finally {
       setLoading(false);
     }
-  }, [setError, mapDbProductToAppProduct]);
+  }, [showError, mapDbProductToAppProduct]);
 
   const createProduct = useCallback(async (data: Partial<Product>) => addProduct(data as any), [addProduct]);
 
@@ -372,10 +371,10 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       await fetchProducts(pagination?.page || 1);
       return mapDbProductToAppProduct(data);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to update product');
+      showError('Failed to update product', error instanceof Error ? error.message : undefined);
       throw error;
     }
-  }, [setError, fetchProducts, pagination, mapDbProductToAppProduct]);
+  }, [showError, fetchProducts, pagination, mapDbProductToAppProduct]);
 
   const deleteProduct = useCallback(async (id: string) => {
     try {
@@ -384,10 +383,10 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       cacheClear('pc_');
       await fetchProducts(pagination?.page || 1);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to delete product');
+      showError('Failed to delete product', error instanceof Error ? error.message : undefined);
       throw error;
     }
-  }, [setError, fetchProducts, pagination]);
+  }, [showError, fetchProducts, pagination]);
 
   const createCategory = useCallback(async (data: Partial<Category>) => {
     try {
@@ -401,10 +400,10 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       await fetchCategories();
       return mapDbCategoryToAppCategory(category);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to create category');
+      showError('Failed to create category', error instanceof Error ? error.message : undefined);
       throw error;
     }
-  }, [setError, fetchCategories, mapDbCategoryToAppCategory]);
+  }, [showError, fetchCategories, mapDbCategoryToAppCategory]);
 
   const updateCategory = useCallback(async (id: string, data: Partial<Category>) => {
     try {
@@ -419,10 +418,10 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       await fetchCategories();
       return mapDbCategoryToAppCategory(category);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to update category');
+      showError('Failed to update category', error instanceof Error ? error.message : undefined);
       throw error;
     }
-  }, [setError, fetchCategories, mapDbCategoryToAppCategory]);
+  }, [showError, fetchCategories, mapDbCategoryToAppCategory]);
 
   const deleteCategory = useCallback(async (id: string) => {
     try {
@@ -431,10 +430,10 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       sessionStorage.removeItem(CACHE_KEYS.categories);
       await fetchCategories();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to delete category');
+      showError('Failed to delete category', error instanceof Error ? error.message : undefined);
       throw error;
     }
-  }, [setError, fetchCategories]);
+  }, [showError, fetchCategories]);
 
   const nextPage     = useCallback(() => { if (pagination?.page < pagination?.pages) fetchProducts(pagination.page + 1); }, [pagination, fetchProducts]);
   const previousPage = useCallback(() => { if (pagination?.page > 1) fetchProducts(pagination.page - 1); }, [pagination, fetchProducts]);
@@ -453,6 +452,9 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       fetchLatestProducts(8),
       fetchBestSellers(8),
     ]);
+    // Reset on unmount so that if the provider remounts (React StrictMode double-invoke
+    // or HMR) a fresh fetch is allowed instead of leaving state empty with no retry.
+    return () => { initFetched.current = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const value: ProductContextType = {

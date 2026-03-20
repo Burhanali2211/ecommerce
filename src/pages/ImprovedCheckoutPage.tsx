@@ -7,7 +7,6 @@ import {
   CheckCircle,
   MapPin,
   CreditCard,
-  Wallet,
   ShoppingBag,
   Truck,
   Shield,
@@ -43,7 +42,6 @@ export const ImprovedCheckoutPage: React.FC = () => {
   const { showNotification } = useNotification();
 
   const [step, setStep] = useState(1);
-  const [orderComplete, setOrderComplete] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('razorpay');
@@ -131,16 +129,12 @@ export const ImprovedCheckoutPage: React.FC = () => {
   const handlePaymentSuccess = async (paymentId: string) => {
     setIsProcessing(true);
     try {
+      // If DB order already created (Razorpay flow), just navigate to confirmation
       if (orderId) {
-        setOrderComplete(true);
         setShowPaymentModal(false);
         await clearCart();
-
-        showNotification({
-          type: 'success',
-          title: 'Order Confirmed!',
-          message: `Your order #${orderId.slice(0, 8)} has been confirmed.`
-        });
+        localStorage.removeItem(SHIPPING_INFO_KEY);
+        navigate(`/order-confirmation/${orderId}`, { replace: true });
         return;
       }
 
@@ -171,16 +165,10 @@ export const ImprovedCheckoutPage: React.FC = () => {
       );
 
       if (newOrderId) {
-        setOrderId(newOrderId);
-        setOrderComplete(true);
         setShowPaymentModal(false);
         await clearCart();
-
-        showNotification({
-          type: 'success',
-          title: 'Order Placed!',
-          message: `Your order #${newOrderId.slice(0, 8)} has been placed successfully.`
-        });
+        localStorage.removeItem(SHIPPING_INFO_KEY);
+        navigate(`/order-confirmation/${newOrderId}`, { replace: true });
       }
     } catch (error) {
       console.error('Order creation failed:', error);
@@ -271,7 +259,7 @@ export const ImprovedCheckoutPage: React.FC = () => {
     }
   };
 
-  if (items.length === 0 && !orderComplete) {
+  if (items.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="text-center max-w-md">
@@ -289,40 +277,6 @@ export const ImprovedCheckoutPage: React.FC = () => {
     );
   }
 
-  if (orderComplete) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-6 sm:p-10 text-center"
-        >
-          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-green-600" />
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">Order Confirmed!</h1>
-          <p className="text-gray-600 mb-6 text-sm sm:text-base">
-            Thank you for your purchase. Your order <span className="font-mono font-medium">#{orderId?.slice(0, 8)}</span> has been placed successfully.
-          </p>
-
-          <div className="space-y-3">
-            <button
-              onClick={() => navigate(`/track-order/${orderId}`)}
-              className="w-full btn-primary"
-            >
-              Track Your Order
-            </button>
-            <button
-              onClick={() => navigate('/products')}
-              className="w-full btn-secondary"
-            >
-              Continue Shopping
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -490,7 +444,10 @@ export const ImprovedCheckoutPage: React.FC = () => {
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <RazorpayPayment
-            amount={subtotal}
+            amount={finalTotal}
+            subtotal={subtotal}
+            gstAmount={gst}
+            shippingAmount={shipping}
             items={items}
             customerInfo={{ name: `${formData.firstName} ${formData.lastName}`, email: formData.email, phone: formData.phone }}
             shippingAddress={{ street: formData.address, city: formData.city, state: formData.state, zipCode: formData.zipCode, country: formData.country }}

@@ -356,40 +356,126 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
       </div>
 
       {/* DESKTOP ROW 2: Nav */}
-      <div className="hidden md:block border-t border-gray-100">
+      <div className="hidden md:block border-t border-green-100/70 bg-green-50/30">
         <div className="max-w-7xl mx-auto px-6">
-          <nav className="flex items-center h-9 gap-1 text-sm">
-            <Link to="/" className={`px-3 h-full flex items-center font-medium border-b-2 transition-colors ${isActive('/') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}>
+          <nav className="flex items-center justify-center h-11 gap-0.5 text-sm">
+
+            {/* Home */}
+            <Link
+              to="/"
+              className={`relative px-4 h-8 flex items-center rounded-md font-semibold text-[13px] tracking-wide transition-all duration-150 ${
+                isActive('/')
+                  ? 'text-green-900 bg-green-100'
+                  : 'text-gray-600 hover:text-green-900 hover:bg-green-50'
+              }`}
+            >
               Home
+              {isActive('/') && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-green-700 rounded-full" />}
             </Link>
+
+            {/* Shop dropdown */}
             <div className="relative h-full flex items-center" ref={shopDropdownRef}>
               <button
                 onClick={() => setIsShopDropdownOpen(!isShopDropdownOpen)}
-                className={`flex items-center gap-1 px-3 h-full font-medium border-b-2 transition-colors ${isActive('/products') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}
+                className={`relative flex items-center gap-1.5 px-4 h-8 rounded-md font-semibold text-[13px] tracking-wide transition-all duration-150 ${
+                  isActive('/products')
+                    ? 'text-green-900 bg-green-100'
+                    : 'text-gray-600 hover:text-green-900 hover:bg-green-50'
+                }`}
               >
-                Shop <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isShopDropdownOpen ? 'rotate-180' : ''}`} />
+                Shop All
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isShopDropdownOpen ? 'rotate-180' : ''}`} />
+                {isActive('/products') && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-green-700 rounded-full" />}
               </button>
+
               {isShopDropdownOpen && (
-                <div className="absolute top-full left-0 w-52 bg-white shadow-xl border border-gray-100 rounded-xl py-2 z-50 mt-0.5">
-                  <Link to="/products" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 font-medium" onClick={() => setIsShopDropdownOpen(false)}>All Products</Link>
-                  <div className="border-t border-gray-100 my-1" />
-                  {categoryItems.slice(0, 8).map(cat => (
-                    <Link key={cat.id} to={`/products?category=${cat.slug || cat.id}`} className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900" onClick={() => setIsShopDropdownOpen(false)}>
-                      {cat.name}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 w-56 bg-white shadow-2xl border border-gray-100 rounded-2xl py-2 z-50 mt-2 overflow-hidden">
+                  <div className="px-3 pb-1.5 mb-1 border-b border-gray-100">
+                    <Link
+                      to="/products"
+                      className="flex items-center justify-between w-full px-2 py-2 text-[13px] font-bold text-green-900 hover:bg-green-50 rounded-lg transition-colors"
+                      onClick={() => setIsShopDropdownOpen(false)}
+                    >
+                      View All Products
+                      <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
-                  ))}
+                  </div>
+                  <div className="px-3 pt-0.5">
+                    <p className="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Categories</p>
+                    {categoryItems.slice(0, 8).map(cat => (
+                      <Link
+                        key={cat.id}
+                        to={`/products?category=${cat.slug || cat.id}`}
+                        className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-gray-700 hover:bg-green-50 hover:text-green-900 rounded-lg transition-colors"
+                        onClick={() => setIsShopDropdownOpen(false)}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                        {cat.name}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
-            <Link to="/new-arrivals" className={`px-3 h-full flex items-center font-medium border-b-2 transition-colors ${isActive('/new-arrivals') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}>
+
+            {/* New Arrivals */}
+            <Link
+              to="/new-arrivals"
+              className={`relative px-4 h-8 flex items-center gap-1.5 rounded-md font-semibold text-[13px] tracking-wide transition-all duration-150 ${
+                isActive('/new-arrivals')
+                  ? 'text-green-900 bg-green-100'
+                  : 'text-gray-600 hover:text-green-900 hover:bg-green-50'
+              }`}
+            >
               New Arrivals
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-green-600 text-white rounded-full leading-none">
+                NEW
+              </span>
+              {isActive('/new-arrivals') && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-green-700 rounded-full" />}
             </Link>
-            <Link to="/deals" className={`px-3 h-full flex items-center font-medium border-b-2 transition-colors ${isActive('/deals') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}>
+
+            {/* Deals */}
+            <Link
+              to="/deals"
+              className={`relative px-4 h-8 flex items-center gap-1.5 rounded-md font-semibold text-[13px] tracking-wide transition-all duration-150 ${
+                isActive('/deals')
+                  ? 'text-red-700 bg-red-50'
+                  : 'text-red-600 hover:text-red-700 hover:bg-red-50'
+              }`}
+            >
               Deals
+              <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-red-500 text-white rounded-full leading-none">
+                SALE
+              </span>
+              {isActive('/deals') && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-red-500 rounded-full" />}
             </Link>
-            <Link to="/about" className={`px-3 h-full flex items-center font-medium border-b-2 transition-colors ${isActive('/about') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}>
+
+            {/* About */}
+            <Link
+              to="/about"
+              className={`relative px-4 h-8 flex items-center rounded-md font-semibold text-[13px] tracking-wide transition-all duration-150 ${
+                isActive('/about')
+                  ? 'text-green-900 bg-green-100'
+                  : 'text-gray-600 hover:text-green-900 hover:bg-green-50'
+              }`}
+            >
               About
+              {isActive('/about') && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-green-700 rounded-full" />}
             </Link>
+
+            {/* Contact */}
+            <Link
+              to="/contact"
+              className={`relative px-4 h-8 flex items-center rounded-md font-semibold text-[13px] tracking-wide transition-all duration-150 ${
+                isActive('/contact')
+                  ? 'text-green-900 bg-green-100'
+                  : 'text-gray-600 hover:text-green-900 hover:bg-green-50'
+              }`}
+            >
+              Contact
+              {isActive('/contact') && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-green-700 rounded-full" />}
+            </Link>
+
           </nav>
         </div>
       </div>

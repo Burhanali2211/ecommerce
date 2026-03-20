@@ -1158,7 +1158,10 @@ export const CheckoutPage: React.FC = () => {
       {showPaymentModal && selectedPaymentMethod !== 'cod' && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <RazorpayPayment
-            amount={subtotal}
+            amount={finalTotal}
+            subtotal={subtotal}
+            gstAmount={gst}
+            shippingAmount={shipping}
             items={items}
             customerInfo={{
               name: `${formData.firstName} ${formData.lastName}`,

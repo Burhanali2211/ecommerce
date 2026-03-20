@@ -1,12 +1,13 @@
 import React, { useEffect, memo } from 'react';
-import { ShoppingBag, Star, TrendingUp, ArrowRight, Flame, Tag } from 'lucide-react';
+import { Star, TrendingUp, ArrowRight, Flame, Tag } from 'lucide-react';
 import { useProducts } from '../../contexts/ProductContext';
 import { Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
+import { BuyNowButton } from '../Product/BuyNowButton';
 
 export const BestSellers: React.FC = memo(() => {
   const { bestSellers, bestSellersLoading, fetchBestSellers } = useProducts();
-  const { addToCart } = useCart();
+  const { addItem } = useCart();
 
   useEffect(() => {
     fetchBestSellers(1);
@@ -25,7 +26,7 @@ export const BestSellers: React.FC = memo(() => {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addToCart(product, 1);
+    addItem(product, 1);
   };
 
   return (
@@ -148,15 +149,12 @@ export const BestSellers: React.FC = memo(() => {
                 </span>
               </div>
 
-              {/* 5. CTAs — Add to Cart primary, View Product secondary */}
+              {/* 5. CTAs */}
               <div className="flex flex-col gap-2">
-                <button
+                <BuyNowButton
                   onClick={handleAddToCart}
-                  className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white font-semibold text-sm py-2.5 rounded-xl transition-all shadow-md shadow-green-900/20"
-                >
-                  <ShoppingBag className="h-4 w-4 flex-shrink-0" />
-                  Add to Cart
-                </button>
+                  disabled={product.stock === 0}
+                />
                 <Link
                   to={`/products/${product.id}`}
                   className="w-full flex items-center justify-center gap-1.5 border border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm py-2.5 rounded-xl transition-all"

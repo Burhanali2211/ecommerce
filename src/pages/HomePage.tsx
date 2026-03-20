@@ -48,7 +48,7 @@ const BENTO_TILES = [
     wide: false,
   },
   {
-    to: '/collections',
+    to: '/products',
     img: '/images/perfumes/perfume-banner.jpg',
     overlay: 'bg-gradient-to-r from-black/70 via-black/30 to-transparent',
     tag: 'Curated',

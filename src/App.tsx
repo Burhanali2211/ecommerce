@@ -1,9 +1,8 @@
 import React, { Suspense, useEffect, lazy, memo } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import './styles/pwa-responsive.css';
 import { CombinedProvider } from '@/contexts/CombinedProvider';
 import { Layout } from '@/components/Layout/Layout';
-import { DatabaseErrorOverlay } from '@/components/Common/DatabaseErrorOverlay';
 import { ErrorBoundary } from '@/components/Common/ErrorBoundary';
 import { ScrollToTop } from '@/components/Common/ScrollToTop';
 import { PageLoader } from '@/components/Common/UniversalLoader';
@@ -22,9 +21,8 @@ const WishlistPage = React.lazy(() => import('@/pages/WishlistPage'));
 const ComparePage = React.lazy(() => import('@/pages/ComparePage'));
 const NewArrivalsPage = React.lazy(() => import('@/pages/NewArrivalsPage'));
 const DealsPage = React.lazy(() => import('@/pages/DealsPage'));
-const CategoriesPage = React.lazy(() => import('@/pages/CategoriesPage'));
-const CollectionsPage = React.lazy(() => import('@/pages/CollectionsPage'));
 const AuthPage = React.lazy(() => import('@/pages/AuthPage'));
+const ResetPasswordPage = React.lazy(() => import('@/pages/ResetPasswordPage'));
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'));
 const AboutPage = React.lazy(() => import('@/pages/AboutPage')); // Added About page
 const ContactPage = React.lazy(() => import('@/pages/ContactPage')); // Added Contact page
@@ -44,6 +42,9 @@ const CheckoutPage = React.lazy(() =>
 );
 const OrderTrackingPage = React.lazy(() =>
   import('@/pages/OrderTrackingPage').then(module => ({ default: module.default }))
+);
+const OrderConfirmationPage = React.lazy(() =>
+  import('@/pages/OrderConfirmationPage').then(module => ({ default: module.default }))
 );
 const ProfileRedirect = React.lazy(() =>
   import('@/components/Common/ProfileRedirect').then(module => ({ default: module.ProfileRedirect }))
@@ -105,20 +106,29 @@ function App() {
     const handleError = (event: ErrorEvent) => {
       const errorMessage = event.message || '';
       const errorSource = event.filename || '';
-      
-      // Suppress ServiceWorker-related errors
+
+      // Chunk load errors = stale deployment. Auto-reload once to get fresh assets.
       if (
-        errorMessage.includes('ServiceWorker intercepted') ||
         errorMessage.includes('error loading dynamically imported module') ||
-        errorSource.includes('sw.js') ||
-        errorMessage.includes('Failed to load')
+        errorMessage.includes('Failed to fetch dynamically imported module') ||
+        errorMessage.includes('Importing a module script failed')
       ) {
         event.preventDefault();
-        // Try to reload the page if it's a critical error
-        if (errorMessage.includes('error loading dynamically imported module')) {
-          // Don't reload immediately, let the error boundary handle it
-          console.warn('[App] Dynamic import error suppressed:', errorMessage);
+        const RELOAD_KEY = 'chunkLoadReload';
+        const last = sessionStorage.getItem(RELOAD_KEY);
+        if (!last || Date.now() - parseInt(last, 10) > 30000) {
+          sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+          window.location.reload();
         }
+        return true;
+      }
+
+      // Suppress only ServiceWorker-related non-critical errors
+      if (
+        errorMessage.includes('ServiceWorker intercepted') ||
+        errorSource.includes('sw.js')
+      ) {
+        event.preventDefault();
         return true;
       }
       return false;
@@ -130,16 +140,6 @@ function App() {
     };
   }, []);
 
-  // Initialize accessibility features
-  useEffect(() => {
-    // This will add skip links and other accessibility features
-    const initializeAccessibility = async () => {
-      const { initializeAccessibility } = await import('./utils/accessibilityEnhancements');
-      initializeAccessibility();
-    };
-
-    initializeAccessibility();
-  }, []);
 
 
 
@@ -175,9 +175,9 @@ function App() {
                       <Route path="/compare" element={<ComparePage />} />
                       <Route path="/new-arrivals" element={<NewArrivalsPage />} />
                       <Route path="/deals" element={<DealsPage />} />
-                      <Route path="/categories" element={<CategoriesPage />} />
+                      <Route path="/categories" element={<Navigate to="/products" replace />} />
                       <Route path="/categories/:slug" element={<ProductsPage />} />
-                      <Route path="/collections" element={<CollectionsPage />} />
+                      <Route path="/collections" element={<Navigate to="/products" replace />} />
                       <Route path="/collections/:slug" element={<ProductsPage />} />
                       <Route path="/about" element={<AboutPage />} />
                       <Route path="/contact" element={<ContactPage />} />
@@ -189,14 +189,17 @@ function App() {
                       <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
 
                       {/* Auth page - Redirect if already authenticated */}
-                      <Route 
-                        path="/auth" 
+                      <Route
+                        path="/auth"
                         element={
                           <PublicRoute redirectIfAuthenticated={true}>
                             <AuthPage />
                           </PublicRoute>
-                        } 
+                        }
                       />
+
+                      {/* Password reset - accessible without auth (user arrives from email link) */}
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                       {/* Protected routes - Require authentication */}
                       <Route 
@@ -223,13 +226,21 @@ function App() {
                           </ProtectedRoute>
                         } 
                       />
-                      <Route 
-                        path="/track-order/:orderId" 
+                      <Route
+                        path="/order-confirmation/:orderId"
+                        element={
+                          <ProtectedRoute>
+                            <OrderConfirmationPage />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/track-order/:orderId"
                         element={
                           <ProtectedRoute>
                             <OrderTrackingPage />
                           </ProtectedRoute>
-                        } 
+                        }
                       />
                       <Route 
                         path="/orders/:orderId" 
@@ -255,7 +266,6 @@ function App() {
               } />
             </Routes>
           </Suspense>
-          <DatabaseErrorOverlay />
         </Router>
       </CombinedProvider>
     </ErrorBoundary>

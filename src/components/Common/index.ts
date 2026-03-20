@@ -4,7 +4,6 @@ export { SkeletonLoader, TableSkeleton, CardSkeleton, AdminLoadingState, EmptySt
 export { ErrorBoundary } from './ErrorBoundary';
 export { AdminErrorBoundary } from './AdminErrorBoundary';
 export { ErrorFallback } from './ErrorFallback';
-export { DatabaseErrorOverlay } from './DatabaseErrorOverlay';
 export { Modal } from './Modal';
 export { LazyImage } from './LazyImage';
 export { ResponsiveImage } from './ResponsiveImage';

@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import {
-  Eye, EyeOff, Mail, Lock, User,
-  AlertCircle, Loader2, Mountain, ArrowLeft, ShoppingBag
-} from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNotification } from '../contexts/NotificationContext';
-import { ProfessionalAuthLayout } from '../components/Auth/ProfessionalAuthLayout';
 import { useSettings } from '../contexts/SettingsContext';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
@@ -18,8 +13,65 @@ interface FormData {
   fullName: string;
 }
 
-interface FormErrors {
-  [key: string]: string;
+// Parse Supabase auth errors into user-friendly field-level messages
+function parseAuthError(err: unknown, mode: AuthMode): {
+  field?: 'email' | 'password' | 'form';
+  message: string;
+  suggestSignup?: boolean;
+} {
+  const raw = (err instanceof Error ? err.message : String(err)).toLowerCase();
+
+  if (mode === 'login') {
+    if (
+      raw.includes('invalid login credentials') ||
+      raw.includes('invalid_credentials') ||
+      raw.includes('wrong password') ||
+      raw.includes('incorrect password')
+    ) {
+      return {
+        field: 'form',
+        message: 'Incorrect email or password.',
+        suggestSignup: false,
+      };
+    }
+    if (
+      raw.includes('user not found') ||
+      raw.includes('no user found') ||
+      raw.includes('email not found')
+    ) {
+      return {
+        field: 'email',
+        message: "We couldn't find an account with this email.",
+        suggestSignup: true,
+      };
+    }
+    if (raw.includes('email not confirmed') || raw.includes('not confirmed')) {
+      return {
+        field: 'email',
+        message: 'Please verify your email before signing in.',
+      };
+    }
+    if (raw.includes('too many requests') || raw.includes('rate limit')) {
+      return { field: 'form', message: 'Too many attempts. Please wait a moment and try again.' };
+    }
+  }
+
+  if (mode === 'signup') {
+    if (raw.includes('already registered') || raw.includes('already exists') || raw.includes('user already registered')) {
+      return { field: 'email', message: 'An account with this email already exists. Sign in instead?' };
+    }
+    if (raw.includes('password') && (raw.includes('weak') || raw.includes('short') || raw.includes('length'))) {
+      return { field: 'password', message: 'Password is too weak. Use at least 8 characters.' };
+    }
+  }
+
+  if (mode === 'forgot') {
+    if (raw.includes('user not found') || raw.includes('no user')) {
+      return { field: 'email', message: "We couldn't find an account with this email." };
+    }
+  }
+
+  return { field: 'form', message: err instanceof Error ? err.message : 'Something went wrong. Please try again.' };
 }
 
 const AuthPage: React.FC = () => {
@@ -27,467 +79,427 @@ const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  // Set to the email address after a successful signUp that requires email confirmation.
+  // If Supabase auto-confirms (email confirmation disabled), the useEffect navigates
+  // the user away immediately and this state is never visible.
+  const [signupConfirmEmail, setSignupConfirmEmail] = useState<string | null>(null);
 
-  const { signIn, signUp, user } = useAuth();
-  const { showNotification } = useNotification();
+  const { signIn, signUp, resetPassword, user } = useAuth();
   const { getSiteSetting } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const siteName = getSiteSetting('site_name') || 'Himalayan Spices Exports';
+  const siteName = getSiteSetting('site_name') || 'Aligarh Attars';
+  const isProduction = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+
+  const sendEmail = (payload: object) => {
+    if (!isProduction) return; // Netlify functions only available in production
+    fetch('/.netlify/functions/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  };
 
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
     confirmPassword: '',
-    fullName: ''
+    fullName: '',
   });
 
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<{ message: string; suggestSignup?: boolean } | null>(null);
 
   useEffect(() => {
     if (user) {
-      if (user.role === 'admin') {
-        navigate('/admin');
-      } else if (user.role === 'seller') {
-        navigate('/dashboard');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate(user.role === 'admin' ? '/admin' : '/dashboard');
     }
   }, [user, navigate]);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const modeParam = searchParams.get('mode');
-
-    if (modeParam === 'signup') {
-      setMode('signup');
-    } else if (modeParam === 'forgot') {
-      setMode('forgot');
-    }
+    const p = new URLSearchParams(location.search).get('mode');
+    if (p === 'signup') setMode('signup');
+    else if (p === 'forgot') setMode('forgot');
   }, [location.search]);
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const handleChange = (field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
+    if (formError) setFormError(null);
   };
 
-  const validatePassword = (password: string): boolean => {
-    return password.length >= 8;
-  };
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
 
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
+    if (!formData.email) e.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) e.email = 'Enter a valid email address';
 
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (mode !== 'forgot' && !formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (mode !== 'forgot' && !validatePassword(formData.password)) {
-      newErrors.password = 'Password must be at least 8 characters';
+    if (mode !== 'forgot') {
+      if (!formData.password) e.password = 'Password is required';
+      else if (formData.password.length < 8) e.password = 'Password must be at least 8 characters';
     }
 
     if (mode === 'signup') {
-      if (!formData.fullName.trim()) {
-        newErrors.fullName = 'Full name is required';
-      }
-
-      if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match';
-      }
+      if (!formData.fullName.trim()) e.fullName = 'Full name is required';
+      if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Passwords do not match';
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) return;
-
-    if (mode === 'login' && (!formData.email || !formData.email.trim())) {
-      setErrors({ email: 'Email is required' });
-      return;
-    }
-    if (mode === 'login' && (!formData.password || !formData.password.trim())) {
-      setErrors({ password: 'Password is required' });
-      return;
-    }
-
+    setFormError(null);
+    if (!validate()) return;
     setLoading(true);
 
     try {
       if (mode === 'login') {
         await signIn(formData.email.trim(), formData.password);
-        showNotification({
-          type: 'success',
-          title: 'Welcome back!',
-          message: 'Successfully logged in.'
-        });
-        // Navigation is handled by useEffect when user state changes
+        // navigation handled by useEffect above
+
       } else if (mode === 'signup') {
-        await signUp(formData.email, formData.password, {
-          fullName: formData.fullName
-        });
-        showNotification({
-          type: 'success',
-          title: 'Account created!',
-          message: 'Welcome to Himalayan Spices!'
-        });
-        // Navigation is handled by useEffect when user state changes
+        await signUp(formData.email, formData.password, { fullName: formData.fullName });
+
+        sendEmail({ type: 'welcome', email: formData.email, name: formData.fullName, siteName });
+
+        // If Supabase requires email confirmation, signUp leaves user=null and no
+        // navigation happens. Show the "check your email" screen in that case.
+        // If email confirmation is disabled, the useEffect above will navigate
+        // the user away before they ever see this.
+        setSignupConfirmEmail(formData.email);
+
       } else if (mode === 'forgot') {
-        showNotification({
-          type: 'success',
-          title: 'Password reset sent!',
-          message: 'Password reset link sent to your email!'
-        });
-        setMode('login');
+        await resetPassword(formData.email.trim());
+
+        sendEmail({ type: 'reset', email: formData.email, siteName });
+
+        setForgotSent(true);
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred. Please try again.';
-      showNotification({
-        type: 'error',
-        title: 'Authentication failed',
-        message: errorMessage
-      });
+    } catch (err: unknown) {
+      const parsed = parseAuthError(err, mode);
+      if (parsed.field === 'email') {
+        setErrors(prev => ({ ...prev, email: parsed.message }));
+        if (parsed.suggestSignup) setFormError({ message: parsed.message, suggestSignup: true });
+      } else if (parsed.field === 'password') {
+        setErrors(prev => ({ ...prev, password: parsed.message }));
+      } else {
+        setFormError({ message: parsed.message, suggestSignup: parsed.suggestSignup });
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const switchMode = (next: AuthMode) => {
+    setMode(next);
+    setErrors({});
+    setFormError(null);
+    setForgotSent(false);
+    setFormData({ email: formData.email, password: '', confirmPassword: '', fullName: '' });
+  };
+
+  const inputClass = (hasError: boolean) =>
+    `w-full bg-white border text-gray-900 text-sm rounded-xl pl-10 pr-4 py-3.5 placeholder-gray-400 outline-none transition-all focus:ring-2 focus:ring-offset-0 ${
+      hasError
+        ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
+        : 'border-gray-200 focus:border-gray-400 focus:ring-gray-100'
+    }`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
-      {/* Top Navigation Bar */}
-      <div className="fixed top-0 left-0 right-0 z-50 p-4 sm:p-6 bg-white/40 backdrop-blur-md border-b border-amber-100/50">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link 
-            to="/" 
-            className="flex items-center space-x-2 group"
-            onClick={() => window.scrollTo(0, 0)}
-          >
-            <div className="w-10 h-10 bg-amber-700 rounded-lg flex items-center justify-center shadow-md group-hover:bg-amber-800 transition-colors">
-              <Mountain className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-amber-900 hidden sm:block">
-              Himalayan Spices
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <header className="bg-white border-b border-gray-100 px-5 py-3">
+        <div className="max-w-sm mx-auto flex items-center justify-between">
+          {/* Logo + brand */}
+          <Link to="/" className="flex items-center gap-2.5">
+            <img
+              src="/logo.png"
+              alt={siteName}
+              className="h-9 w-9 object-contain rounded-lg"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <span className="font-semibold text-gray-900 text-[15px] leading-tight">
+              {siteName}
             </span>
           </Link>
 
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => navigate('/')}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white/80 rounded-lg shadow-sm hover:bg-white hover:text-amber-700 transition-all duration-200 flex items-center space-x-2 border border-amber-100"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden xs:block">Back to Home</span>
-              <span className="xs:hidden">Home</span>
-            </button>
-            <Link
-              to="/products"
-              className="px-4 py-2 text-sm font-medium text-white bg-amber-700 rounded-lg shadow-sm hover:bg-amber-800 transition-all duration-200 flex items-center space-x-2"
-            >
-              <ShoppingBag className="h-4 w-4" />
-              <span className="hidden xs:block">Explore Spices</span>
-              <span className="xs:hidden">Shop</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="pt-20 sm:pt-24">
-        <ProfessionalAuthLayout showBranding={true}>
-          <div
-            className="animate-fade-in-right"
-            style={{ animationDelay: '0.3s' }}
+          {/* Home button */}
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"
           >
-            <div className="p-6 sm:p-8 lg:p-10">
-              {/* Header */}
-              <div className="mb-8 text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-500 to-amber-700 rounded-2xl mb-4 shadow-lg">
-                  <Mountain className="h-8 w-8 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  {mode === 'login' && 'Welcome Back'}
-                  {mode === 'signup' && 'Create Account'}
-                  {mode === 'forgot' && 'Reset Password'}
-                </h2>
-                <p className="text-gray-600 text-sm">
-                  {mode === 'login' && 'Sign in to explore premium Kashmiri spices'}
-                  {mode === 'signup' && 'Join us for the finest Himalayan flavors'}
-                  {mode === 'forgot' && "We'll send you a reset link"}
-                </p>
-              </div>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Home
+          </Link>
+        </div>
+      </header>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Full Name Field (Signup) */}
+      {/* ── Main ───────────────────────────────────────────────── */}
+      <main className="flex-1 flex items-start justify-center px-5 pt-10 pb-8">
+        <div className="w-full max-w-sm">
+
+          {/* Card */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-7">
+
+            {/* Heading */}
+            <div className="mb-6">
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+                {mode === 'login' && 'Sign in to your account'}
+                {mode === 'signup' && 'Create an account'}
+                {mode === 'forgot' && 'Reset your password'}
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {mode === 'login' && 'Welcome back'}
+                {mode === 'signup' && 'Fill in your details to get started'}
+                {mode === 'forgot' && "Enter your email and we'll send a reset link"}
+              </p>
+            </div>
+
+            {/* ── Signup: email confirmation pending ── */}
+            {mode === 'signup' && signupConfirmEmail ? (
+              <div className="space-y-5">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <p className="text-blue-800 text-sm font-medium mb-0.5">Check your inbox</p>
+                  <p className="text-blue-700 text-sm">
+                    We sent a confirmation link to <strong>{signupConfirmEmail}</strong>.
+                    Click it to activate your account, then sign in.
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setSignupConfirmEmail(null); switchMode('login'); }}
+                  className="w-full text-sm text-gray-500 hover:text-gray-800 transition-colors text-center"
+                >
+                  ← Back to sign in
+                </button>
+              </div>
+            ) : mode === 'forgot' && forgotSent ? (
+              <div className="space-y-5">
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                  <p className="text-green-800 text-sm font-medium mb-0.5">Check your inbox</p>
+                  <p className="text-green-700 text-sm">
+                    A reset link was sent to <strong>{formData.email}</strong>. Check your spam folder too.
+                  </p>
+                </div>
+                <button
+                  onClick={() => switchMode('login')}
+                  className="w-full text-sm text-gray-500 hover:text-gray-800 transition-colors text-center"
+                >
+                  ← Back to sign in
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} noValidate className="space-y-4">
+
+                {/* Form-level error banner */}
+                {formError && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                      <p className="text-red-700">{formError.message}</p>
+                      {formError.suggestSignup && (
+                        <button
+                          type="button"
+                          onClick={() => switchMode('signup')}
+                          className="mt-1 text-red-700 font-semibold underline underline-offset-2 hover:text-red-900"
+                        >
+                          Create an account instead →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Full Name */}
                 {mode === 'signup' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
                       Full Name
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <User className="h-5 w-5 text-gray-400" />
-                      </div>
+                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                       <input
                         type="text"
                         value={formData.fullName}
-                        onChange={(e) => handleInputChange('fullName', e.target.value)}
-                        className={`block w-full pl-12 pr-4 py-3.5 border text-sm ${errors.fullName ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-amber-500 focus:border-amber-500'
-                          } rounded-xl shadow-sm transition-colors`}
+                        onChange={e => handleChange('fullName', e.target.value)}
                         placeholder="Your full name"
                         disabled={loading}
-                        required
+                        autoComplete="name"
+                        className={inputClass(!!errors.fullName)}
                       />
                     </div>
                     {errors.fullName && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="h-4 w-4 mr-1" />
-                        {errors.fullName}
+                      <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />{errors.fullName}
                       </p>
                     )}
                   </div>
                 )}
 
-                {/* Email Field */}
+                {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                    Email
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-400" />
-                    </div>
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                     <input
                       type="email"
                       value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      className={`block w-full pl-12 pr-4 py-3.5 border text-sm ${errors.email ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-amber-500 focus:border-amber-500'
-                        } rounded-xl shadow-sm transition-colors`}
+                      onChange={e => handleChange('email', e.target.value)}
                       placeholder="you@example.com"
                       disabled={loading}
-                      required
+                      autoComplete="email"
+                      className={inputClass(!!errors.email)}
                     />
                   </div>
                   {errors.email && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <AlertCircle className="h-4 w-4 mr-1" />
-                      {errors.email}
+                    <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />{errors.email}
                     </p>
                   )}
                 </div>
 
-                {/* Password Field */}
+                {/* Password */}
                 {mode !== 'forgot' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Password
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Password
+                      </label>
+                      {mode === 'login' && (
+                        <button
+                          type="button"
+                          onClick={() => switchMode('forgot')}
+                          className="text-xs text-gray-500 hover:text-gray-800 transition-colors"
+                        >
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Lock className="h-5 w-5 text-gray-400" />
-                      </div>
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                       <input
                         type={showPassword ? 'text' : 'password'}
                         value={formData.password}
-                        onChange={(e) => handleInputChange('password', e.target.value)}
-                        className={`block w-full pl-12 pr-12 py-3.5 border text-sm ${errors.password ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-amber-500 focus:border-amber-500'
-                          } rounded-xl shadow-sm transition-colors`}
+                        onChange={e => handleChange('password', e.target.value)}
                         placeholder="••••••••"
                         disabled={loading}
-                        required
+                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                        className={`${inputClass(!!errors.password)} pr-11`}
                       />
                       <button
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-700"
-                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        tabIndex={-1}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
                       >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                     {errors.password && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="h-4 w-4 mr-1" />
-                        {errors.password}
+                      <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />{errors.password}
                       </p>
                     )}
                   </div>
                 )}
 
-                {/* Confirm Password Field (Signup) */}
+                {/* Confirm Password */}
                 {mode === 'signup' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
                       Confirm Password
                     </label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Lock className="h-5 w-5 text-gray-400" />
-                      </div>
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                       <input
                         type={showConfirmPassword ? 'text' : 'password'}
                         value={formData.confirmPassword}
-                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                        className={`block w-full pl-12 pr-12 py-3.5 border text-sm ${errors.confirmPassword ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-amber-500 focus:border-amber-500'
-                          } rounded-xl shadow-sm transition-colors`}
+                        onChange={e => handleChange('confirmPassword', e.target.value)}
                         placeholder="••••••••"
                         disabled={loading}
-                        required
+                        autoComplete="new-password"
+                        className={`${inputClass(!!errors.confirmPassword)} pr-11`}
                       />
                       <button
                         type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-700"
-                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowConfirmPassword(v => !v)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                        tabIndex={-1}
+                        aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                       >
-                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                     {errors.confirmPassword && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <AlertCircle className="h-4 w-4 mr-1" />
-                        {errors.confirmPassword}
+                      <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />{errors.confirmPassword}
                       </p>
                     )}
                   </div>
                 )}
 
-                {/* Remember Me & Forgot Password (Login) */}
-                {mode === 'login' && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <input
-                        id="remember-me"
-                        name="remember-me"
-                        type="checkbox"
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                        className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
-                        disabled={loading}
-                      />
-                      <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                        Remember me
-                      </label>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setMode('forgot')}
-                      className="text-sm font-medium text-amber-700 hover:text-amber-800 focus:outline-none transition-colors"
-                      disabled={loading}
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-                )}
-
-                {/* Submit Button */}
-                <div className="pt-2">
+                {/* Submit button */}
+                <div className="pt-1">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    className="w-full bg-gray-900 hover:bg-gray-800 active:bg-black text-white text-sm font-semibold rounded-xl py-3.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {loading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {mode === 'login' ? 'Signing in…' : mode === 'signup' ? 'Creating account…' : 'Sending link…'}
                       </>
-                    ) : mode === 'login' ? (
-                      'Sign In'
-                    ) : mode === 'signup' ? (
-                      'Create Account'
                     ) : (
-                      'Send Reset Link'
+                      mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'
                     )}
                   </button>
                 </div>
 
-                {/* Mode Toggle */}
-                <div className="text-center pt-4">
-                  {mode === 'login' ? (
-                    <p className="text-gray-600 text-sm">
+                {/* Mode switch */}
+                <div className="text-center pt-1">
+                  {mode === 'login' && (
+                    <p className="text-sm text-gray-500">
                       Don't have an account?{' '}
-                      <button
-                        type="button"
-                        onClick={() => setMode('signup')}
-                        className="font-semibold text-amber-700 hover:text-amber-800 focus:outline-none transition-colors"
-                        disabled={loading}
-                      >
+                      <button type="button" onClick={() => switchMode('signup')} className="font-semibold text-gray-900 hover:underline">
                         Sign up
                       </button>
                     </p>
-                  ) : mode === 'signup' ? (
-                    <p className="text-gray-600 text-sm">
+                  )}
+                  {mode === 'signup' && (
+                    <p className="text-sm text-gray-500">
                       Already have an account?{' '}
-                      <button
-                        type="button"
-                        onClick={() => setMode('login')}
-                        className="font-semibold text-amber-700 hover:text-amber-800 focus:outline-none transition-colors"
-                        disabled={loading}
-                      >
-                        Sign in
-                      </button>
-                    </p>
-                  ) : (
-                    <p className="text-gray-600 text-sm">
-                      Remember your password?{' '}
-                      <button
-                        type="button"
-                        onClick={() => setMode('login')}
-                        className="font-semibold text-amber-700 hover:text-amber-800 focus:outline-none transition-colors"
-                        disabled={loading}
-                      >
+                      <button type="button" onClick={() => switchMode('login')} className="font-semibold text-gray-900 hover:underline">
                         Sign in
                       </button>
                     </p>
                   )}
-                </div>
-
-                {/* Trust badges */}
-                <div className="pt-6 border-t border-gray-100">
-                  <div className="flex items-center justify-center space-x-6 text-xs text-gray-500">
-                    <span className="flex items-center">
-                      <svg className="h-4 w-4 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Secure
-                    </span>
-                    <span className="flex items-center">
-                      <svg className="h-4 w-4 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Encrypted
-                    </span>
-                    <span className="flex items-center">
-                      <svg className="h-4 w-4 mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      Private
-                    </span>
-                  </div>
+                  {mode === 'forgot' && (
+                    <button type="button" onClick={() => switchMode('login')} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
+                      ← Back to sign in
+                    </button>
+                  )}
                 </div>
               </form>
-            </div>
+            )}
           </div>
-        </ProfessionalAuthLayout>
-      </div>
+
+          {/* Footer links */}
+          <p className="text-center text-xs text-gray-400 mt-5">
+            By continuing, you agree to our{' '}
+            <Link to="/terms-of-service" className="underline hover:text-gray-600 transition-colors">Terms</Link>
+            {' '}and{' '}
+            <Link to="/privacy-policy" className="underline hover:text-gray-600 transition-colors">Privacy Policy</Link>
+          </p>
+        </div>
+      </main>
     </div>
   );
 };

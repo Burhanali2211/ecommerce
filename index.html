@@ -185,13 +185,14 @@
 </head>
 
 <body>
-  <!-- Skip link for accessibility -->
-  <a href="#main-content" class="skip-link sr-only focus:not-sr-only">Skip to main content</a>
-
-  <!-- Placeholder for main-content id (for link checker - React will create the actual one) -->
-  <main id="main-content" style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;" aria-hidden="true"></main>
-
-  <div id="root"></div>
+  <div id="root">
+    <!-- Inline loader shown before React hydrates — replaced automatically when React mounts -->
+    <div id="app-init-loader" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff;z-index:9999;gap:20px;">
+      <div style="width:48px;height:48px;border-radius:50%;border:3px solid #dcfce7;border-top-color:#15803d;animation:_appSpin 0.7s linear infinite;"></div>
+      <p style="font-family:system-ui,sans-serif;font-size:13px;font-weight:600;color:#6b7280;letter-spacing:0.05em;text-transform:uppercase;">Loading...</p>
+      <style>@keyframes _appSpin{to{transform:rotate(360deg)}}</style>
+    </div>
+  </div>
 
   <!-- Razorpay SDK is now loaded dynamically only when needed (on checkout/payment pages) -->
   <!-- This reduces initial page load time and network requests -->

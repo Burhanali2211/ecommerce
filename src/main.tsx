@@ -36,8 +36,29 @@ if (typeof window !== 'undefined') {
     const errorStack = error?.stack || '';
     const errorString = String(error);
     
+    // Handle chunk/module load errors (stale deployment: new deploy = new hash = old URL 404s)
+    // These must NOT be suppressed — they need a page reload to pick up fresh assets
+    const isChunkLoadError =
+      errorMessage.includes('error loading dynamically imported module') ||
+      errorMessage.includes('Failed to fetch dynamically imported module') ||
+      errorMessage.includes('Importing a module script failed') ||
+      errorString.includes('error loading dynamically imported module') ||
+      errorString.includes('Failed to fetch dynamically imported module');
+
+    if (isChunkLoadError) {
+      event.preventDefault();
+      // Reload once (with a 30-second cooldown) to pick up new deployment assets
+      const RELOAD_KEY = 'chunkLoadReload';
+      const last = sessionStorage.getItem(RELOAD_KEY);
+      if (!last || Date.now() - parseInt(last, 10) > 30000) {
+        sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+        window.location.reload();
+      }
+      return;
+    }
+
     // Check if error is from a browser extension or known non-critical sources
-    const isExtensionError = 
+    const isExtensionError =
       errorMessage.includes('moz-extension://') ||
       errorMessage.includes('chrome-extension://') ||
       errorMessage.includes('safari-extension://') ||
@@ -57,13 +78,11 @@ if (typeof window !== 'undefined') {
       errorMessage.includes('ServiceWorker intercepted') ||
       errorMessage.includes('ServiceWorker') ||
       errorMessage.includes('sw.js') ||
-      errorMessage.includes('error loading dynamically imported module') ||
-      errorMessage.includes('Failed to load') ||
       errorString.includes('NS_BINDING_ABORTED') ||
       errorString.includes('ServiceWorker intercepted') ||
       errorString.includes('sw.js') ||
       errorStack.includes('sw.js');
-    
+
     if (isExtensionError) {
       // Prevent extension errors from breaking the app
       event.preventDefault();
@@ -80,8 +99,24 @@ if (typeof window !== 'undefined') {
     const errorMessage = String(message);
     const errorSource = String(source || '');
     
+    // Handle chunk/module load errors with a reload (same logic as unhandledrejection handler)
+    const isChunkLoadError =
+      errorMessage.includes('error loading dynamically imported module') ||
+      errorMessage.includes('Failed to fetch dynamically imported module') ||
+      errorMessage.includes('Importing a module script failed');
+
+    if (isChunkLoadError) {
+      const RELOAD_KEY = 'chunkLoadReload';
+      const last = sessionStorage.getItem(RELOAD_KEY);
+      if (!last || Date.now() - parseInt(last, 10) > 30000) {
+        sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+        window.location.reload();
+      }
+      return true;
+    }
+
     // Check if error is from a browser extension or known non-critical sources
-    const isExtensionError = 
+    const isExtensionError =
       errorSource.includes('moz-extension://') ||
       errorSource.includes('chrome-extension://') ||
       errorSource.includes('safari-extension://') ||
@@ -94,11 +129,9 @@ if (typeof window !== 'undefined') {
       errorMessage.includes('ServiceWorker intercepted') ||
       errorMessage.includes('ServiceWorker') ||
       errorMessage.includes('sw.js') ||
-      errorMessage.includes('error loading dynamically imported module') ||
-      errorMessage.includes('Failed to load') ||
       (errorMessage.includes('newValue') && (errorMessage.includes('undefined') || errorMessage.includes('can\'t access'))) ||
       (errorMessage.includes('can\'t access property') && errorMessage.includes('newValue'));
-    
+
     if (isExtensionError) {
       // Suppress extension errors
       if (process.env.NODE_ENV === 'development') {

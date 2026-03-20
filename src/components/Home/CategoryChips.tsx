@@ -73,7 +73,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = memo(({ categories, l
       >
         {/* All Categories chip — grid icon instead of weird mountain emoji */}
         <Link
-          to="/categories"
+          to="/products"
           className="flex-shrink-0 flex flex-col items-center gap-1.5 group snap-start"
         >
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-900 border-2 border-gray-900 flex items-center justify-center group-hover:bg-black group-hover:border-black transition-colors shadow-sm">
@@ -120,7 +120,7 @@ export const CategoryChips: React.FC<CategoryChipsProps> = memo(({ categories, l
 
         {/* View all */}
         <Link
-          to="/categories"
+          to="/products"
           className="flex-shrink-0 flex flex-col items-center gap-1.5 group snap-start"
         >
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center group-hover:border-green-500 group-hover:bg-green-50 transition-colors">

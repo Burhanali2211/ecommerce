@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { User, AuthContextType } from '../types';
 import { supabase } from '../lib/supabase';
-import { useError } from './ErrorContext';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -22,7 +21,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isMobileAuthOpen, setIsMobileAuthOpen] = useState(false);
   const [mobileAuthMode, setMobileAuthMode] = useState<'login' | 'signup' | 'profile'>('login');
-  const { setError } = useError();
 
   const mapSupabaseUserToAppUser = (sbUser: any, profile: any): User => {
     return {
@@ -54,12 +52,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       .select('*')
       .eq('id', userId)
       .single();
-    
-    if (error) {
-      console.error('Error fetching profile:', error);
-      return null;
+
+    if (!error) return data;
+
+    // PGRST116 = 0 rows — profile was never created (trigger missing / pre-trigger signup).
+    // Use the SECURITY DEFINER RPC so RLS never blocks this fallback creation.
+    if (error.code === 'PGRST116') {
+      const { data: { user: sbUser } } = await supabase.auth.getUser();
+
+      // If there is no active session, we can't create the profile safely.
+      // This happens right after signUp when email confirmation is still required.
+      // The trigger already created the profile row; it's just not visible to anon.
+      if (!sbUser) return null;
+
+      const { error: rpcErr } = await supabase.rpc('ensure_profile_exists', {
+        p_user_id:   userId,
+        p_email:     sbUser.email || '',
+        p_full_name: sbUser.user_metadata?.full_name || 'User',
+        p_role:      sbUser.user_metadata?.role || 'customer',
+      });
+
+      if (rpcErr) {
+        console.error('Error creating missing profile:', rpcErr);
+        return null;
+      }
+
+      // Re-fetch the profile that was just upserted
+      const { data: created } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      return created || null;
     }
-    return data;
+
+    console.error('Error fetching profile:', error);
+    return null;
   };
 
   useEffect(() => {
@@ -99,25 +128,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const signIn = async (email: string, password: string): Promise<void> => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-      
-      if (data.user) {
-        const profile = await fetchProfile(data.user.id);
-        setUser(mapSupabaseUserToAppUser(data.user, profile));
-        setError(null);
-      }
-    } catch (error: any) {
-      setError(error.message || 'Login failed');
-      throw error;
-    } finally {
-      setLoading(false);
+    // Do NOT touch the shared `loading` state here — that's only for the initial
+    // session check. AuthPage manages its own button-level loading state.
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.user) {
+      const profile = await fetchProfile(data.user.id);
+      setUser(mapSupabaseUserToAppUser(data.user, profile));
     }
   };
 
@@ -126,41 +143,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     password: string,
     additionalData?: Record<string, unknown>
   ): Promise<void> => {
-    try {
-      setLoading(true);
-      
-      let fullName = additionalData?.fullName as string;
-      if (!fullName) {
-        const firstName = (additionalData?.firstName as string) || '';
-        const lastName = (additionalData?.lastName as string) || '';
-        fullName = `${firstName} ${lastName}`.trim() || 'User';
-      }
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: additionalData?.role || 'customer',
-          }
-        }
-      });
+    // Do NOT touch the shared `loading` state here.
+    let fullName = additionalData?.fullName as string;
+    if (!fullName) {
+      const firstName = (additionalData?.firstName as string) || '';
+      const lastName = (additionalData?.lastName as string) || '';
+      fullName = `${firstName} ${lastName}`.trim() || 'User';
+    }
 
-      if (error) throw error;
-      
-      if (data.user) {
-        // Profile creation is usually handled by a database trigger in Supabase
-        // but we'll fetch it to be sure
-        const profile = await fetchProfile(data.user.id);
-        setUser(mapSupabaseUserToAppUser(data.user, profile));
-        setError(null);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: additionalData?.role || 'customer',
+        }
       }
-    } catch (error: any) {
-      setError(error.message || 'Registration failed');
-      throw error;
-    } finally {
-      setLoading(false);
+    });
+
+    if (error) throw error;
+
+    // data.session is null when email confirmation is required.
+    // Do NOT set user state in that case — the Supabase client has no JWT,
+    // so any subsequent DB write (cart, wishlist, etc.) would use the anon
+    // role and fail with RLS violations.  The caller (AuthPage) will
+    // detect this and show a "check your email" message instead.
+    if (data.user && data.session) {
+      const profile = await fetchProfile(data.user.id);
+      setUser(mapSupabaseUserToAppUser(data.user, profile));
     }
   };
 
@@ -169,13 +180,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
+
       setUser(null);
       localStorage.removeItem('user_preferences');
       localStorage.removeItem('cart_items');
-      setError(null);
     } catch (error: any) {
-      setError(error.message || 'Logout failed');
       throw error;
     } finally {
       setLoading(false);
@@ -245,7 +254,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(mapSupabaseUserToAppUser(sbUser, data));
       }
     } catch (error: any) {
-      setError(error.message || 'Profile update failed');
       throw error;
     }
   };

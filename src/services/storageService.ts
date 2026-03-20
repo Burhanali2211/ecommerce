@@ -18,25 +18,34 @@ export class StorageService {
     folder: string = 'uploads',
     onProgress?: (progress: UploadProgress) => void
   ): Promise<string> {
+    // Declare outside try so it can be cleared in both success and error paths
+    let progressInterval: ReturnType<typeof setInterval> | null = null;
+
     try {
+      // Normalise content type — camera captures can return "" (some Android) or
+      // "image/heic"/"image/heif" (iOS). Default both to JPEG so Supabase accepts them.
+      let contentType = file.type;
+      let fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+
+      if (!contentType || contentType === 'image/heic' || contentType === 'image/heif') {
+        contentType = 'image/jpeg';
+        fileExt = 'jpg';
+      }
+
+      // Simulate progress up to 90% max — jumps to 100% only when upload actually finishes
       if (onProgress) {
         const total = file.size;
         let loaded = 0;
-        const interval = setInterval(() => {
-          loaded += total / 10;
-          if (loaded >= total) {
-            loaded = total;
-            clearInterval(interval);
-          }
+        progressInterval = setInterval(() => {
+          loaded = Math.min(loaded + total / 15, total * 0.9);
           onProgress({
             loaded,
             total,
-            percentage: Math.round((loaded / total) * 100)
+            percentage: Math.round((loaded / total) * 100),
           });
-        }, 100);
+        }, 150);
       }
 
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${crypto.randomUUID()}.${fileExt}`;
       const path = `${folder}/${fileName}`;
 
@@ -44,9 +53,18 @@ export class StorageService {
         .from(BUCKET_NAME)
         .upload(path, file, {
           cacheControl: '31536000',
-          contentType: file.type,
-          upsert: false
+          contentType,
+          upsert: false,
         });
+
+      // Upload finished — clear the simulation and report 100%
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
+      if (onProgress) {
+        onProgress({ loaded: file.size, total: file.size, percentage: 100 });
+      }
 
       if (error) {
         console.error('Supabase storage upload error:', error);
@@ -59,6 +77,11 @@ export class StorageService {
 
       return urlData.publicUrl;
     } catch (error) {
+      // Always clear the interval on failure so the UI doesn't stay stuck
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+      }
       console.error('Image upload error:', error);
       throw error instanceof Error ? error : new Error('Failed to upload image');
     }

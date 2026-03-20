@@ -24,7 +24,7 @@ const slides = [
     title: 'Artisan Gift Sets',
     subtitle: 'Perfect for every occasion',
     cta: 'View Gifts',
-    ctaLink: '/collections',
+    ctaLink: '/products',
     accent: 'from-stone-900/80 to-transparent',
   },
 ];

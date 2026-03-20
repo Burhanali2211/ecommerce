@@ -86,8 +86,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   }, []);
 
   const handleFileUpload = useCallback(async (file: File) => {
-    // Validate file
-    if (!file.type.startsWith('image/')) {
+    // Validate file type — allow empty MIME (some Android camera captures) and HEIC/HEIF (iOS)
+    const isImage = !file.type || file.type.startsWith('image/');
+    if (!isImage) {
       showError('Upload Error', 'Only image files are allowed');
       return;
     }

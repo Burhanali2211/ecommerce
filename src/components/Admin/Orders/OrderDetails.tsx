@@ -116,7 +116,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
         order_number: orderRow.order_number || orderRow.id,
         customer_name: profile?.full_name || 'Guest',
         customer_email: profile?.email || '',
-        customer_phone: profile?.phone || orderRow.shipping_address?.phone || '',
+        customer_phone: profile?.phone || orderRow.shipping_address?.phone || orderRow.shipping_address?.phoneNumber || '',
         status: orderRow.status,
         payment_status: orderRow.payment_status || 'pending',
         payment_method: orderRow.payment_method || 'cod',
@@ -158,8 +158,27 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
     if (!order || newStatus === order.status) { setShowStatusModal(false); return; }
     try {
       setUpdating(true);
-      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+      const updates: Record<string, any> = { status: newStatus };
+      if (newStatus === 'shipped') updates.shipped_at = new Date().toISOString();
+      if (newStatus === 'delivered') updates.delivered_at = new Date().toISOString();
+
+      const { error } = await supabase.from('orders').update(updates).eq('id', orderId);
       if (error) throw error;
+
+      // Insert a tracking event so the customer can see the status change
+      const statusMessages: Record<string, string> = {
+        confirmed: 'Your order has been confirmed and is being prepared.',
+        processing: 'Your order is being packed and prepared for shipment.',
+        shipped: 'Your order has been shipped and is on its way.',
+        delivered: 'Your order has been delivered. Thank you for shopping with us!',
+        cancelled: 'Your order has been cancelled.',
+      };
+      await supabase.from('order_tracking').insert({
+        order_id: orderId,
+        status: newStatus,
+        message: statusMessages[newStatus] || `Order status updated to ${newStatus}.`,
+      });
+
       showSuccess('Success', 'Order status updated');
       setShowStatusModal(false);
       fetchOrderDetails();
@@ -244,9 +263,9 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
 
   const addr = order.shipping_address;
   const addrLine = [
-    addr?.street_address,
+    addr?.streetAddress || addr?.street_address || addr?.street,
     addr?.city && addr?.state ? `${addr.city}, ${addr.state}` : addr?.city || addr?.state,
-    addr?.postal_code,
+    addr?.postalCode || addr?.postal_code || addr?.zipCode,
     addr?.country,
   ].filter(Boolean).join('\n');
 

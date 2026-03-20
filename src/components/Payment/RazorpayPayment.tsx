@@ -11,7 +11,10 @@ import { loadRazorpayScript, getRazorpayInstance } from '../../utils/loadRazorpa
 import { supabase } from '../../lib/supabase';
 
 interface RazorpayPaymentProps {
-  amount: number;
+  amount: number;       // final total to charge (already includes GST + shipping)
+  subtotal?: number;    // for display only
+  gstAmount?: number;   // for display only
+  shippingAmount?: number; // for display only
   items: CartItem[];
   customerInfo: {
     name: string;
@@ -33,6 +36,9 @@ interface RazorpayPaymentProps {
 
 export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   amount,
+  subtotal,
+  gstAmount,
+  shippingAmount,
   items,
   customerInfo,
   shippingAddress,
@@ -45,10 +51,11 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   const [selectedMethod, setSelectedMethod] = useState('card');
   const { showNotification } = useNotification();
 
-  const subtotal = amount;
-  const gst = Math.round(subtotal * 0.18 * 100) / 100;
-  const shipping = subtotal >= 2000 ? 0 : 5;
-  const total = subtotal + gst + shipping;
+  // Use passed breakdown for display; `amount` is the verified final total to charge
+  const displaySubtotal = subtotal ?? amount;
+  const displayGst = gstAmount ?? 0;
+  const displayShipping = shippingAmount ?? 0;
+  const total = amount;
 
   const paymentMethods = [
     { id: 'card', name: 'Card', description: 'Debit/Credit', icon: CreditCard, color: 'from-blue-500 to-blue-600' },
@@ -210,16 +217,18 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">Subtotal ({items.length} items)</span>
-              <span className="font-medium">₹{subtotal.toLocaleString('en-IN')}</span>
+              <span className="font-medium">₹{displaySubtotal.toLocaleString('en-IN')}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">GST (18%)</span>
-              <span className="font-medium">₹{gst.toLocaleString('en-IN')}</span>
-            </div>
+            {displayGst > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">GST (18%)</span>
+                <span className="font-medium">₹{displayGst.toLocaleString('en-IN')}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-600">Shipping</span>
-              <span className={`font-medium ${shipping === 0 ? 'text-green-600' : ''}`}>
-                {shipping === 0 ? 'FREE' : `₹${shipping}`}
+              <span className={`font-medium ${displayShipping === 0 ? 'text-green-600' : ''}`}>
+                {displayShipping === 0 ? 'FREE' : `₹${displayShipping}`}
               </span>
             </div>
           </div>
