@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Maximize2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LuxuryGalleryProps {
   images: string[];
@@ -13,58 +13,113 @@ export const LuxuryGallery: React.FC<LuxuryGalleryProps> = ({ images, name }) =>
 
   if (!images || images.length === 0) return null;
 
+  const prev = () => setActiveIdx(i => (i - 1 + images.length) % images.length);
+  const next = () => setActiveIdx(i => (i + 1) % images.length);
+
   return (
     <div className="relative">
-      {/* Main Image Display */}
-      <div className="relative aspect-[4/5] overflow-hidden rounded-luxury-xl bg-stone-100 group cursor-zoom-in" onClick={() => setIsZoomed(true)}>
+      {/* Main image — square on mobile, taller on desktop */}
+      <div
+        className="relative aspect-square sm:aspect-[4/5] overflow-hidden rounded-xl sm:rounded-2xl bg-stone-100 group cursor-zoom-in"
+        onClick={() => setIsZoomed(true)}
+      >
         <AnimatePresence mode="wait">
           <motion.img
             key={images[activeIdx]}
             src={images[activeIdx]}
             alt={name}
-            initial={{ opacity: 0, scale: 1.05 }}
+            initial={{ opacity: 0, scale: 1.03 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.6, ease: [0.43, 0.13, 0.23, 0.96] }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.4, ease: [0.43, 0.13, 0.23, 0.96] }}
             className="w-full h-full object-cover"
           />
         </AnimatePresence>
-        
-        {/* Gallery Controls Overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500" />
-        <button className="absolute bottom-6 right-6 p-3 bg-white/90 backdrop-blur rounded-full shadow-luxury opacity-0 group-hover:opacity-100 transition-opacity">
-          <Maximize2 className="h-5 w-5 text-stone-900" />
+
+        {/* Prev/Next arrows — show on mobile always, hover on desktop */}
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={e => { e.stopPropagation(); prev(); }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-white/80 rounded-full shadow sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+              aria-label="Previous"
+            >
+              <ChevronLeft className="h-4 w-4 text-stone-700" />
+            </button>
+            <button
+              onClick={e => { e.stopPropagation(); next(); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-white/80 rounded-full shadow sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+              aria-label="Next"
+            >
+              <ChevronRight className="h-4 w-4 text-stone-700" />
+            </button>
+          </>
+        )}
+
+        {/* Zoom hint — desktop hover only */}
+        <button className="absolute bottom-3 right-3 p-2 bg-white/90 rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity hidden sm:flex">
+          <Maximize2 className="h-4 w-4 text-stone-700" />
         </button>
+
+        {/* Dot indicators on mobile */}
+        {images.length > 1 && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 sm:hidden">
+            {images.map((_, i) => (
+              <button
+                key={i}
+                onClick={e => { e.stopPropagation(); setActiveIdx(i); }}
+                className={`rounded-full transition-all ${i === activeIdx ? 'w-4 h-1.5 bg-white' : 'w-1.5 h-1.5 bg-white/50'}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Thumbnail Strip */}
+      {/* Thumbnail strip — desktop only */}
       {images.length > 1 && (
-        <div className="mt-6 flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+        <div className="mt-3 hidden sm:flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           {images.map((img, idx) => (
             <button
               key={img}
               onClick={() => setActiveIdx(idx)}
-              className={`relative flex-shrink-0 w-24 aspect-[4/5] rounded-luxury overflow-hidden border-2 transition-all duration-300 ${
-                activeIdx === idx ? 'border-stone-800 scale-105' : 'border-transparent opacity-60 hover:opacity-100'
+              className={`relative flex-shrink-0 w-16 aspect-square rounded-lg overflow-hidden border-2 transition-all duration-200 ${
+                activeIdx === idx ? 'border-stone-800' : 'border-transparent opacity-50 hover:opacity-80'
               }`}
             >
-              <img src={img} alt={`${name} thumb ${idx}`} className="w-full h-full object-cover" />
+              <img src={img} alt={`${name} ${idx + 1}`} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
       )}
 
-      {/* Zoom Modal (Simplified for now) */}
+      {/* Zoom modal */}
       {isZoomed && (
-        <div 
-          className="fixed inset-0 z-[100] bg-white flex items-center justify-center p-4 lg:p-12 cursor-zoom-out"
+        <div
+          className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center p-4"
           onClick={() => setIsZoomed(false)}
         >
-          <motion.img 
-            initial={{ opacity: 0, scale: 0.9 }}
+          <button
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            onClick={() => setIsZoomed(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {images.length > 1 && (
+            <>
+              <button onClick={e => { e.stopPropagation(); prev(); }} className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white">
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <button onClick={e => { e.stopPropagation(); next(); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white">
+                <ChevronRight className="h-6 w-6" />
+              </button>
+            </>
+          )}
+          <motion.img
+            initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            src={images[activeIdx]} 
-            className="max-w-full max-h-full object-contain shadow-2xl" 
+            src={images[activeIdx]}
+            className="max-w-full max-h-full object-contain"
+            onClick={e => e.stopPropagation()}
           />
         </div>
       )}

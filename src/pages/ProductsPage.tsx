@@ -78,12 +78,16 @@ const ProductsPage: React.FC = () => {
         }
     }, [categories, searchParams, slug]);
 
-    // Fetch products with filters when page mounts or filters change (critical for mobile/direct links)
+    // Debounced fetch — instant for category changes, 400ms delay for search typing
     useEffect(() => {
-        fetchProducts(1, 20, {
-            categoryId: filters.category || undefined,
-            search: filters.search || undefined
-        });
+        const delay = filters.search ? 400 : 0;
+        const timer = setTimeout(() => {
+            fetchProducts(1, 20, {
+                categoryId: filters.category || undefined,
+                search: filters.search || undefined
+            });
+        }, delay);
+        return () => clearTimeout(timer);
     }, [filters.category, filters.search, fetchProducts]);
 
     const filteredProducts = useMemo(() => {

@@ -9,6 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+
 // Helper functions for common operations
 export const db = {
   // Products
@@ -27,40 +28,39 @@ export const db = {
     const limit = params?.limit || 20;
     const offset = (page - 1) * limit;
 
+    // Use count only for paginated list pages, not homepage sections
+    const needsCount = !params?.featured && !params?.bestSellers && !params?.latest && !params?.showOnHomepage;
+
     let query = supabase
       .from('products')
-      .select('*', { count: 'exact' });
+      .select('*', needsCount ? { count: 'exact' } : { count: 'none' });
 
-    if (params?.categoryId) {
-      query = query.eq('category_id', params.categoryId);
-    }
-
-    if (params?.featured) {
-      query = query.eq('is_featured', true);
-    }
-
-    if (params?.showOnHomepage) {
-      query = query.eq('show_on_homepage', true);
-    }
-
-    if (params?.sellerId) {
-      query = query.eq('seller_id', params.sellerId);
-    }
+    if (params?.categoryId) query = query.eq('category_id', params.categoryId);
+    if (params?.featured)    query = query.eq('is_featured', true);
+    if (params?.showOnHomepage) query = query.eq('show_on_homepage', true);
+    if (params?.sellerId)    query = query.eq('seller_id', params.sellerId);
 
     if (params?.search) {
-      query = query.or(`name.ilike.%${params.search}%,description.ilike.%${params.search}%`);
+      query = query.ilike('name', `%${params.search}%`);
     }
 
-    query = query.order('created_at', { ascending: false });
+    // bestSellers: order by rating desc, then review_count desc
+    if (params?.bestSellers) {
+      query = query.order('rating', { ascending: false });
+    } else if (params?.latest) {
+      query = query.order('created_at', { ascending: false });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
 
     const { data, error, count } = await query
       .eq('is_active', true)
       .range(offset, offset + limit - 1);
-    
+
     if (error) throw error;
-    
-    return { 
-      data, 
+
+    return {
+      data: data || [],
       pagination: {
         page,
         limit,
@@ -71,11 +71,10 @@ export const db = {
   },
 
   async getProduct(id: string) {
-    // Supabase id column is UUID — skip the query for non-UUID strings
-    // to avoid a 400 error (e.g. when a slug is passed via the URL)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id)) return null;
 
+    // Full select for detail page — needs description, specifications etc.
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -89,34 +88,35 @@ export const db = {
   async getFeaturedProducts(limit = 8) {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('*', { count: 'none' })
       .eq('is_active', true)
       .eq('is_featured', true)
-      .limit(limit)
-      .order('created_at', { ascending: false });
-    
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
   async getLatestProducts(limit = 8) {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('*', { count: 'none' })
       .eq('is_active', true)
-      .limit(limit)
-      .order('created_at', { ascending: false });
-    
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
     if (error) throw error;
-    return data;
+    return data || [];
   },
 
   async getHomepageProducts(limit = 4) {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('*', { count: 'none' })
       .eq('is_active', true)
       .eq('show_on_homepage', true)
+      .order('created_at', { ascending: false })
       .limit(limit)
       .order('created_at', { ascending: false });
     
