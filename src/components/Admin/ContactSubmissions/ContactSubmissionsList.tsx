@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Search, Eye, Filter, X, Mail, Clock, 
-  CheckCircle, AlertCircle, Loader2, ChevronLeft, ChevronRight,
-  RefreshCw, Archive, MessageSquare, User, Phone
+import {
+  Search, Eye, Filter, X, Mail, Clock,
+  CheckCircle, Loader2, ChevronLeft, ChevronRight,
+  RefreshCw, MessageSquare, Archive
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 import { ContactSubmissionDetails } from './ContactSubmissionDetails';
-import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
 
 interface ContactSubmission {
   id: string;
@@ -19,14 +18,28 @@ interface ContactSubmission {
   status: 'new' | 'read' | 'replied' | 'archived';
   admin_notes?: string;
   user_id?: string;
-  user_name?: string;
-  user_email?: string;
   replied_at?: string;
   replied_by?: string;
   replied_by_name?: string;
   created_at: string;
   updated_at: string;
 }
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'new': return 'bg-blue-100 text-blue-700 border border-blue-200';
+    case 'read': return 'bg-amber-100 text-amber-700 border border-amber-200';
+    case 'replied': return 'bg-emerald-100 text-emerald-700 border border-emerald-200';
+    case 'archived': return 'bg-gray-100 text-gray-600 border border-gray-200';
+    default: return 'bg-gray-100 text-gray-600 border border-gray-200';
+  }
+};
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+const formatDateShort = (d: string) =>
+  new Date(d).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
 
 export const ContactSubmissionsList: React.FC = () => {
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
@@ -38,56 +51,36 @@ export const ContactSubmissionsList: React.FC = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const { showNotification } = useNotification();
-  const { settings } = useAdminDashboardSettings();
 
   const pageSize = 20;
 
-  useEffect(() => {
-    fetchSubmissions();
-  }, [currentPage, searchTerm, statusFilter]);
+  useEffect(() => { fetchSubmissions(); }, [currentPage, searchTerm, statusFilter]);
 
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
-
       let query = supabase
         .from('contact_submissions')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
-
       if (statusFilter) query = query.eq('status', statusFilter);
       if (searchTerm) query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,subject.ilike.%${searchTerm}%,message.ilike.%${searchTerm}%`);
-
       const { data, error, count } = await query.range(from, to);
       if (error) throw error;
-
       const rows = (data || []).map((r: any) => ({
-        id: r.id,
-        name: r.name || '',
-        email: r.email || '',
-        phone: r.phone,
-        subject: r.subject || '',
-        message: r.message || '',
-        status: r.status || 'new',
-        admin_notes: r.admin_notes,
-        user_id: r.user_id,
-        replied_at: r.replied_at,
-        replied_by: r.replied_by,
-        replied_by_name: r.replied_by_name,
-        created_at: r.created_at,
-        updated_at: r.updated_at || r.created_at
+        id: r.id, name: r.name || '', email: r.email || '', phone: r.phone,
+        subject: r.subject || '', message: r.message || '', status: r.status || 'new',
+        admin_notes: r.admin_notes, user_id: r.user_id,
+        replied_at: r.replied_at, replied_by: r.replied_by, replied_by_name: r.replied_by_name,
+        created_at: r.created_at, updated_at: r.updated_at || r.created_at
       }));
       setSubmissions(rows);
       setTotalItems(count ?? 0);
       setTotalPages(Math.max(1, Math.ceil((count ?? 0) / pageSize)));
     } catch (error: any) {
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: error.message || 'Failed to load contact submissions'
-      });
+      showNotification({ type: 'error', title: 'Error', message: error.message || 'Failed to load contact submissions' });
     } finally {
       setLoading(false);
     }
@@ -99,65 +92,18 @@ export const ContactSubmissionsList: React.FC = () => {
       if (adminNotes !== undefined) updates.admin_notes = adminNotes;
       const { error } = await supabase.from('contact_submissions').update(updates).eq('id', id);
       if (error) throw error;
-      showNotification({
-        type: 'success',
-        title: 'Success',
-        message: 'Contact submission updated successfully'
-      });
+      showNotification({ type: 'success', title: 'Success', message: 'Submission updated successfully' });
       fetchSubmissions();
-      if (selectedSubmissionId === id) {
-        setSelectedSubmissionId(null);
-      }
+      if (selectedSubmissionId === id) setSelectedSubmissionId(null);
     } catch (error: any) {
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: error.message || 'Failed to update submission'
-      });
+      showNotification({ type: 'error', title: 'Error', message: error.message || 'Failed to update submission' });
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'read': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'replied': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'archived': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  };
-
-  const clearFilters = () => {
-    setSearchTerm('');
-    setStatusFilter('');
-    setCurrentPage(1);
   };
 
   if (selectedSubmissionId) {
-    const selectedSubmission = submissions.find(s => s.id === selectedSubmissionId);
-    if (selectedSubmission) {
-      return (
-        <ContactSubmissionDetails
-          submission={selectedSubmission}
-          onBack={() => setSelectedSubmissionId(null)}
-          onUpdate={updateStatus}
-        />
-      );
+    const sub = submissions.find(s => s.id === selectedSubmissionId);
+    if (sub) {
+      return <ContactSubmissionDetails submission={sub} onBack={() => setSelectedSubmissionId(null)} onUpdate={updateStatus} />;
     }
   }
 
@@ -166,259 +112,206 @@ export const ContactSubmissionsList: React.FC = () => {
   const repliedCount = submissions.filter(s => s.status === 'replied').length;
   const archivedCount = submissions.filter(s => s.status === 'archived').length;
 
+  const statCards = [
+    { label: 'Total', value: totalItems, icon: MessageSquare, iconCls: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200' },
+    { label: 'New', value: newCount, icon: Mail, iconCls: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
+    { label: 'Replied', value: repliedCount, icon: CheckCircle, iconCls: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+    { label: 'Archived', value: archivedCount, icon: Archive, iconCls: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200' },
+  ];
+
+  const Pagination = () => (
+    totalPages > 1 ? (
+      <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <p className="text-xs text-gray-500">
+          Showing <span className="font-medium text-gray-700">{(currentPage - 1) * pageSize + 1}</span>–<span className="font-medium text-gray-700">{Math.min(currentPage * pageSize, totalItems)}</span> of <span className="font-medium text-gray-700">{totalItems}</span>
+        </p>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <ChevronLeft className="h-4 w-4 text-gray-500" />
+          </button>
+          {[...Array(totalPages)].map((_, i) => {
+            const p = i + 1;
+            if (p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)) {
+              return (
+                <button key={p} onClick={() => setCurrentPage(p)}
+                  className={`px-2.5 py-1 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                  {p}
+                </button>
+              );
+            }
+            if (p === currentPage - 2 || p === currentPage + 2) return <span key={p} className="px-1 text-gray-400 text-sm">…</span>;
+            return null;
+          })}
+          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <ChevronRight className="h-4 w-4 text-gray-500" />
+          </button>
+        </div>
+      </div>
+    ) : null
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div 
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{
-              background: `linear-gradient(to bottom right, ${settings.primary_color_from}20, ${settings.primary_color_to}20)`
-            }}
-          >
-            <Mail className="w-6 h-6" style={{ color: settings.primary_color_from }} />
+          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+            <MessageSquare className="w-5 h-5 text-slate-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">Contact Submissions</h2>
-            <p className="text-sm text-white/60 mt-0.5">Manage customer inquiries and messages</p>
+            <h2 className="text-xl font-bold text-gray-900">Inquiries</h2>
+            <p className="text-sm text-gray-500">Manage customer inquiries and messages</p>
           </div>
         </div>
-        <button
-          onClick={fetchSubmissions}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-medium text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+        <button onClick={fetchSubmissions} disabled={loading}
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Refresh</span>
         </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div 
-          className="bg-gradient-to-br backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-white/20 transition-all group"
-          style={{
-            background: `linear-gradient(to bottom right, ${settings.primary_color_from}20, ${settings.primary_color_to}20)`
-          }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"
-              style={{
-                background: `${settings.primary_color_from}30`
-              }}
-            >
-              <MessageSquare className="w-5 h-5" style={{ color: settings.primary_color_from }} />
+      {/* Stat Cards — compact 4-col */}
+      <div className="grid grid-cols-4 gap-2 sm:gap-4">
+        {statCards.map((s) => (
+          <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-3 sm:p-4`}>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white rounded-lg flex items-center justify-center mb-2 shadow-sm">
+              <s.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${s.iconCls}`} />
             </div>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 leading-none">{s.value}</p>
+            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
           </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Total</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{totalItems}</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-blue-500/40 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-blue-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Mail className="w-5 h-5 text-blue-300" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">New</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{newCount}</p>
-        </div>
-
-        <div 
-          className="bg-gradient-to-br backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-white/20 transition-all group"
-          style={{
-            background: `linear-gradient(to bottom right, ${settings.primary_color_from}20, ${settings.primary_color_to}20)`
-          }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"
-              style={{
-                background: `${settings.primary_color_from}30`
-              }}
-            >
-              <Clock className="w-5 h-5" style={{ color: settings.primary_color_from }} />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Read</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{readCount}</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-emerald-500/40 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-emerald-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <CheckCircle className="w-5 h-5 text-emerald-300" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Replied</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{repliedCount}</p>
-        </div>
+        ))}
       </div>
 
-      {/* Filters */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-5 h-5 text-white/60" />
-          <h3 className="text-lg font-semibold text-white">Filters</h3>
+      {/* Status filter chips */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {(['', 'new', 'read', 'replied', 'archived'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => { setStatusFilter(s); setCurrentPage(1); }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              statusFilter === s
+                ? 'bg-slate-700 text-white border-slate-700'
+                : 'bg-white text-gray-600 border-gray-200 hover:border-slate-300 hover:bg-gray-50'
+            }`}
+          >
+            {s === '' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+            {s === 'new' && newCount > 0 && (
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded text-xs font-semibold ${statusFilter === s ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>{newCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, email, or subject..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 text-sm text-gray-900 placeholder-gray-400"
+            />
+          </div>
           {(searchTerm || statusFilter) && (
-            <button
-              onClick={clearFilters}
-              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X className="h-4 w-4" />
-              Clear All
+            <button onClick={() => { setSearchTerm(''); setStatusFilter(''); setCurrentPage(1); }}
+              className="flex items-center gap-1 px-3 py-2.5 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors border border-gray-200">
+              <X className="w-4 h-4" /> Clear
             </button>
           )}
         </div>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
-            <input
-              type="text"
-              placeholder="Search by name, email, subject, or message..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:border-white/20 text-sm text-white placeholder-white/40 transition-all"
-              style={{
-                '--tw-ring-color': `${settings.primary_color_from}50`
-              } as React.CSSProperties}
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:border-white/20 text-sm text-white transition-all"
-            style={{
-              '--tw-ring-color': `${settings.primary_color_from}50`
-            } as React.CSSProperties}
-          >
-            <option value="" className="bg-gray-900">All Status</option>
-            <option value="new" className="bg-gray-900">New</option>
-            <option value="read" className="bg-gray-900">Read</option>
-            <option value="replied" className="bg-gray-900">Replied</option>
-            <option value="archived" className="bg-gray-900">Archived</option>
-          </select>
-        </div>
       </div>
 
-      {/* Submissions List */}
+      {/* Content */}
       {loading ? (
-        <div className="flex justify-center items-center py-12 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
-          <Loader2 className="h-8 w-8 animate-spin" style={{ color: settings.primary_color_from }} />
-          <p className="text-white/60 ml-3">Loading submissions...</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Loader2 className="h-8 w-8 text-slate-400 animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Loading submissions...</p>
         </div>
       ) : submissions.length === 0 ? (
-        <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-12 text-center">
-          <Mail className="h-12 w-12 text-white/20 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-white mb-2">No submissions found</h3>
-          <p className="text-white/60">
-            {searchTerm || statusFilter 
-              ? 'Try adjusting your filters' 
-              : 'No contact submissions yet'}
-          </p>
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Mail className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-700 font-medium mb-1">No submissions found</p>
+          <p className="text-gray-500 text-sm">{searchTerm || statusFilter ? 'Try adjusting your filters' : 'No contact submissions yet'}</p>
         </div>
       ) : (
-        <>
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-white/5 border-b border-white/10">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                      Contact
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                      Subject
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-white/60 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                  {submissions.map((submission) => (
-                    <tr key={submission.id} className="hover:bg-white/5 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <div className="text-sm font-medium text-white">{submission.name}</div>
-                          <div className="text-sm text-white/60">{submission.email}</div>
-                          {submission.phone && (
-                            <div className="text-xs text-white/40">{submission.phone}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-white max-w-xs truncate">
-                          {submission.subject}
-                        </div>
-                        <div className="text-xs text-white/60 max-w-xs truncate mt-1">
-                          {submission.message.substring(0, 60)}...
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(submission.status)}`}>
-                          {getStatusLabel(submission.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white/60">
-                        {formatDate(submission.created_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => setSelectedSubmissionId(submission.id)}
-                          className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 p-2 rounded-lg transition-all hover:scale-110"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          {/* Mobile Cards */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {submissions.map((sub) => (
+              <div key={sub.id} className={`p-4 ${sub.status === 'new' ? 'bg-blue-50/30' : ''}`}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-sm text-gray-900 truncate">{sub.name}</p>
+                      <span className={`flex-shrink-0 px-2 py-0.5 text-xs font-medium rounded-full ${getStatusBadge(sub.status)}`}>
+                        {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate">{sub.email}</p>
+                  </div>
+                  <button onClick={() => setSelectedSubmissionId(sub.id)}
+                    className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors flex-shrink-0">
+                    <Eye className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-sm font-medium text-gray-800 truncate mb-0.5">{sub.subject}</p>
+                <p className="text-xs text-gray-500 line-clamp-2">{sub.message.substring(0, 80)}…</p>
+                <p className="text-xs text-gray-400 mt-2">{formatDateShort(sub.created_at)}</p>
+              </div>
+            ))}
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between bg-white/5 backdrop-blur-sm px-4 py-3 rounded-xl border border-white/10">
-              <div className="text-sm text-white/60">
-                Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} submissions
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          )}
-        </>
+          {/* Desktop Table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Contact</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Subject</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Status</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Date</th>
+                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {submissions.map((sub) => (
+                  <tr key={sub.id} className={`hover:bg-gray-50 transition-colors ${sub.status === 'new' ? 'bg-blue-50/20' : ''}`}>
+                    <td className="px-5 py-4">
+                      <p className="font-medium text-sm text-gray-900">{sub.name}</p>
+                      <p className="text-xs text-gray-500">{sub.email}</p>
+                      {sub.phone && <p className="text-xs text-gray-400">{sub.phone}</p>}
+                    </td>
+                    <td className="px-5 py-4 max-w-xs">
+                      <p className="text-sm text-gray-900 font-medium truncate">{sub.subject}</p>
+                      <p className="text-xs text-gray-500 truncate">{sub.message.substring(0, 60)}…</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${getStatusBadge(sub.status)}`}>
+                        {sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-500 whitespace-nowrap">{formatDate(sub.created_at)}</td>
+                    <td className="px-5 py-4 text-right">
+                      <button onClick={() => setSelectedSubmissionId(sub.id)}
+                        className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors inline-flex items-center gap-1.5 text-xs font-medium border border-gray-200">
+                        <Eye className="h-4 w-4" /> View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination />
+        </div>
       )}
     </div>
   );
 };
-

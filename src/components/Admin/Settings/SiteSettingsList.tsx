@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Save, RefreshCw, Upload, X, Plus, Globe, Mail, Phone, DollarSign, Truck, FileText, Palette, Settings } from 'lucide-react';
+import { Save, RefreshCw, Upload, Globe, Mail, Phone, DollarSign, Truck, FileText, Palette, Settings } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
-import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
 
 interface SiteSetting {
   id: string;
@@ -34,7 +33,6 @@ export const SiteSettingsList: React.FC = () => {
   const [uploading, setUploading] = useState<string | null>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
   const { showSuccess, showError } = useNotification();
-  const { settings: dashboardSettings } = useAdminDashboardSettings();
 
   useEffect(() => {
     fetchSettings();
@@ -43,20 +41,15 @@ export const SiteSettingsList: React.FC = () => {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      
-      // Fetch all site settings from Supabase
       const { data, error } = await supabase
         .from('site_settings')
         .select('*')
         .order('category', { ascending: true });
-      
       if (error) throw error;
-      
       if (data && data.length > 0) {
         setSettings(data);
         setOriginalSettings(JSON.parse(JSON.stringify(data)));
       } else {
-        // If no settings, create essential ones
         const essentialSettings = ESSENTIAL_SETTINGS.map((s, idx) => ({
           id: `temp-${idx}`,
           setting_key: s.key,
@@ -77,47 +70,33 @@ export const SiteSettingsList: React.FC = () => {
     }
   };
 
-  // Check if a setting has been modified
   const isModified = (key: string): boolean => {
     const current = settings.find(s => s.setting_key === key);
     const original = originalSettings.find(s => s.setting_key === key);
-    
     if (!current) return false;
-    if (!original) return true; // New setting
-    
+    if (!original) return true;
     return current.setting_value !== original.setting_value;
   };
 
-  // Get all modified settings
   const getModifiedSettings = (): Array<{ key: string; value: string; isNew: boolean }> => {
     const modified: Array<{ key: string; value: string; isNew: boolean }> = [];
-    
     settings.forEach(setting => {
       const original = originalSettings.find(s => s.setting_key === setting.setting_key);
       if (!original || original.setting_value !== setting.setting_value) {
-        modified.push({
-          key: setting.setting_key,
-          value: setting.setting_value,
-          isNew: !original
-        });
+        modified.push({ key: setting.setting_key, value: setting.setting_value, isNew: !original });
       }
     });
-    
     return modified;
   };
 
-  // Save all changes at once
   const handleSaveAll = async () => {
     const modified = getModifiedSettings();
-    
     if (modified.length === 0) {
       showError('No Changes', 'No settings have been modified');
       return;
     }
-
     try {
       setSaving(true);
-      
       for (const { key, value } of modified) {
         const essentialSetting = ESSENTIAL_SETTINGS.find(s => s.key === key);
         const { error } = await supabase
@@ -130,10 +109,8 @@ export const SiteSettingsList: React.FC = () => {
             description: essentialSetting?.description || '',
             is_public: essentialSetting?.is_public ?? true
           }, { onConflict: 'setting_key' });
-        
         if (error) throw error;
       }
-
       showSuccess('Settings Saved', `${modified.length} setting(s) saved successfully`);
       await fetchSettings();
       window.dispatchEvent(new Event('settingsUpdated'));
@@ -148,12 +125,8 @@ export const SiteSettingsList: React.FC = () => {
   const handleChange = (key: string, value: string) => {
     const existing = settings.find(s => s.setting_key === key);
     if (existing) {
-      // Update existing setting
-      setSettings(settings.map(s =>
-        s.setting_key === key ? { ...s, setting_value: value } : s
-      ));
+      setSettings(settings.map(s => s.setting_key === key ? { ...s, setting_value: value } : s));
     } else {
-      // Add new placeholder setting to state
       const essential = ESSENTIAL_SETTINGS.find(s => s.key === key);
       if (essential) {
         const newSetting: SiteSetting = {
@@ -173,35 +146,23 @@ export const SiteSettingsList: React.FC = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       showError('Invalid File', 'Please upload an image file');
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       showError('File Too Large', 'Please upload an image smaller than 5MB');
       return;
     }
-
     try {
       setUploading(key);
-
-      // Upload to Supabase Storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${key}-${Date.now()}.${fileExt}`;
       const filePath = `settings/${fileName}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('public')
         .upload(filePath, file, { upsert: true });
-
       if (uploadError) {
-        // If storage bucket doesn't exist, just use local path
-        console.warn('Storage upload failed, using local reference:', uploadError);
-        // Convert to base64 as fallback
         const reader = new FileReader();
         reader.onload = async () => {
           const base64 = reader.result as string;
@@ -211,13 +172,7 @@ export const SiteSettingsList: React.FC = () => {
         reader.readAsDataURL(file);
         return;
       }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('public')
-        .getPublicUrl(filePath);
-
-      // Update the setting
+      const { data: { publicUrl } } = supabase.storage.from('public').getPublicUrl(filePath);
       const essentialSetting = ESSENTIAL_SETTINGS.find(s => s.key === key);
       const { error } = await supabase
         .from('site_settings')
@@ -229,9 +184,7 @@ export const SiteSettingsList: React.FC = () => {
           description: essentialSetting?.description || '',
           is_public: true
         }, { onConflict: 'setting_key' });
-
       if (error) throw error;
-
       handleChange(key, publicUrl);
       await fetchSettings();
       showSuccess('Upload Successful', 'Logo uploaded and saved successfully');
@@ -245,23 +198,13 @@ export const SiteSettingsList: React.FC = () => {
     }
   };
 
-  // Get essential settings (create placeholders if they don't exist)
   const getEssentialSetting = (key: string, alternativeKey?: string): SiteSetting | null => {
-    // Check for primary key first
     let existing = settings.find(s => s.setting_key === key);
-    
-    // If not found and alternative key provided, check for that
     if (!existing && alternativeKey) {
       existing = settings.find(s => s.setting_key === alternativeKey);
-      // If found with alternative key, migrate it to the primary key
-      if (existing) {
-        // Update the setting key to the primary key
-        existing = { ...existing, setting_key: key };
-      }
+      if (existing) existing = { ...existing, setting_key: key };
     }
-    
     if (existing) return existing;
-    
     const essential = ESSENTIAL_SETTINGS.find(s => s.key === key);
     if (essential) {
       return {
@@ -277,15 +220,13 @@ export const SiteSettingsList: React.FC = () => {
     return null;
   };
 
-  // Check if a setting exists in the database (has been saved before)
   const isSettingSaved = (key: string): boolean => {
     const setting = settings.find(s => s.setting_key === key);
     return setting ? Boolean(setting.id && setting.id !== '') : false;
   };
 
-  // Separate essential settings for special display
   const siteName = getEssentialSetting('site_name');
-  const logoUrl = getEssentialSetting('logo_url', 'site_logo'); // Check for both logo_url and site_logo
+  const logoUrl = getEssentialSetting('logo_url', 'site_logo');
   const siteDescription = getEssentialSetting('site_description');
   const contactEmail = getEssentialSetting('contact_email');
   const contactPhone = getEssentialSetting('contact_phone');
@@ -293,25 +234,58 @@ export const SiteSettingsList: React.FC = () => {
   const freeShippingThreshold = getEssentialSetting('free_shipping_threshold');
   const copyrightText = getEssentialSetting('copyright_text');
 
-  // Get other settings (non-essential)
   const essentialKeys = ESSENTIAL_SETTINGS.map(s => s.key);
   const otherSettings = settings.filter(s => !essentialKeys.includes(s.setting_key));
-
   const groupedSettings = otherSettings.reduce((acc, setting) => {
-    if (!acc[setting.category]) {
-      acc[setting.category] = [];
-    }
+    if (!acc[setting.category]) acc[setting.category] = [];
     acc[setting.category]?.push(setting);
     return acc;
   }, {} as Record<string, SiteSetting[]>);
 
+  // --- Input class helpers ---
+  const inputCls = (key: string) =>
+    `w-full px-3 sm:px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 text-sm text-gray-900 placeholder-gray-400 min-h-[44px] transition-colors ${
+      isModified(key) ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-white'
+    }`;
+
+  const modifiedBadge = (
+    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 border border-orange-200 text-xs rounded-full flex items-center gap-1">
+      <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
+      Modified
+    </span>
+  );
+
+  const notSavedBadge = (
+    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 border border-yellow-200 text-xs rounded-full">
+      Not Saved
+    </span>
+  );
+
+  const publicBadge = (
+    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-200 text-xs rounded-full">
+      Public
+    </span>
+  );
+
+  const FieldWrapper = ({ settingKey, label, icon: Icon, isSaved, children }: {
+    settingKey: string; label: string; icon?: React.ElementType; isSaved?: boolean; children: React.ReactNode;
+  }) => (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        {Icon && <Icon className="h-4 w-4 text-slate-500 flex-shrink-0" />}
+        <label className="font-medium text-sm text-gray-900">{label}</label>
+        {publicBadge}
+        {isSaved === false && !isModified(settingKey) && notSavedBadge}
+        {isModified(settingKey) && modifiedBadge}
+      </div>
+      {children}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div 
-          className="animate-spin rounded-full h-12 w-12 border-b-2"
-          style={{ borderColor: dashboardSettings.primary_color_from }}
-        ></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-700" />
       </div>
     );
   }
@@ -321,835 +295,349 @@ export const SiteSettingsList: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div 
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{
-              background: `linear-gradient(to bottom right, ${dashboardSettings.primary_color_from}20, ${dashboardSettings.primary_color_to}20)`
-            }}
-          >
-            <Settings className="w-6 h-6" style={{ color: dashboardSettings.primary_color_from }} />
+          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+            <Settings className="w-5 h-5 text-slate-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">Site Settings</h2>
-            <p className="text-sm text-white/60 mt-0.5">Configure general website settings</p>
+            <h2 className="text-xl font-bold text-gray-900">Site Settings</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Configure general website settings</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={fetchSettings}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white transition-all hover:scale-105 active:scale-95 text-sm"
-          >
-            <RefreshCw className="h-5 w-5 flex-shrink-0" />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-        </div>
+        <button
+          onClick={fetchSettings}
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors text-sm"
+        >
+          <RefreshCw className="h-4 w-4" />
+          <span>Refresh</span>
+        </button>
       </div>
 
-      {/* Save All Button - Top */}
+      {/* Unsaved changes banner */}
       {getModifiedSettings().length > 0 && (
-        <div 
-          className="backdrop-blur-sm rounded-2xl border p-4"
-          style={{
-            background: `linear-gradient(to right, ${dashboardSettings.primary_color_from}20, ${dashboardSettings.primary_color_to}20)`,
-            borderColor: `${dashboardSettings.primary_color_from}40`
-          }}
-        >
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-gray-900">
                 {getModifiedSettings().length} setting(s) modified
               </p>
-              <p className="text-xs text-white/60 mt-1">Click "Save All Changes" to apply your modifications</p>
+              <p className="text-xs text-gray-500 mt-0.5">Click "Save All Changes" to apply your modifications</p>
             </div>
             <button
               onClick={handleSaveAll}
               disabled={saving}
-              className="px-4 sm:px-6 py-2 sm:py-3 rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium shadow-md hover:shadow-lg min-h-[44px] sm:min-h-auto disabled:hover:scale-100"
-              style={{
-                background: `linear-gradient(to right, ${dashboardSettings.primary_color_from}, ${dashboardSettings.primary_color_to})`
-              }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             >
               {saving ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
-                  <span>Saving...</span>
-                </>
+                <><RefreshCw className="h-4 w-4 animate-spin" /><span>Saving...</span></>
               ) : (
-                <>
-                  <Save className="h-4 w-4 flex-shrink-0" />
-                  <span>Save All Changes</span>
-                </>
+                <><Save className="h-4 w-4" /><span>Save All Changes</span></>
               )}
             </button>
           </div>
         </div>
       )}
 
-      {/* Essential Settings Section */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
-        {/* Header */}
-        <div 
-          className="px-3 sm:px-6 py-3 sm:py-4 border-b border-white/10"
-          style={{
-            background: `linear-gradient(to right, ${dashboardSettings.primary_color_from}20, ${dashboardSettings.primary_color_to}20)`
-          }}
-        >
-          <h3 className="font-semibold text-sm sm:text-base text-white">Essential Website Settings</h3>
-          <p className="text-xs sm:text-sm text-white/60 mt-1">Configure your website identity and basic information</p>
+      {/* Essential Settings */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50">
+          <h3 className="font-semibold text-gray-900">Essential Website Settings</h3>
+          <p className="text-sm text-gray-500 mt-0.5">Configure your website identity and basic information</p>
         </div>
 
-        {/* Content - Grid Layout */}
-        <div className="p-4 sm:p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="p-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
             {/* Site Name */}
             {siteName && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Globe className="h-4 w-4 flex-shrink-0" style={{ color: dashboardSettings.primary_color_from }} />
-                  <label className="font-medium text-sm text-white">
-                    Website Name
-                  </label>
-                  {siteName.is_public && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                      Public
-                    </span>
-                  )}
-                  {!isSettingSaved(siteName.setting_key) && !isModified(siteName.setting_key) && (
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs rounded-full">
-                      Not Saved
-                    </span>
-                  )}
-                  {isModified(siteName.setting_key) && (
-                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                      Modified
-                    </span>
-                  )}
-                </div>
-                {siteName.description && (
-                  <p className="text-xs text-white/60">{siteName.description}</p>
-                )}
+              <FieldWrapper settingKey={siteName.setting_key} label="Website Name" icon={Globe} isSaved={isSettingSaved(siteName.setting_key)}>
+                {siteName.description && <p className="text-xs text-gray-500">{siteName.description}</p>}
                 <input
                   type="text"
                   value={siteName.setting_value || ''}
                   onChange={(e) => handleChange(siteName.setting_key, e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] transition-colors ${
-                    isModified(siteName.setting_key) 
-                      ? 'border-orange-500/50 bg-orange-500/10' 
-                      : 'border-white/10'
-                  }`}
-                  style={{
-                    '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                  } as React.CSSProperties}
+                  className={inputCls(siteName.setting_key)}
                   placeholder="Enter website name"
                 />
-              </div>
+              </FieldWrapper>
             )}
 
             {/* Logo Upload */}
             {logoUrl && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Upload className="h-4 w-4 flex-shrink-0" style={{ color: dashboardSettings.primary_color_from }} />
-                  <label className="font-medium text-sm text-white">
-                    Website Logo
-                  </label>
-                  {logoUrl.is_public && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                      Public
-                    </span>
-                  )}
-                  {!isSettingSaved(logoUrl.setting_key) && !isModified(logoUrl.setting_key) && (
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs rounded-full">
-                      Not Saved
-                    </span>
-                  )}
-                  {isModified(logoUrl.setting_key) && (
-                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                      Modified
-                    </span>
-                  )}
-                </div>
-                {logoUrl.description && (
-                  <p className="text-xs text-white/60">{logoUrl.description}</p>
-                )}
+              <FieldWrapper settingKey={logoUrl.setting_key} label="Website Logo" icon={Upload} isSaved={isSettingSaved(logoUrl.setting_key)}>
+                {logoUrl.description && <p className="text-xs text-gray-500">{logoUrl.description}</p>}
                 <div className="flex flex-col gap-3">
                   {logoUrl.setting_value && (() => {
-                    // Normalize logo URL - convert relative paths to absolute URLs
                     let logoSrc = logoUrl.setting_value;
-                    if (logoSrc && typeof logoSrc === 'string') {
-                      // If it's a relative path starting with /uploads, make it absolute
-                      if (logoSrc.startsWith('/uploads') && !logoSrc.startsWith('http')) {
-                        // In production, use the current origin
-                        const baseUrl = window.location.origin;
-                        logoSrc = `${baseUrl}${logoSrc}`;
-                      }
+                    if (logoSrc?.startsWith('/uploads') && !logoSrc.startsWith('http')) {
+                      logoSrc = `${window.location.origin}${logoSrc}`;
                     }
                     return (
-                      <div className="flex items-center justify-center p-4 bg-white/5 rounded-xl border border-white/10 min-h-[80px]">
+                      <div className="flex items-center justify-center p-4 bg-gray-50 rounded-xl border border-gray-200 min-h-[80px]">
                         <img
-                          key={logoUrl.setting_value} // Force re-render when URL changes
+                          key={logoUrl.setting_value}
                           src={logoSrc}
                           alt="Logo preview"
                           className="h-20 w-auto max-w-full object-contain rounded"
                           onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            // Only show placeholder if it's not already the placeholder
-                            if (!target.src.includes('data:image/svg')) {
-                              target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="3" y="3" width="18" height="18" rx="2" ry="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpolyline points="21 15 16 10 5 21"/%3E%3C/svg%3E';
+                            const t = e.target as HTMLImageElement;
+                            if (!t.src.includes('data:image/svg')) {
+                              t.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="3" y="3" width="18" height="18" rx="2" ry="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpolyline points="21 15 16 10 5 21"/%3E%3C/svg%3E';
                             }
-                          }}
-                          onLoad={() => {
-                            // Image loaded successfully
-                            console.log('Logo preview loaded:', logoSrc);
                           }}
                         />
                       </div>
                     );
                   })()}
-                  <input
-                    ref={logoFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileUpload(e, logoUrl.setting_key)}
-                    className="hidden"
-                  />
+                  <input ref={logoFileInputRef} type="file" accept="image/*" onChange={(e) => handleFileUpload(e, logoUrl.setting_key)} className="hidden" />
                   <button
                     onClick={() => logoFileInputRef.current?.click()}
                     disabled={uploading === logoUrl.setting_key}
-                    className="w-full px-4 py-2 border-2 border-dashed rounded-xl hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm min-h-[44px] text-white"
-                    style={{
-                      borderColor: `${dashboardSettings.primary_color_from}50`,
-                      color: dashboardSettings.primary_color_from
-                    }}
+                    className="w-full px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-slate-400 hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm min-h-[44px]"
                   >
                     {uploading === logoUrl.setting_key ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
-                        <span>Uploading...</span>
-                      </>
+                      <><RefreshCw className="h-4 w-4 animate-spin" /><span>Uploading...</span></>
                     ) : (
-                      <>
-                        <Upload className="h-4 w-4 flex-shrink-0" />
-                        <span>Upload Logo</span>
-                      </>
+                      <><Upload className="h-4 w-4" /><span>Upload Logo</span></>
                     )}
                   </button>
                 </div>
-              </div>
+              </FieldWrapper>
             )}
 
-            {/* Site Description - Full Width */}
+            {/* Site Description - full width */}
             {siteDescription && (
-              <div className="flex flex-col gap-2 lg:col-span-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <FileText className="h-4 w-4 flex-shrink-0" style={{ color: dashboardSettings.primary_color_from }} />
-                  <label className="font-medium text-sm text-white">
-                    Website Description
-                  </label>
-                  {siteDescription.is_public && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                      Public
-                    </span>
-                  )}
-                  {!isSettingSaved(siteDescription.setting_key) && !isModified(siteDescription.setting_key) && (
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs rounded-full">
-                      Not Saved
-                    </span>
-                  )}
-                  {isModified(siteDescription.setting_key) && (
-                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                      Modified
-                    </span>
-                  )}
-                </div>
-                {siteDescription.description && (
-                  <p className="text-xs text-white/60">{siteDescription.description}</p>
-                )}
-                <textarea
-                  value={siteDescription.setting_value}
-                  onChange={(e) => handleChange(siteDescription.setting_key, e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[100px] resize-y transition-colors ${
-                    isModified(siteDescription.setting_key) 
-                      ? 'border-orange-500/50 bg-orange-500/10' 
-                      : 'border-white/10'
-                  }`}
-                  style={{
-                    '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                  } as React.CSSProperties}
-                  placeholder="Enter website description"
-                  rows={3}
-                />
+              <div className="lg:col-span-2">
+                <FieldWrapper settingKey={siteDescription.setting_key} label="Website Description" icon={FileText} isSaved={isSettingSaved(siteDescription.setting_key)}>
+                  {siteDescription.description && <p className="text-xs text-gray-500">{siteDescription.description}</p>}
+                  <textarea
+                    value={siteDescription.setting_value}
+                    onChange={(e) => handleChange(siteDescription.setting_key, e.target.value)}
+                    className={`w-full px-3 sm:px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 text-sm text-gray-900 placeholder-gray-400 resize-y transition-colors ${
+                      isModified(siteDescription.setting_key) ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-white'
+                    }`}
+                    placeholder="Enter website description"
+                    rows={3}
+                  />
+                </FieldWrapper>
               </div>
             )}
 
             {/* Contact Email */}
             {contactEmail && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Mail className="h-4 w-4 flex-shrink-0" style={{ color: dashboardSettings.primary_color_from }} />
-                  <label className="font-medium text-sm text-white">
-                    Contact Email
-                  </label>
-                  {contactEmail.is_public && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                      Public
-                    </span>
-                  )}
-                  {!isSettingSaved(contactEmail.setting_key) && !isModified(contactEmail.setting_key) && (
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs rounded-full">
-                      Not Saved
-                    </span>
-                  )}
-                  {isModified(contactEmail.setting_key) && (
-                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                      Modified
-                    </span>
-                  )}
-                </div>
-                {contactEmail.description && (
-                  <p className="text-xs text-white/60">{contactEmail.description}</p>
-                )}
+              <FieldWrapper settingKey={contactEmail.setting_key} label="Contact Email" icon={Mail} isSaved={isSettingSaved(contactEmail.setting_key)}>
+                {contactEmail.description && <p className="text-xs text-gray-500">{contactEmail.description}</p>}
                 <input
                   type="email"
                   value={contactEmail.setting_value}
                   onChange={(e) => handleChange(contactEmail.setting_key, e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] transition-colors ${
-                    isModified(contactEmail.setting_key) 
-                      ? 'border-orange-500/50 bg-orange-500/10' 
-                      : 'border-white/10'
-                  }`}
-                  style={{
-                    '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                  } as React.CSSProperties}
+                  className={inputCls(contactEmail.setting_key)}
                   placeholder="admin@example.com"
                 />
-              </div>
+              </FieldWrapper>
             )}
 
             {/* Contact Phone */}
             {contactPhone && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Phone className="h-4 w-4 flex-shrink-0" style={{ color: dashboardSettings.primary_color_from }} />
-                  <label className="font-medium text-sm text-white">
-                    Contact Phone
-                  </label>
-                  {contactPhone.is_public && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                      Public
-                    </span>
-                  )}
-                  {!isSettingSaved(contactPhone.setting_key) && !isModified(contactPhone.setting_key) && (
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs rounded-full">
-                      Not Saved
-                    </span>
-                  )}
-                  {isModified(contactPhone.setting_key) && (
-                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                      Modified
-                    </span>
-                  )}
-                </div>
-                {contactPhone.description && (
-                  <p className="text-xs text-white/60">{contactPhone.description}</p>
-                )}
+              <FieldWrapper settingKey={contactPhone.setting_key} label="Contact Phone" icon={Phone} isSaved={isSettingSaved(contactPhone.setting_key)}>
+                {contactPhone.description && <p className="text-xs text-gray-500">{contactPhone.description}</p>}
                 <input
                   type="text"
                   value={contactPhone.setting_value}
                   onChange={(e) => handleChange(contactPhone.setting_key, e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] transition-colors ${
-                    isModified(contactPhone.setting_key) 
-                      ? 'border-orange-500/50 bg-orange-500/10' 
-                      : 'border-white/10'
-                  }`}
-                  style={{
-                    '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                  } as React.CSSProperties}
+                  className={inputCls(contactPhone.setting_key)}
                   placeholder="+91-XXXXXXXXXX"
                 />
-              </div>
+              </FieldWrapper>
             )}
 
             {/* Currency */}
             {currency && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <DollarSign className="h-4 w-4 flex-shrink-0" style={{ color: dashboardSettings.primary_color_from }} />
-                  <label className="font-medium text-sm text-white">
-                    Currency
-                  </label>
-                  {currency.is_public && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                      Public
-                    </span>
-                  )}
-                  {!isSettingSaved(currency.setting_key) && !isModified(currency.setting_key) && (
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs rounded-full">
-                      Not Saved
-                    </span>
-                  )}
-                  {isModified(currency.setting_key) && (
-                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                      Modified
-                    </span>
-                  )}
-                </div>
-                {currency.description && (
-                  <p className="text-xs text-white/60">{currency.description}</p>
-                )}
+              <FieldWrapper settingKey={currency.setting_key} label="Currency" icon={DollarSign} isSaved={isSettingSaved(currency.setting_key)}>
+                {currency.description && <p className="text-xs text-gray-500">{currency.description}</p>}
                 <input
                   type="text"
                   value={currency.setting_value}
                   onChange={(e) => handleChange(currency.setting_key, e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] transition-colors ${
-                    isModified(currency.setting_key) 
-                      ? 'border-orange-500/50 bg-orange-500/10' 
-                      : 'border-white/10'
-                  }`}
-                  style={{
-                    '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                  } as React.CSSProperties}
+                  className={inputCls(currency.setting_key)}
                   placeholder="INR, USD, EUR, etc."
                 />
-              </div>
+              </FieldWrapper>
             )}
 
             {/* Free Shipping Threshold */}
             {freeShippingThreshold && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Truck className="h-4 w-4 flex-shrink-0" style={{ color: dashboardSettings.primary_color_from }} />
-                  <label className="font-medium text-sm text-white">
-                    Free Shipping Threshold
-                  </label>
-                  {freeShippingThreshold.is_public && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                      Public
-                    </span>
-                  )}
-                  {!isSettingSaved(freeShippingThreshold.setting_key) && !isModified(freeShippingThreshold.setting_key) && (
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs rounded-full">
-                      Not Saved
-                    </span>
-                  )}
-                  {isModified(freeShippingThreshold.setting_key) && (
-                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                      Modified
-                    </span>
-                  )}
-                </div>
-                {freeShippingThreshold.description && (
-                  <p className="text-xs text-white/60">{freeShippingThreshold.description}</p>
-                )}
+              <FieldWrapper settingKey={freeShippingThreshold.setting_key} label="Free Shipping Threshold" icon={Truck} isSaved={isSettingSaved(freeShippingThreshold.setting_key)}>
+                {freeShippingThreshold.description && <p className="text-xs text-gray-500">{freeShippingThreshold.description}</p>}
                 <input
                   type="number"
                   value={freeShippingThreshold.setting_value}
                   onChange={(e) => handleChange(freeShippingThreshold.setting_key, e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] transition-colors ${
-                    isModified(freeShippingThreshold.setting_key) 
-                      ? 'border-orange-500/50 bg-orange-500/10' 
-                      : 'border-white/10'
-                  }`}
-                  style={{
-                    '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                  } as React.CSSProperties}
+                  className={inputCls(freeShippingThreshold.setting_key)}
                   placeholder="2000"
                 />
-              </div>
+              </FieldWrapper>
             )}
 
-            {/* Copyright Text */}
+            {/* Copyright Text - full width */}
             {copyrightText && (
-              <div className="flex flex-col gap-2 lg:col-span-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <FileText className="h-4 w-4 flex-shrink-0" style={{ color: dashboardSettings.primary_color_from }} />
-                  <label className="font-medium text-sm text-white">
-                    Copyright Text
-                  </label>
-                  {copyrightText.is_public && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                      Public
-                    </span>
-                  )}
-                  {!isSettingSaved(copyrightText.setting_key) && !isModified(copyrightText.setting_key) && (
-                    <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 text-xs rounded-full">
-                      Not Saved
-                    </span>
-                  )}
-                  {isModified(copyrightText.setting_key) && (
-                    <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                      Modified
-                    </span>
-                  )}
-                </div>
-                {copyrightText.description && (
-                  <p className="text-xs text-white/60">{copyrightText.description}</p>
-                )}
-                <input
-                  type="text"
-                  value={copyrightText.setting_value}
-                  onChange={(e) => handleChange(copyrightText.setting_key, e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] transition-colors ${
-                    isModified(copyrightText.setting_key) 
-                      ? 'border-orange-500/50 bg-orange-500/10' 
-                      : 'border-white/10'
-                  }`}
-                  style={{
-                    '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                  } as React.CSSProperties}
-                  placeholder="© 2024 Your Company. All rights reserved."
-                />
+              <div className="lg:col-span-2">
+                <FieldWrapper settingKey={copyrightText.setting_key} label="Copyright Text" icon={FileText} isSaved={isSettingSaved(copyrightText.setting_key)}>
+                  {copyrightText.description && <p className="text-xs text-gray-500">{copyrightText.description}</p>}
+                  <input
+                    type="text"
+                    value={copyrightText.setting_value}
+                    onChange={(e) => handleChange(copyrightText.setting_key, e.target.value)}
+                    className={inputCls(copyrightText.setting_key)}
+                    placeholder="© 2024 Your Company. All rights reserved."
+                  />
+                </FieldWrapper>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Settings by Category */}
+      {/* Additional settings by category */}
       <div className="space-y-6">
         {Object.entries(groupedSettings).map(([category, items]) => {
           const isDesignCategory = category.toLowerCase() === 'design';
-          const colorSettings = items.filter(item => isColorField(item.setting_key));
-          const otherSettings = items.filter(item => !isColorField(item.setting_key));
-          
-          return (
-          <div key={category} className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
-            {/* Category Header */}
-            <div 
-              className={`px-3 sm:px-6 py-2 sm:py-3 border-b border-white/10 ${isDesignCategory ? '' : ''}`}
-              style={isDesignCategory ? {
-                background: `linear-gradient(to right, ${dashboardSettings.secondary_color_from}20, ${dashboardSettings.secondary_color_to}20)`
-              } : {
-                background: `linear-gradient(to right, ${dashboardSettings.primary_color_from}20, ${dashboardSettings.primary_color_to}20)`
-              }}
-            >
-              <h3 className="font-semibold text-xs sm:text-base text-white capitalize flex items-center gap-2">
-                {isDesignCategory && <Palette className="h-4 w-4" style={{ color: dashboardSettings.secondary_color_from }} />}
-                {category}
-              </h3>
-              {isDesignCategory && (
-                <p className="text-xs text-white/60 mt-1">Customize colors and visual appearance</p>
-              )}
-            </div>
+          const colorItems = items.filter(item => isColorField(item.setting_key));
+          const nonColorItems = items.filter(item => !isColorField(item.setting_key));
 
-            {/* Settings - Grid Layout */}
-            <div className="p-4 sm:p-6">
-              {/* Color Settings Section (for design category) */}
-              {isDesignCategory && colorSettings.length > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                    <Palette className="h-4 w-4" style={{ color: dashboardSettings.secondary_color_from }} />
-                    Color Settings
-                  </h4>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
-                    {colorSettings.map((setting) => (
-                      <div key={setting.id} className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <label className="font-medium text-sm text-white">
-                            {formatKey(setting.setting_key)}
-                          </label>
-                          {setting.is_public && (
-                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                              Public
-                            </span>
-                          )}
-                          {isModified(setting.setting_key) && (
-                            <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                              Modified
-                            </span>
-                          )}
-                        </div>
-                        {setting.description && (
-                          <p className="text-xs text-white/60">{setting.description}</p>
-                        )}
-                        <div className="flex gap-3 items-center">
-                          <div className="relative flex-shrink-0">
+          return (
+            <div key={category} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+                <h3 className="font-semibold text-gray-900 capitalize flex items-center gap-2">
+                  {isDesignCategory && <Palette className="h-4 w-4 text-slate-500" />}
+                  {category}
+                </h3>
+              </div>
+
+              <div className="p-5">
+                {isDesignCategory && colorItems.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                      <Palette className="h-4 w-4 text-slate-500" />
+                      Color Settings
+                    </h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+                      {colorItems.map((setting) => (
+                        <div key={setting.id} className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <label className="font-medium text-sm text-gray-900">{formatKey(setting.setting_key)}</label>
+                            {setting.is_public && publicBadge}
+                            {isModified(setting.setting_key) && modifiedBadge}
+                          </div>
+                          {setting.description && <p className="text-xs text-gray-500">{setting.description}</p>}
+                          <div className="flex gap-3 items-center">
                             <input
                               type="color"
                               value={isValidHexColor(setting.setting_value) ? setting.setting_value : '#000000'}
                               onChange={(e) => handleChange(setting.setting_key, e.target.value)}
-                              className="w-16 h-16 rounded-lg border-2 cursor-pointer transition-colors shadow-sm appearance-none"
-                              style={{ 
-                                backgroundColor: isValidHexColor(setting.setting_value) ? setting.setting_value : '#000000',
-                                borderColor: `${dashboardSettings.secondary_color_from}50`
-                              }}
-                              title="Click to pick a color"
+                              className="w-14 h-14 rounded-lg border-2 border-gray-200 cursor-pointer"
                             />
-                          </div>
-                          <div className="flex-1 flex flex-col gap-1">
-                            <input
-                              type="text"
-                              value={setting.setting_value}
-                              onChange={(e) => handleChange(setting.setting_key, e.target.value)}
-                              placeholder="#000000"
-                              className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] font-mono transition-colors ${
-                                isModified(setting.setting_key) 
-                                  ? 'border-orange-500/50 bg-orange-500/10' 
-                                  : 'border-white/10'
-                              } ${!isValidHexColor(setting.setting_value) && setting.setting_value ? 'border-red-500/50 bg-red-500/10' : ''}`}
-                              style={{
-                                '--tw-ring-color': `${dashboardSettings.secondary_color_from}50`
-                              } as React.CSSProperties}
-                            />
-                            {!isValidHexColor(setting.setting_value) && setting.setting_value && (
-                              <p className="text-xs text-red-300">Invalid hex color format</p>
+                            <div className="flex-1 flex flex-col gap-1">
+                              <input
+                                type="text"
+                                value={setting.setting_value}
+                                onChange={(e) => handleChange(setting.setting_key, e.target.value)}
+                                placeholder="#000000"
+                                className={`${inputCls(setting.setting_key)} font-mono ${!isValidHexColor(setting.setting_value) && setting.setting_value ? 'border-red-300 bg-red-50' : ''}`}
+                              />
+                              {!isValidHexColor(setting.setting_value) && setting.setting_value && (
+                                <p className="text-xs text-red-500">Invalid hex color format</p>
+                              )}
+                            </div>
+                            {setting.setting_value && isValidHexColor(setting.setting_value) && (
+                              <div
+                                className="w-12 h-12 rounded-lg border-2 border-gray-200 flex-shrink-0"
+                                style={{ backgroundColor: setting.setting_value }}
+                              />
                             )}
                           </div>
-                          {setting.setting_value && isValidHexColor(setting.setting_value) && (
-                            <div 
-                              className="w-12 h-12 rounded-lg border-2 shadow-sm flex-shrink-0"
-                              style={{ 
-                                backgroundColor: setting.setting_value,
-                                borderColor: `${dashboardSettings.secondary_color_from}50`
-                              }}
-                              title="Color preview"
-                            />
-                          )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Other Settings */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {(isDesignCategory ? otherSettings : items).map((setting) => (
-                  <div key={setting.id} className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <label className="font-medium text-sm text-white">
-                        {formatKey(setting.setting_key)}
-                      </label>
-                      {setting.is_public && (
-                        <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs rounded-full">
-                          Public
-                        </span>
-                      )}
-                      {isModified(setting.setting_key) && (
-                        <span className="px-2 py-0.5 bg-orange-500/20 text-orange-300 border border-orange-500/40 text-xs rounded-full flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 bg-orange-400 rounded-full"></span>
-                          Modified
-                        </span>
-                      )}
+                      ))}
                     </div>
-                    {setting.description && (
-                      <p className="text-xs text-white/60">{setting.description}</p>
-                    )}
+                  </div>
+                )}
 
-                    <div className="w-full">
-                      {setting.setting_key === 'logo_url' ? (
-                        <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  {(isDesignCategory ? nonColorItems : items).map((setting) => (
+                    <div key={setting.id} className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <label className="font-medium text-sm text-gray-900">{formatKey(setting.setting_key)}</label>
+                        {setting.is_public && publicBadge}
+                        {isModified(setting.setting_key) && modifiedBadge}
+                      </div>
+                      {setting.description && <p className="text-xs text-gray-500">{setting.description}</p>}
+                      <div className="w-full">
+                        {setting.setting_key === 'logo_url' ? (
                           <div className="flex flex-col gap-3">
                             {setting.setting_value && (() => {
-                              // Normalize logo URL - convert relative paths to absolute URLs
-                              let logoSrc = setting.setting_value;
-                              if (logoSrc && typeof logoSrc === 'string') {
-                                // If it's a relative path starting with /uploads, make it absolute
-                                if (logoSrc.startsWith('/uploads') && !logoSrc.startsWith('http')) {
-                                  // In production, use the current origin
-                                  const baseUrl = window.location.origin;
-                                  logoSrc = `${baseUrl}${logoSrc}`;
-                                }
-                              }
+                              let src = setting.setting_value;
+                              if (src?.startsWith('/uploads') && !src.startsWith('http')) src = `${window.location.origin}${src}`;
                               return (
-                                <div className="flex items-center justify-center p-4 bg-white/5 rounded-xl border border-white/10 min-h-[80px]">
-                                  <img
-                                    key={setting.setting_value} // Force re-render when URL changes
-                                    src={logoSrc}
-                                    alt="Logo preview"
-                                    className="h-20 w-auto max-w-full object-contain rounded"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      // Only show placeholder if it's not already the placeholder
-                                      if (!target.src.includes('data:image/svg')) {
-                                        target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"%3E%3Crect x="3" y="3" width="18" height="18" rx="2" ry="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpolyline points="21 15 16 10 5 21"/%3E%3C/svg%3E';
-                                      }
-                                    }}
-                                    onLoad={() => {
-                                      // Image loaded successfully
-                                      console.log('Logo preview loaded:', logoSrc);
-                                    }}
-                                  />
+                                <div className="flex items-center justify-center p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                  <img key={setting.setting_value} src={src} alt="Logo" className="h-20 w-auto max-w-full object-contain" />
                                 </div>
                               );
                             })()}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleFileUpload(e, setting.setting_key)}
-                              className="hidden"
-                              id={`file-input-${setting.setting_key}`}
-                            />
+                            <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setting.setting_key)} className="hidden" id={`file-input-${setting.setting_key}`} />
                             <button
-                              onClick={() => {
-                                const input = document.getElementById(`file-input-${setting.setting_key}`) as HTMLInputElement;
-                                input?.click();
-                              }}
+                              onClick={() => (document.getElementById(`file-input-${setting.setting_key}`) as HTMLInputElement)?.click()}
                               disabled={uploading === setting.setting_key}
-                              className="w-full px-4 py-2 border-2 border-dashed rounded-xl hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm min-h-[44px] text-white"
-                              style={{
-                                borderColor: `${dashboardSettings.primary_color_from}50`,
-                                color: dashboardSettings.primary_color_from
-                              }}
+                              className="w-full px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-slate-400 hover:bg-gray-50 flex items-center justify-center gap-2 text-sm min-h-[44px] transition-colors"
                             >
-                              {uploading === setting.setting_key ? (
-                                <>
-                                  <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
-                                  <span>Uploading...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Upload className="h-4 w-4 flex-shrink-0" />
-                                  <span>Upload Logo</span>
-                                </>
-                              )}
+                              {uploading === setting.setting_key
+                                ? <><RefreshCw className="h-4 w-4 animate-spin" /><span>Uploading...</span></>
+                                : <><Upload className="h-4 w-4" /><span>Upload Logo</span></>}
                             </button>
                           </div>
-                        </>
-                      ) : setting.setting_type === 'boolean' ? (
-                        <select
-                          value={setting.setting_value}
-                          onChange={(e) => handleChange(setting.setting_key, e.target.value)}
-                          className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white min-h-[44px] transition-colors ${
-                            isModified(setting.setting_key) 
-                              ? 'border-orange-500/50 bg-orange-500/10' 
-                              : 'border-white/10'
-                          }`}
-                          style={{
-                            '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                          } as React.CSSProperties}
-                        >
-                          <option value="true" className="bg-gray-900">True</option>
-                          <option value="false" className="bg-gray-900">False</option>
-                        </select>
-                      ) : setting.setting_type === 'number' ? (
-                        <input
-                          type="number"
-                          value={setting.setting_value}
-                          onChange={(e) => handleChange(setting.setting_key, e.target.value)}
-                          className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] transition-colors ${
-                            isModified(setting.setting_key) 
-                              ? 'border-orange-500/50 bg-orange-500/10' 
-                              : 'border-white/10'
-                          }`}
-                          style={{
-                            '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                          } as React.CSSProperties}
-                        />
-                      ) : isColorField(setting.setting_key) ? (
-                        <div className="flex gap-3 items-center">
-                          <div className="relative flex-shrink-0">
-                            <input
-                              type="color"
-                              value={isValidHexColor(setting.setting_value) ? setting.setting_value : '#000000'}
-                              onChange={(e) => handleChange(setting.setting_key, e.target.value)}
-                              className="w-16 h-16 rounded-lg border-2 cursor-pointer transition-colors shadow-sm appearance-none"
-                              style={{ 
-                                backgroundColor: isValidHexColor(setting.setting_value) ? setting.setting_value : '#000000',
-                                borderColor: `${dashboardSettings.secondary_color_from}50`
-                              }}
-                              title="Click to pick a color"
-                            />
+                        ) : setting.setting_type === 'boolean' ? (
+                          <select
+                            value={setting.setting_value}
+                            onChange={(e) => handleChange(setting.setting_key, e.target.value)}
+                            className={inputCls(setting.setting_key)}
+                          >
+                            <option value="true">True</option>
+                            <option value="false">False</option>
+                          </select>
+                        ) : setting.setting_type === 'number' ? (
+                          <input type="number" value={setting.setting_value} onChange={(e) => handleChange(setting.setting_key, e.target.value)} className={inputCls(setting.setting_key)} />
+                        ) : isColorField(setting.setting_key) ? (
+                          <div className="flex gap-3 items-center">
+                            <input type="color" value={isValidHexColor(setting.setting_value) ? setting.setting_value : '#000000'} onChange={(e) => handleChange(setting.setting_key, e.target.value)} className="w-14 h-14 rounded-lg border-2 border-gray-200 cursor-pointer" />
+                            <input type="text" value={setting.setting_value} onChange={(e) => handleChange(setting.setting_key, e.target.value)} placeholder="#000000" className={`${inputCls(setting.setting_key)} font-mono`} />
                           </div>
-                          <div className="flex-1 flex flex-col gap-1">
-                            <input
-                              type="text"
-                              value={setting.setting_value}
-                              onChange={(e) => handleChange(setting.setting_key, e.target.value)}
-                              placeholder="#000000"
-                              className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] font-mono transition-colors ${
-                                isModified(setting.setting_key) 
-                                  ? 'border-orange-500/50 bg-orange-500/10' 
-                                  : 'border-white/10'
-                              } ${!isValidHexColor(setting.setting_value) && setting.setting_value ? 'border-red-500/50 bg-red-500/10' : ''}`}
-                              style={{
-                                '--tw-ring-color': `${dashboardSettings.secondary_color_from}50`
-                              } as React.CSSProperties}
-                            />
-                            {!isValidHexColor(setting.setting_value) && setting.setting_value && (
-                              <p className="text-xs text-red-300">Invalid hex color format</p>
-                            )}
-                          </div>
-                          {setting.setting_value && isValidHexColor(setting.setting_value) && (
-                            <div 
-                              className="w-12 h-12 rounded-lg border-2 shadow-sm flex-shrink-0"
-                              style={{ 
-                                backgroundColor: setting.setting_value,
-                                borderColor: `${dashboardSettings.secondary_color_from}50`
-                              }}
-                              title="Color preview"
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <input
-                          type="text"
-                          value={setting.setting_value}
-                          onChange={(e) => handleChange(setting.setting_key, e.target.value)}
-                          className={`w-full px-3 sm:px-4 py-2 bg-white/5 border rounded-xl focus:ring-2 focus:border-transparent text-sm text-white placeholder-white/40 min-h-[44px] transition-colors ${
-                            isModified(setting.setting_key) 
-                              ? 'border-orange-500/50 bg-orange-500/10' 
-                              : 'border-white/10'
-                          }`}
-                          style={{
-                            '--tw-ring-color': `${dashboardSettings.primary_color_from}50`
-                          } as React.CSSProperties}
-                        />
-                      )}
+                        ) : (
+                          <input type="text" value={setting.setting_value} onChange={(e) => handleChange(setting.setting_key, e.target.value)} className={inputCls(setting.setting_key)} />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        );
+          );
         })}
       </div>
 
-      {/* Save All Button - Bottom */}
+      {/* Save button bottom sticky */}
       {getModifiedSettings().length > 0 && (
-        <div 
-          className="backdrop-blur-sm rounded-2xl border p-4 sticky bottom-4 shadow-lg"
-          style={{
-            background: `linear-gradient(to right, ${dashboardSettings.primary_color_from}20, ${dashboardSettings.primary_color_to}20)`,
-            borderColor: `${dashboardSettings.primary_color_from}40`
-          }}
-        >
+        <div className="bg-white border border-gray-200 rounded-xl p-4 sticky bottom-4 shadow-lg">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-white">
-                {getModifiedSettings().length} setting(s) modified
-              </p>
-              <p className="text-xs text-white/60 mt-1">Click "Save All Changes" to apply your modifications</p>
+              <p className="text-sm font-medium text-gray-900">{getModifiedSettings().length} setting(s) modified</p>
+              <p className="text-xs text-gray-500 mt-0.5">Click "Save All Changes" to apply your modifications</p>
             </div>
             <button
               onClick={handleSaveAll}
               disabled={saving}
-              className="px-4 sm:px-6 py-2 sm:py-3 rounded-xl text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm font-medium shadow-md hover:shadow-lg min-h-[44px] sm:min-h-auto disabled:hover:scale-100"
-              style={{
-                background: `linear-gradient(to right, ${dashboardSettings.primary_color_from}, ${dashboardSettings.primary_color_to})`
-              }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50 min-h-[44px]"
             >
-              {saving ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 flex-shrink-0" />
-                  <span>Save All Changes</span>
-                </>
-              )}
+              {saving
+                ? <><RefreshCw className="h-4 w-4 animate-spin" /><span>Saving...</span></>
+                : <><Save className="h-4 w-4" /><span>Save All Changes</span></>}
             </button>
           </div>
         </div>
@@ -1157,31 +645,24 @@ export const SiteSettingsList: React.FC = () => {
 
       {/* Empty State */}
       {settings.length === 0 && (
-        <div className="text-center py-12 bg-white/5 backdrop-blur-sm rounded-2xl border-2 border-dashed border-white/10">
-          <h3 className="text-lg font-semibold text-white mb-2">No Settings Found</h3>
-          <p className="text-white/60">Site settings will appear here once configured</p>
+        <div className="text-center py-12 bg-white border-2 border-dashed border-gray-200 rounded-xl">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Settings Found</h3>
+          <p className="text-gray-500">Site settings will appear here once configured</p>
         </div>
       )}
     </div>
   );
 };
 
-// Helper function to format setting keys
 function formatKey(key: string): string {
-  return key
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-// Helper function to check if a setting is a color field
 function isColorField(key: string): boolean {
   const colorKeywords = ['color', 'primary_color', 'secondary_color', 'accent_color', 'background_color', 'text_color', 'button_color', 'cart_button_color', 'cart_button_text_color'];
   return colorKeywords.some(keyword => key.toLowerCase().includes(keyword));
 }
 
-// Helper function to validate hex color
 function isValidHexColor(color: string): boolean {
   return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
 }
-

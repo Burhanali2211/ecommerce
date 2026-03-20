@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  ArrowLeft, Package, Truck, Printer, Loader2, AlertCircle, CheckCircle,
-  DollarSign, User, MapPin, Calendar, CreditCard, Edit, Save, X
+import {
+  ArrowLeft, Package, Truck, Printer, Loader2, AlertCircle,
+  DollarSign, User, MapPin, Calendar, CreditCard, Edit, Save, Phone
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
@@ -10,9 +10,9 @@ import {
   getOrderStatusConfig,
   getPaymentStatusConfig,
   getPaymentMethodConfig,
+  getAdminStatusClasses,
   ORDER_STATUS_CONFIG,
   PAYMENT_STATUS_CONFIG,
-  getNextPossibleStatuses,
   OrderStatus
 } from '../../../utils/orderStatusUtils';
 
@@ -36,6 +36,7 @@ interface OrderData {
   order_number: string;
   customer_name: string;
   customer_email: string;
+  customer_phone?: string;
   status: string;
   payment_status: string;
   payment_method: string;
@@ -50,9 +51,34 @@ interface OrderData {
   shipping_address: any;
   billing_address: any;
   tracking_number: string;
+  notes?: string;
   created_at: string;
   items: OrderItem[];
 }
+
+const SectionCard: React.FC<{
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  children: React.ReactNode;
+}> = ({ icon, iconBg, title, children }) => (
+  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+      <div className={`w-9 h-9 ${iconBg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+        {icon}
+      </div>
+      <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+    </div>
+    <div className="p-5">{children}</div>
+  </div>
+);
+
+const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <div>
+    <p className="text-xs text-gray-500 mb-0.5">{label}</p>
+    <div className="text-sm font-medium text-gray-900">{value}</div>
+  </div>
+);
 
 export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) => {
   const [order, setOrder] = useState<OrderData | null>(null);
@@ -64,9 +90,7 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
   const [showStatusModal, setShowStatusModal] = useState(false);
   const { showSuccess, showError } = useNotification();
 
-  useEffect(() => {
-    fetchOrderDetails();
-  }, [orderId]);
+  useEffect(() => { fetchOrderDetails(); }, [orderId]);
 
   const fetchOrderDetails = async () => {
     try {
@@ -77,24 +101,22 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
         .eq('id', orderId)
         .single();
       if (error) throw error;
-      if (!orderRow) {
-        setOrder(null);
-        return;
-      }
-      const { data: items } = await supabase
-        .from('order_items')
-        .select('*, products(name, images)')
-        .eq('order_id', orderId);
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('id', orderRow.user_id)
-        .single();
+      if (!orderRow) { setOrder(null); return; }
+
+      const [itemsRes, profileRes] = await Promise.all([
+        supabase.from('order_items').select('*, products(name, images)').eq('order_id', orderId),
+        orderRow.user_id
+          ? supabase.from('profiles').select('full_name, email, phone').eq('id', orderRow.user_id).single()
+          : Promise.resolve({ data: null }),
+      ]);
+
+      const profile = profileRes.data;
       const orderData: OrderData = {
         id: orderRow.id,
         order_number: orderRow.order_number || orderRow.id,
         customer_name: profile?.full_name || 'Guest',
         customer_email: profile?.email || '',
+        customer_phone: profile?.phone || orderRow.shipping_address?.phone || '',
         status: orderRow.status,
         payment_status: orderRow.payment_status || 'pending',
         payment_method: orderRow.payment_method || 'cod',
@@ -109,43 +131,40 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
         shipping_address: orderRow.shipping_address || {},
         billing_address: orderRow.billing_address || {},
         tracking_number: orderRow.tracking_number || '',
+        notes: orderRow.notes || '',
         created_at: orderRow.created_at,
-        items: (items || []).map((i: any) => ({
+        items: (itemsRes.data || []).map((i: any) => ({
           id: i.id,
           product_id: i.product_id,
           product_name: i.products?.name || 'Product',
           product_image: Array.isArray(i.products?.images) ? i.products.images[0] : '',
           quantity: i.quantity,
           unit_price: String(i.unit_price || 0),
-          total_price: String((i.quantity || 0) * parseFloat(i.unit_price || '0'))
-        }))
+          total_price: String((i.quantity || 0) * parseFloat(i.unit_price || '0')),
+        })),
       };
       setOrder(orderData);
       setNewStatus(orderData.status);
       setNewPaymentStatus(orderData.payment_status);
       setTrackingNumber(orderData.tracking_number || '');
     } catch (error: any) {
-      showError(error.message || 'Failed to load order details');
+      showError('Error', error.message || 'Failed to load order details');
     } finally {
       setLoading(false);
     }
   };
 
   const handleUpdateStatus = async () => {
-    if (!order || newStatus === order.status) {
-      setShowStatusModal(false);
-      return;
-    }
-
+    if (!order || newStatus === order.status) { setShowStatusModal(false); return; }
     try {
       setUpdating(true);
       const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
       if (error) throw error;
-      showSuccess('Order status updated successfully');
+      showSuccess('Success', 'Order status updated');
       setShowStatusModal(false);
       fetchOrderDetails();
     } catch (error: any) {
-      showError(error.message || 'Failed to update order status');
+      showError('Error', error.message || 'Failed to update order status');
     } finally {
       setUpdating(false);
     }
@@ -153,15 +172,14 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
 
   const handleUpdatePaymentStatus = async () => {
     if (!order || newPaymentStatus === order.payment_status) return;
-
     try {
       setUpdating(true);
       const { error } = await supabase.from('orders').update({ payment_status: newPaymentStatus }).eq('id', orderId);
       if (error) throw error;
-      showSuccess('Payment status updated successfully');
+      showSuccess('Success', 'Payment status updated');
       await fetchOrderDetails();
     } catch (error: any) {
-      showError(error.message || 'Failed to update payment status');
+      showError('Error', error.message || 'Failed to update payment status');
     } finally {
       setUpdating(false);
     }
@@ -169,80 +187,34 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
 
   const handleUpdateTracking = async () => {
     if (!order) return;
-    
-    // Allow empty tracking number (to clear it)
-    const trimmedTracking = trackingNumber.trim();
-    
-    if (trimmedTracking === (order.tracking_number || '')) return;
-
+    const trimmed = trackingNumber.trim();
+    if (trimmed === (order.tracking_number || '')) return;
     try {
       setUpdating(true);
-      const { error } = await supabase.from('orders').update({ tracking_number: trimmedTracking || null }).eq('id', orderId);
+      const { error } = await supabase.from('orders').update({ tracking_number: trimmed || null }).eq('id', orderId);
       if (error) throw error;
-      showSuccess(trimmedTracking ? 'Tracking number updated successfully' : 'Tracking number cleared');
+      showSuccess('Success', trimmed ? 'Tracking number updated' : 'Tracking number cleared');
       await fetchOrderDetails();
     } catch (error: any) {
-      showError(error.message || 'Failed to update tracking number');
+      showError('Error', error.message || 'Failed to update tracking number');
     } finally {
       setUpdating(false);
     }
   };
 
-  const handlePrintInvoice = async () => {
-    if (order) {
-      window.print();
-    }
+  const fmt = (amount: number | string) => {
+    const n = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
   };
 
-  const formatCurrency = (amount: number | string) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'shipped': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'processing': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'confirmed': return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
-      case 'pending': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'refunded': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-white/10 text-white/60 border-white/10';
-    }
-  };
-
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'pending': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'failed': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'refunded': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-white/10 text-white/60 border-white/10';
-    }
-  };
-
-  const renderStatusBadge = (status: string, isPayment: boolean = false) => {
+  const renderStatusBadge = (status: string, isPayment = false) => {
     const config = isPayment ? getPaymentStatusConfig(status) : getOrderStatusConfig(status);
     const Icon = config.icon;
-    const colorClasses = isPayment ? getPaymentStatusColor(status) : getStatusColor(status);
-
+    const cls = getAdminStatusClasses(status, isPayment);
     return (
-      <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg border ${colorClasses}`}>
-        <Icon className="h-4 w-4 flex-shrink-0" />
-        <span className="text-sm font-medium">{config.label}</span>
-      </div>
-    );
-  };
-
-  const renderPaymentMethod = (method: string) => {
-    const config = getPaymentMethodConfig(method);
-    const Icon = config.icon;
-
-    return (
-      <div className="inline-flex items-center gap-2">
-        <Icon className="h-5 w-5 text-white/60" />
-        <span className="text-sm font-medium text-white">{config.label}</span>
+      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium ${cls}`}>
+        <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+        <span>{config.label}</span>
       </div>
     );
   };
@@ -251,8 +223,8 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 text-amber-400 animate-spin mx-auto mb-4" />
-          <p className="text-white/60">Loading order details...</p>
+          <Loader2 className="h-10 w-10 text-amber-500 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-gray-500">Loading order details...</p>
         </div>
       </div>
     );
@@ -260,487 +232,375 @@ export const OrderDetails: React.FC<OrderDetailsProps> = ({ orderId, onClose }) 
 
   if (!order) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="h-12 w-12 text-white/40 mx-auto mb-4" />
-        <p className="text-white/60 mb-4">Order not found</p>
-        <button 
-          onClick={onClose} 
-          className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
-        >
+      <div className="text-center py-16">
+        <AlertCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+        <p className="text-gray-500 mb-4">Order not found</p>
+        <button onClick={onClose} className="px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-colors">
           Go Back
         </button>
       </div>
     );
   }
 
+  const addr = order.shipping_address;
+  const addrLine = [
+    addr?.street_address,
+    addr?.city && addr?.state ? `${addr.city}, ${addr.state}` : addr?.city || addr?.state,
+    addr?.postal_code,
+    addr?.country,
+  ].filter(Boolean).join('\n');
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex items-start gap-3">
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors mt-0.5 flex-shrink-0"
             aria-label="Go back"
           >
-            <ArrowLeft className="h-5 w-5 text-white" />
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-white">{order.order_number}</h1>
-              {renderStatusBadge(order.status, false)}
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-xl font-bold text-gray-900">{order.order_number}</h1>
+              {renderStatusBadge(order.status)}
             </div>
-            <div className="flex items-center gap-2 text-sm text-white/60">
-              <Calendar className="h-4 w-4" />
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Calendar className="h-3.5 w-3.5" />
               <span>
-                Placed on {new Date(order.created_at).toLocaleDateString('en-IN', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
+                {new Date(order.created_at).toLocaleDateString('en-IN', {
+                  year: 'numeric', month: 'long', day: 'numeric',
+                  hour: '2-digit', minute: '2-digit'
                 })}
               </span>
             </div>
           </div>
         </div>
         <button
-          onClick={handlePrintInvoice}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-medium text-white transition-all hover:scale-105"
+          onClick={() => window.print()}
+          className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-medium text-sm text-gray-700 transition-colors flex-shrink-0"
         >
-          <Printer className="h-5 w-5" />
-          <span>Print Invoice</span>
+          <Printer className="h-4 w-4" />
+          Print Invoice
         </button>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="h-5 w-5 text-amber-400" />
-            <p className="text-xs text-white/60 uppercase">Total Amount</p>
+      {/* Quick stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <DollarSign className="h-4 w-4 text-amber-600" />
+            <p className="text-xs text-gray-500 font-medium">Total</p>
           </div>
-          <p className="text-2xl font-bold text-white">{formatCurrency(order.total_amount)}</p>
+          <p className="text-xl font-bold text-amber-700">{fmt(order.total_amount)}</p>
         </div>
-        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-          <div className="flex items-center gap-2 mb-2">
-            <Package className="h-5 w-5 text-blue-400" />
-            <p className="text-xs text-white/60 uppercase">Items</p>
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Package className="h-4 w-4 text-blue-600" />
+            <p className="text-xs text-gray-500 font-medium">Items</p>
           </div>
-          <p className="text-2xl font-bold text-white">{order.items.length}</p>
+          <p className="text-xl font-bold text-blue-700">{order.items.length}</p>
         </div>
-        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-          <div className="flex items-center gap-2 mb-2">
-            <CreditCard className="h-5 w-5 text-emerald-400" />
-            <p className="text-xs text-white/60 uppercase">Payment</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <CreditCard className="h-4 w-4 text-gray-500" />
+            <p className="text-xs text-gray-500 font-medium">Payment</p>
           </div>
-          <div className="mt-1">{renderStatusBadge(order.payment_status, true)}</div>
+          <div className="mt-0.5">{renderStatusBadge(order.payment_status, true)}</div>
         </div>
-        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-          <div className="flex items-center gap-2 mb-2">
-            <Truck className="h-5 w-5 text-purple-400" />
-            <p className="text-xs text-white/60 uppercase">Tracking</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Truck className="h-4 w-4 text-gray-500" />
+            <p className="text-xs text-gray-500 font-medium">Tracking</p>
           </div>
-          <p className="text-sm font-medium text-white mt-1">
-            {order.tracking_number || 'Not assigned'}
+          <p className="text-sm font-medium text-gray-700 truncate">
+            {order.tracking_number || '—'}
           </p>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Order Items - Main Focus */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Order Items Section */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
-            <div className="p-5 border-b border-white/10">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                    <Package className="w-5 h-5 text-amber-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-white">Order Items</h2>
-                    <p className="text-sm text-white/60">{order.items.length} {order.items.length === 1 ? 'item' : 'items'}</p>
-                  </div>
-                </div>
+      {/* Main layout: left (items + customer + payment) + right (manage) */}
+      <div className="grid lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 space-y-5">
+
+          {/* Order Items */}
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+              <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center">
+                <Package className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Order Items</h2>
+                <p className="text-xs text-gray-500">{order.items.length} {order.items.length === 1 ? 'item' : 'items'}</p>
               </div>
             </div>
-            <div className="p-5 space-y-4">
-              {order.items.map((item, index) => (
-                <div 
-                  key={item.id} 
-                  className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 transition-colors"
-                >
-                  <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border border-white/10">
+
+            {/* Items list */}
+            <div className="divide-y divide-gray-50">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50 transition-colors">
+                  <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 border border-gray-200">
                     <img
                       src={item.product_image || '/placeholder.png'}
                       alt={item.product_name}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder.png';
-                      }}
+                      onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.png'; }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-base text-white mb-2">{item.product_name}</p>
-                    <div className="flex flex-wrap items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/60">Quantity:</span>
-                        <span className="font-medium text-white">{item.quantity}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/60">Unit Price:</span>
-                        <span className="font-medium text-white">{formatCurrency(item.unit_price)}</span>
-                      </div>
-                    </div>
+                    <p className="font-medium text-sm text-gray-900 truncate">{item.product_name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {fmt(item.unit_price)} × {item.quantity}
+                    </p>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-lg font-bold text-amber-400">{formatCurrency(item.total_price)}</p>
-                  </div>
+                  <p className="font-semibold text-sm text-amber-600 flex-shrink-0">{fmt(item.total_price)}</p>
                 </div>
               ))}
             </div>
 
-            {/* Order Summary */}
-            <div className="p-5 border-t border-white/10 bg-white/5">
-              <h3 className="text-base font-semibold text-white mb-4">Order Summary</h3>
-              <div className="space-y-3">
+            {/* Summary */}
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Subtotal</span>
+                <span className="font-medium text-gray-900">{fmt(order.subtotal)}</span>
+              </div>
+              {Number(order.discount_amount) > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/60">Subtotal</span>
-                  <span className="font-medium text-white">{formatCurrency(order.subtotal)}</span>
+                  <span className="text-gray-600">Discount</span>
+                  <span className="font-medium text-emerald-600">−{fmt(order.discount_amount)}</span>
                 </div>
-                {Number(order.discount_amount) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/60">Discount</span>
-                    <span className="font-medium text-emerald-400">-{formatCurrency(order.discount_amount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/60">Tax</span>
-                  <span className="font-medium text-white">{formatCurrency(order.tax_amount)}</span>
+              )}
+              {Number(order.tax_amount) > 0 && (
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Tax</span>
+                  <span className="font-medium text-gray-900">{fmt(order.tax_amount)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/60">Shipping</span>
-                  <span className="font-medium text-white">{formatCurrency(order.shipping_amount)}</span>
+              )}
+              {Number(order.shipping_amount) > 0 && (
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Shipping</span>
+                  <span className="font-medium text-gray-900">{fmt(order.shipping_amount)}</span>
                 </div>
-                <div className="flex justify-between text-lg font-bold pt-3 border-t border-white/10">
-                  <span className="text-white">Total Amount</span>
-                  <span className="text-amber-400">{formatCurrency(order.total_amount)}</span>
-                </div>
+              )}
+              <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
+                <span className="text-gray-900">Total</span>
+                <span className="text-amber-600">{fmt(order.total_amount)}</span>
               </div>
             </div>
           </div>
 
-          {/* Customer Information */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                <User className="w-5 h-5 text-blue-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">Customer Information</h2>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs text-white/60 mb-1">Name</p>
-                <p className="font-medium text-white">{order.customer_name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-white/60 mb-1">Email</p>
-                <p className="font-medium text-white break-all">{order.customer_email}</p>
-              </div>
-              {order.shipping_address && (
+          {/* Customer Info */}
+          <SectionCard
+            icon={<User className="w-4 h-4 text-blue-600" />}
+            iconBg="bg-blue-50"
+            title="Customer"
+          >
+            <div className="space-y-3">
+              <InfoRow label="Name" value={order.customer_name} />
+              <InfoRow label="Email" value={<span className="break-all">{order.customer_email || '—'}</span>} />
+              {order.customer_phone && <InfoRow label="Phone" value={order.customer_phone} />}
+              {addrLine && (
                 <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <MapPin className="h-4 w-4 text-white/60" />
-                    <p className="text-xs text-white/60">Shipping Address</p>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                    <p className="text-xs text-gray-500">Shipping Address</p>
                   </div>
-                  <div className="pl-6 text-sm text-white">
-                    <p>{order.shipping_address.street_address}</p>
-                    <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
-                    <p>{order.shipping_address.country}</p>
-                  </div>
+                  <p className="text-sm text-gray-900 whitespace-pre-line pl-5">{addrLine}</p>
+                </div>
+              )}
+              {order.notes && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-0.5">Order Notes</p>
+                  <p className="text-sm text-gray-700 italic">"{order.notes}"</p>
                 </div>
               )}
             </div>
-          </div>
+          </SectionCard>
 
-          {/* Payment Information */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-emerald-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">Payment Information</h2>
-            </div>
-            <div className="space-y-4">
+          {/* Payment Info */}
+          <SectionCard
+            icon={<CreditCard className="w-4 h-4 text-emerald-600" />}
+            iconBg="bg-emerald-50"
+            title="Payment"
+          >
+            <div className="space-y-3">
               <div>
-                <p className="text-xs text-white/60 mb-1">Payment Status</p>
-                <div className="mt-1">{renderStatusBadge(order.payment_status, true)}</div>
+                <p className="text-xs text-gray-500 mb-1">Status</p>
+                {renderStatusBadge(order.payment_status, true)}
               </div>
-              <div>
-                <p className="text-xs text-white/60 mb-1">Payment Method</p>
-                <p className="font-medium text-white">{order.payment_method || 'N/A'}</p>
-              </div>
+              <InfoRow
+                label="Method"
+                value={getPaymentMethodConfig(order.payment_method).label}
+              />
               {order.payment_status === 'paid' && (
-                <>
-                  <div>
-                    <p className="text-xs text-white/60 mb-1">Amount Paid</p>
-                    <p className="font-semibold text-lg text-emerald-400">{formatCurrency(order.total_amount)}</p>
-                  </div>
-                  {order.razorpay_payment_id && (
-                    <div>
-                      <p className="text-xs text-white/60 mb-1">Razorpay Payment ID</p>
-                      <p className="font-mono text-sm text-white break-all bg-white/5 px-2 py-1 rounded border border-white/10">
-                        {order.razorpay_payment_id}
-                      </p>
+                <InfoRow label="Amount Paid" value={<span className="text-emerald-600 font-semibold">{fmt(order.total_amount)}</span>} />
+              )}
+              {order.razorpay_payment_id && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Razorpay Payment ID</p>
+                  <code className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded border border-gray-200 block break-all">
+                    {order.razorpay_payment_id}
+                  </code>
+                </div>
+              )}
+              {order.razorpay_order_id && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Razorpay Order ID</p>
+                  <code className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded border border-gray-200 block break-all">
+                    {order.razorpay_order_id}
+                  </code>
+                </div>
+              )}
+              {order.payment_method_details && (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 space-y-1.5 text-sm">
+                  {order.payment_method_details.method && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Method</span>
+                      <span className="font-medium text-gray-900 capitalize">{order.payment_method_details.method}</span>
                     </div>
                   )}
-                  {order.razorpay_order_id && (
-                    <div>
-                      <p className="text-xs text-white/60 mb-1">Razorpay Order ID</p>
-                      <p className="font-mono text-sm text-white break-all bg-white/5 px-2 py-1 rounded border border-white/10">
-                        {order.razorpay_order_id}
-                      </p>
+                  {order.payment_method_details.card?.last4 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Card</span>
+                      <span className="font-medium text-gray-900">
+                        ****{order.payment_method_details.card.last4} ({order.payment_method_details.card.network || 'Card'})
+                      </span>
                     </div>
                   )}
-                  {order.payment_method_details && (
-                    <div>
-                      <p className="text-xs text-white/60 mb-2">Payment Details</p>
-                      <div className="bg-white/5 rounded-lg p-3 border border-white/10 space-y-2">
-                        {order.payment_method_details.method && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-white/60">Method:</span>
-                            <span className="text-white font-medium capitalize">{order.payment_method_details.method}</span>
-                          </div>
-                        )}
-                        {order.payment_method_details.card && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-white/60">Card:</span>
-                            <span className="text-white font-medium">
-                              {order.payment_method_details.card.last4 ? 
-                                `****${order.payment_method_details.card.last4} (${order.payment_method_details.card.network || 'Card'})` : 
-                                'Card Payment'
-                              }
-                            </span>
-                          </div>
-                        )}
-                        {order.payment_method_details.vpa && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-white/60">UPI ID:</span>
-                            <span className="text-white font-medium">{order.payment_method_details.vpa}</span>
-                          </div>
-                        )}
-                        {order.payment_method_details.bank && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-white/60">Bank:</span>
-                            <span className="text-white font-medium">{order.payment_method_details.bank}</span>
-                          </div>
-                        )}
-                        {order.payment_method_details.wallet && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-white/60">Wallet:</span>
-                            <span className="text-white font-medium">{order.payment_method_details.wallet}</span>
-                          </div>
-                        )}
-                      </div>
+                  {order.payment_method_details.vpa && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">UPI ID</span>
+                      <span className="font-medium text-gray-900">{order.payment_method_details.vpa}</span>
                     </div>
                   )}
-                </>
+                  {order.payment_method_details.bank && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Bank</span>
+                      <span className="font-medium text-gray-900">{order.payment_method_details.bank}</span>
+                    </div>
+                  )}
+                  {order.payment_method_details.wallet && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Wallet</span>
+                      <span className="font-medium text-gray-900">{order.payment_method_details.wallet}</span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          </div>
+          </SectionCard>
         </div>
 
-        {/* Manage Order Sidebar */}
-        <div className="space-y-6">
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                <Edit className="w-5 h-5 text-purple-400" />
-              </div>
-              <h2 className="text-lg font-semibold text-white">Manage Order</h2>
-            </div>
+        {/* Right sidebar: Manage Order */}
+        <div>
+          <SectionCard
+            icon={<Edit className="w-4 h-4 text-purple-600" />}
+            iconBg="bg-purple-50"
+            title="Manage Order"
+          >
             <div className="space-y-5">
-              {/* Order Status Update */}
+              {/* Order Status */}
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                   Order Status
                 </label>
-                <p className="text-xs text-white/60 mb-3">
-                  Current: <span className="font-medium text-white">{getOrderStatusConfig(order.status).label}</span>
+                <p className="text-xs text-gray-500 mb-2">
+                  Current: <span className="font-medium text-gray-900">{getOrderStatusConfig(order.status).label}</span>
                 </p>
                 <select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
                   disabled={updating}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all appearance-none cursor-pointer"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.75rem center',
-                    backgroundSize: '1em 1em',
-                    paddingRight: '2.5rem',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)'
-                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm text-gray-900 bg-white disabled:opacity-50"
                 >
                   {Object.entries(ORDER_STATUS_CONFIG).map(([key, config]) => (
-                    <option 
-                      key={key} 
-                      value={key}
-                      style={{
-                        backgroundColor: '#1f2937',
-                        color: '#ffffff'
-                      }}
-                    >
-                      {config.label}
-                    </option>
+                    <option key={key} value={key}>{config.label}</option>
                   ))}
                 </select>
                 {newStatus !== order.status && (
                   <button
                     onClick={() => setShowStatusModal(true)}
                     disabled={updating}
-                    className="mt-3 w-full px-4 py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-all font-medium text-sm flex items-center justify-center gap-2"
+                    className="mt-2.5 w-full px-4 py-2.5 bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 transition-colors font-medium text-sm flex items-center justify-center gap-2"
                   >
-                    {updating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        Update Status
-                      </>
-                    )}
+                    {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Update Status
                   </button>
                 )}
               </div>
 
-              <div className="border-t border-white/10 pt-5">
-                {/* Payment Status Update */}
-                <label className="block text-sm font-medium text-white mb-2">
+              <div className="border-t border-gray-100 pt-5">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                   Payment Status
                 </label>
-                <p className="text-xs text-white/60 mb-3">
-                  Current: <span className="font-medium text-white">{getPaymentStatusConfig(order.payment_status).label}</span>
+                <p className="text-xs text-gray-500 mb-2">
+                  Current: <span className="font-medium text-gray-900">{getPaymentStatusConfig(order.payment_status).label}</span>
                 </p>
                 <select
                   value={newPaymentStatus}
                   onChange={(e) => setNewPaymentStatus(e.target.value)}
                   disabled={updating}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all disabled:opacity-50 appearance-none cursor-pointer"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 0.75rem center',
-                    backgroundSize: '1em 1em',
-                    paddingRight: '2.5rem',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)'
-                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm text-gray-900 bg-white disabled:opacity-50"
                 >
                   {Object.entries(PAYMENT_STATUS_CONFIG).map(([key, config]) => (
-                    <option 
-                      key={key} 
-                      value={key}
-                      style={{
-                        backgroundColor: '#1f2937',
-                        color: '#ffffff'
-                      }}
-                    >
-                      {config.label}
-                    </option>
+                    <option key={key} value={key}>{config.label}</option>
                   ))}
                 </select>
                 {newPaymentStatus !== order.payment_status && (
                   <button
                     onClick={handleUpdatePaymentStatus}
                     disabled={updating}
-                    className="mt-3 w-full px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 disabled:opacity-50 transition-all font-medium text-sm flex items-center justify-center gap-2"
+                    className="mt-2.5 w-full px-4 py-2.5 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 disabled:opacity-50 transition-colors font-medium text-sm flex items-center justify-center gap-2"
                   >
-                    {updating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Updating...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        Update Payment Status
-                      </>
-                    )}
+                    {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Update Payment
                   </button>
                 )}
               </div>
 
-              <div className="border-t border-white/10 pt-5">
-                {/* Tracking Number */}
-                <label className="block text-sm font-medium text-white mb-2 flex items-center gap-2">
-                  <Truck className="h-4 w-4" />
+              <div className="border-t border-gray-100 pt-5">
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide flex items-center gap-1.5">
+                  <Truck className="h-3.5 w-3.5" />
                   Tracking Number
                 </label>
-                <p className="text-xs text-white/60 mb-3">
-                  {order.tracking_number ? (
-                    <>Current: <span className="font-medium text-white">{order.tracking_number}</span></>
-                  ) : (
-                    'No tracking number assigned'
-                  )}
-                </p>
+                {order.tracking_number && (
+                  <p className="text-xs text-gray-500 mb-2">
+                    Current: <span className="font-medium text-gray-900 font-mono">{order.tracking_number}</span>
+                  </p>
+                )}
                 <input
                   type="text"
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
                   placeholder="Enter tracking number (optional)"
                   disabled={updating}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white placeholder-white/40 transition-all disabled:opacity-50"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm text-gray-900 placeholder-gray-400 disabled:opacity-50"
                 />
                 {trackingNumber.trim() !== (order.tracking_number || '').trim() && (
-                  <div className="mt-3 space-y-2">
-                    <button
-                      onClick={handleUpdateTracking}
-                      disabled={updating}
-                      className="w-full px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 transition-all font-medium text-sm flex items-center justify-center gap-2"
-                    >
-                      {updating ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="h-4 w-4" />
-                          {trackingNumber.trim() ? 'Update Tracking' : 'Clear Tracking'}
-                        </>
-                      )}
-                    </button>
-                    {!trackingNumber.trim() && order.tracking_number && (
-                      <p className="text-xs text-white/60 text-center">
-                        Leave empty to clear tracking number
-                      </p>
-                    )}
-                  </div>
+                  <button
+                    onClick={handleUpdateTracking}
+                    disabled={updating}
+                    className="mt-2.5 w-full px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+                  >
+                    {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    {trackingNumber.trim() ? 'Save Tracking' : 'Clear Tracking'}
+                  </button>
                 )}
               </div>
             </div>
-          </div>
-
-          {/* Payment Method Info */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-            <h3 className="text-sm font-semibold text-white mb-3">Payment Method</h3>
-            <div className="flex items-center gap-2">
-              {renderPaymentMethod(order.payment_method)}
-            </div>
-          </div>
+          </SectionCard>
         </div>
       </div>
 
-      {/* Status Update Confirmation Modal */}
+      {/* Status Update Confirmation */}
       <ConfirmModal
         isOpen={showStatusModal}
         onClose={() => setShowStatusModal(false)}
         onConfirm={handleUpdateStatus}
         title="Update Order Status"
-        message={`Are you sure you want to change the order status from "${getOrderStatusConfig(order.status).label}" to "${getOrderStatusConfig(newStatus).label}"?`}
+        message={`Change status from "${getOrderStatusConfig(order.status).label}" to "${getOrderStatusConfig(newStatus).label}"?`}
         confirmText="Update"
         variant="warning"
         loading={updating}

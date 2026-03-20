@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Edit, Trash2 } from 'lucide-react';
 import { DataTable, Column } from '../../Common/DataTable';
 import { ConfirmModal } from '../../Common/Modal';
 import { apiClient } from '../../../lib/apiClient';
 import { useNotification } from '../../../contexts/NotificationContext';
-import { ProductForm } from '../../Admin/Products/ProductForm';
 
 interface Product {
   id: string;
@@ -19,6 +19,7 @@ interface Product {
 }
 
 export const SellerProductsList: React.FC = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +28,6 @@ export const SellerProductsList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -84,19 +84,11 @@ export const SellerProductsList: React.FC = () => {
   };
 
   const handleEdit = (product: Product) => {
-    setSelectedProduct(product);
-    setShowFormModal(true);
+    navigate(`/admin/products/edit/${product.id}`);
   };
 
   const handleAdd = () => {
-    setSelectedProduct(null);
-    setShowFormModal(true);
-  };
-
-  const handleFormSuccess = () => {
-    setShowFormModal(false);
-    setSelectedProduct(null);
-    fetchProducts();
+    navigate('/admin/products/add');
   };
 
   const columns: Column<Product>[] = [
@@ -272,19 +264,6 @@ export const SellerProductsList: React.FC = () => {
         }}
         emptyMessage="No products found"
       />
-
-      {/* Product Form Modal */}
-      {showFormModal && (
-        <ProductForm
-          product={selectedProduct}
-          onClose={() => {
-            setShowFormModal(false);
-            setSelectedProduct(null);
-          }}
-          onSuccess={handleFormSuccess}
-          endpointPrefix="/seller"
-        />
-      )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal

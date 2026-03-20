@@ -33,13 +33,7 @@ export const SocialMediaSettings: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<SocialMediaAccount | null>(null);
   const [formData, setFormData] = useState({
-    platform: '',
-    platform_name: '',
-    url: '',
-    username: '',
-    icon_name: '',
-    follower_count: '',
-    description: ''
+    platform: '', platform_name: '', url: '', username: '', icon_name: '', follower_count: '', description: ''
   });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -47,7 +41,6 @@ export const SocialMediaSettings: React.FC = () => {
   const [platformFilter, setPlatformFilter] = useState('');
   const { showSuccess, showError } = useNotification();
 
-  // Fetch accounts
   const fetchAccounts = async () => {
     try {
       setLoading(true);
@@ -58,219 +51,141 @@ export const SocialMediaSettings: React.FC = () => {
       if (error) throw error;
       setAccounts((data || []).sort((a: SocialMediaAccount, b: SocialMediaAccount) => (a.display_order ?? 0) - (b.display_order ?? 0)));
     } catch (error: any) {
-      showError(error.message || 'Failed to fetch social media accounts');
+      showError('Error', error.message || 'Failed to fetch social media accounts');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
+  useEffect(() => { fetchAccounts(); }, []);
 
-  // Open modal for add/edit
   const openModal = (account?: SocialMediaAccount) => {
     if (account) {
       setEditingAccount(account);
       setFormData({
-        platform: account.platform,
-        platform_name: account.platform_name,
-        url: account.url,
-        username: account.username || '',
-        icon_name: account.icon_name,
-        follower_count: account.follower_count?.toString() || '',
-        description: account.description || ''
+        platform: account.platform, platform_name: account.platform_name, url: account.url,
+        username: account.username || '', icon_name: account.icon_name,
+        follower_count: account.follower_count?.toString() || '', description: account.description || ''
       });
     } else {
       setEditingAccount(null);
-      setFormData({
-        platform: '',
-        platform_name: '',
-        url: '',
-        username: '',
-        icon_name: '',
-        follower_count: '',
-        description: ''
-      });
+      setFormData({ platform: '', platform_name: '', url: '', username: '', icon_name: '', follower_count: '', description: '' });
     }
     setShowModal(true);
   };
 
-  // Close modal
   const closeModal = () => {
     setShowModal(false);
     setEditingAccount(null);
-    setFormData({
-      platform: '',
-      platform_name: '',
-      url: '',
-      username: '',
-      icon_name: '',
-      follower_count: '',
-      description: ''
-    });
+    setFormData({ platform: '', platform_name: '', url: '', username: '', icon_name: '', follower_count: '', description: '' });
   };
 
-  // Handle platform selection
   const handlePlatformChange = (platform: string) => {
     const selected = platformOptions.find(p => p.value === platform);
-    if (selected) {
-      setFormData(prev => ({
-        ...prev,
-        platform,
-        platform_name: selected.label,
-        icon_name: selected.icon
-      }));
-    }
+    if (selected) setFormData(prev => ({ ...prev, platform, platform_name: selected.label, icon_name: selected.icon }));
   };
 
-  // Save account
   const handleSave = async () => {
     try {
       const payload = {
-        platform: formData.platform,
-        platform_name: formData.platform_name,
-        url: formData.url,
-        username: formData.username || null,
-        icon_name: formData.icon_name,
+        platform: formData.platform, platform_name: formData.platform_name, url: formData.url,
+        username: formData.username || null, icon_name: formData.icon_name,
         follower_count: formData.follower_count ? parseInt(formData.follower_count, 10) : null,
         description: formData.description || null
       };
-
       if (editingAccount) {
-        const { error } = await supabase
-          .from('social_media_accounts')
-          .update(payload)
-          .eq('id', editingAccount.id);
+        const { error } = await supabase.from('social_media_accounts').update(payload).eq('id', editingAccount.id);
         if (error) throw error;
       } else {
         const maxOrder = accounts.length > 0 ? Math.max(...accounts.map(a => a.display_order ?? 0)) + 1 : 1;
-        const { error } = await supabase
-          .from('social_media_accounts')
-          .insert({ ...payload, display_order: maxOrder, is_active: true });
+        const { error } = await supabase.from('social_media_accounts').insert({ ...payload, display_order: maxOrder, is_active: true });
         if (error) throw error;
       }
-      showSuccess(`Account ${editingAccount ? 'updated' : 'added'} successfully!`);
+      showSuccess('Saved', `Account ${editingAccount ? 'updated' : 'added'} successfully`);
       await fetchAccounts();
       closeModal();
     } catch (error: any) {
-      showError(error.message || 'Error saving account');
+      showError('Error', error.message || 'Error saving account');
     }
   };
 
-  // Delete account
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this social media account?')) return;
-
     try {
       const { error } = await supabase.from('social_media_accounts').delete().eq('id', id);
       if (error) throw error;
-      showSuccess('Account deleted successfully!');
+      showSuccess('Deleted', 'Account deleted successfully');
       await fetchAccounts();
     } catch (error: any) {
-      showError(error.message || 'Error deleting account');
+      showError('Error', error.message || 'Error deleting account');
     }
   };
 
-  // Bulk delete accounts
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-
     const count = selectedIds.size;
     if (!confirm(`Are you sure you want to delete ${count} social media account(s)?`)) return;
-
     try {
       const { error } = await supabase.from('social_media_accounts').delete().in('id', Array.from(selectedIds));
       if (error) throw error;
-      showSuccess(`${count} account(s) deleted successfully!`);
+      showSuccess('Deleted', `${count} account(s) deleted successfully`);
       setSelectedIds(new Set());
       setSelectionMode(false);
       await fetchAccounts();
     } catch (error: any) {
-      showError(error.message || 'Error deleting accounts');
+      showError('Error', error.message || 'Error deleting accounts');
     }
   };
 
-  // Toggle selection mode
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
-    if (selectionMode) {
-      setSelectedIds(new Set());
-    }
+    if (selectionMode) setSelectedIds(new Set());
   };
 
-  // Toggle individual selection
   const toggleSelect = (id: string) => {
     const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
+    if (newSelected.has(id)) newSelected.delete(id);
+    else newSelected.add(id);
     setSelectedIds(newSelected);
   };
 
-  // Select all accounts
-  const selectAll = () => {
-    setSelectedIds(new Set(accounts.map(account => account.id)));
-  };
+  const selectAll = () => setSelectedIds(new Set(accounts.map(a => a.id)));
+  const deselectAll = () => setSelectedIds(new Set());
 
-  // Deselect all accounts
-  const deselectAll = () => {
-    setSelectedIds(new Set());
-  };
-
-  // Toggle active status
   const toggleActive = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('social_media_accounts')
-        .update({ is_active: !currentStatus })
-        .eq('id', id);
+      const { error } = await supabase.from('social_media_accounts').update({ is_active: !currentStatus }).eq('id', id);
       if (error) throw error;
-      showSuccess(`Account ${!currentStatus ? 'activated' : 'deactivated'}`);
+      showSuccess('Updated', `Account ${!currentStatus ? 'activated' : 'deactivated'}`);
       await fetchAccounts();
     } catch (error: any) {
-      showError(error.message || 'Error updating account status');
+      showError('Error', error.message || 'Error updating account status');
     }
   };
 
-  // Move account up/down
   const moveAccount = async (id: string, direction: 'up' | 'down') => {
     const index = accounts.findIndex(a => a.id === id);
     if (index === -1) return;
     if (direction === 'up' && index === 0) return;
     if (direction === 'down' && index === accounts.length - 1) return;
-
     const newAccounts = [...accounts];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     [newAccounts[index], newAccounts[targetIndex]] = [newAccounts[targetIndex], newAccounts[index]];
-
-    // Update display orders
-    newAccounts.forEach((account, idx) => {
-      account.display_order = idx + 1;
-    });
-
+    newAccounts.forEach((account, idx) => { account.display_order = idx + 1; });
     setAccounts(newAccounts);
-
-    // Save to backend
     try {
       for (const account of newAccounts) {
-        const { error } = await supabase
-          .from('social_media_accounts')
-          .update({ display_order: account.display_order })
-          .eq('id', account.id);
+        const { error } = await supabase.from('social_media_accounts').update({ display_order: account.display_order }).eq('id', account.id);
         if (error) throw error;
       }
     } catch (error: any) {
-      showError(error.message || 'Error updating order');
+      showError('Error', error.message || 'Error updating order');
       await fetchAccounts();
     }
   };
 
-  // Filter accounts
   const filteredAccounts = accounts.filter(account => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       account.platform_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       account.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (account.username && account.username.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -278,32 +193,25 @@ export const SocialMediaSettings: React.FC = () => {
     return matchesSearch && matchesPlatform;
   });
 
-  // Get unique platforms for filter
   const platforms = Array.from(new Set(accounts.map(a => a.platform))).sort();
 
-  // Get platform icon
   const getPlatformIcon = (platform: string) => {
     const icons: Record<string, string> = {
-      facebook: '📘',
-      instagram: '📷',
-      twitter: '🐦',
-      youtube: '📺',
-      linkedin: '💼',
-      pinterest: '📌',
-      tiktok: '🎵',
-      whatsapp: '💬',
-      telegram: '✈️',
-      snapchat: '👻',
+      facebook: '📘', instagram: '📷', twitter: '🐦', youtube: '📺',
+      linkedin: '💼', pinterest: '📌', tiktok: '🎵', whatsapp: '💬',
+      telegram: '✈️', snapchat: '👻',
     };
     return icons[platform.toLowerCase()] || '🌐';
   };
 
+  const inputCls = 'w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 text-sm text-gray-900 placeholder-gray-400 transition-all';
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-amber-400 animate-spin mx-auto mb-4" />
-          <p className="text-white/60">Loading social media accounts...</p>
+          <Loader2 className="w-10 h-10 text-slate-400 animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Loading social media accounts...</p>
         </div>
       </div>
     );
@@ -313,54 +221,41 @@ export const SocialMediaSettings: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
-              <Share2 className="w-6 h-6 text-blue-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Social Media</h1>
-              <p className="text-sm text-white/60 mt-0.5">Manage your social media accounts and links</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+            <Share2 className="w-5 h-5 text-slate-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Social Media</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Manage your social media accounts and links</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {selectionMode && selectedIds.size > 0 && (
             <button
               onClick={handleBulkDelete}
-              className="flex items-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/20"
+              className="flex items-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors text-sm"
             >
-              <Trash2 className="h-5 w-5" />
-              <span className="hidden sm:inline">Delete ({selectedIds.size})</span>
-              <span className="sm:hidden">Delete</span>
+              <Trash2 className="h-4 w-4" />
+              <span>Delete ({selectedIds.size})</span>
             </button>
           )}
           <button
             onClick={toggleSelectionMode}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all hover:scale-105 active:scale-95 ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors ${
               selectionMode
-                ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-500/20'
-                : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
+                ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
             }`}
           >
-            {selectionMode ? (
-              <>
-                <X className="h-5 w-5" />
-                <span className="hidden sm:inline">Cancel</span>
-              </>
-            ) : (
-              <>
-                <CheckSquare className="h-5 w-5" />
-                <span className="hidden sm:inline">Select</span>
-              </>
-            )}
+            {selectionMode ? <><X className="h-4 w-4" /><span>Cancel</span></> : <><CheckSquare className="h-4 w-4" /><span className="hidden sm:inline">Select</span></>}
           </button>
           {!selectionMode && (
             <button
               onClick={() => openModal()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/20"
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg font-medium text-sm transition-colors"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4" />
               <span>Add Account</span>
             </button>
           )}
@@ -368,44 +263,39 @@ export const SocialMediaSettings: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-5 h-5 text-white/60" />
-          <h3 className="text-lg font-semibold text-white">Filters</h3>
+          <Filter className="w-4 h-4 text-gray-400" />
+          <h3 className="text-sm font-semibold text-gray-700">Filters</h3>
           {(searchTerm || platformFilter) && (
             <button
-              onClick={() => {
-                setSearchTerm('');
-                setPlatformFilter('');
-              }}
-              className="ml-auto flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              onClick={() => { setSearchTerm(''); setPlatformFilter(''); }}
+              className="ml-auto flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
               Clear
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search accounts..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white placeholder-white/40 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300 text-sm text-gray-900 placeholder-gray-400"
             />
           </div>
           <select
             value={platformFilter}
             onChange={(e) => setPlatformFilter(e.target.value)}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all"
+            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300 text-sm text-gray-900"
           >
-            <option value="" className="bg-gray-900">All Platforms</option>
+            <option value="">All Platforms</option>
             {platforms.map((platform) => (
-              <option key={platform} value={platform} className="bg-gray-900 capitalize">
-                {platform}
-              </option>
+              <option key={platform} value={platform} className="capitalize">{platform}</option>
             ))}
           </select>
         </div>
@@ -413,101 +303,76 @@ export const SocialMediaSettings: React.FC = () => {
 
       {/* Selection Mode Controls */}
       {selectionMode && (
-        <div className="bg-indigo-500/20 border border-indigo-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-white">
-              {selectedIds.size} of {accounts.length} selected
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={selectAll}
-                className="px-3 py-1.5 text-sm bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 transition-colors"
-              >
-                Select All
-              </button>
-              <button
-                onClick={deselectAll}
-                className="px-3 py-1.5 text-sm bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 transition-colors"
-              >
-                Deselect All
-              </button>
-            </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span className="text-sm font-medium text-gray-700">{selectedIds.size} of {accounts.length} selected</span>
+          <div className="flex items-center gap-2">
+            <button onClick={selectAll} className="px-3 py-1.5 text-sm bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Select All</button>
+            <button onClick={deselectAll} className="px-3 py-1.5 text-sm bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Deselect All</button>
           </div>
         </div>
       )}
 
       {/* Accounts Grid */}
       {filteredAccounts.length === 0 ? (
-        <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-12 text-center">
-          <Share2 className="w-12 h-12 text-white/20 mx-auto mb-3" />
-          <p className="text-white/60 mb-2">No social media accounts found</p>
-          {searchTerm || platformFilter ? (
-            <p className="text-sm text-white/40">Try adjusting your filters</p>
-          ) : (
-            <p className="text-sm text-white/40">Get started by adding your first account</p>
-          )}
+        <div className="bg-white border border-gray-200 rounded-lg p-10 text-center">
+          <Share2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 mb-1">No social media accounts found</p>
+          {searchTerm || platformFilter
+            ? <p className="text-sm text-gray-400">Try adjusting your filters</p>
+            : <p className="text-sm text-gray-400">Get started by adding your first account</p>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredAccounts.map((account, index) => (
             <div
               key={account.id}
-              className={`bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6 transition-all hover:bg-white/10 ${
+              className={`bg-white border rounded-lg p-4 transition-all hover:shadow-sm ${
                 !account.is_active ? 'opacity-60' : ''
-              } ${selectionMode && selectedIds.has(account.id) ? 'bg-indigo-500/20 border-indigo-500/30' : ''}`}
+              } ${selectionMode && selectedIds.has(account.id) ? 'border-slate-400 bg-slate-50 ring-2 ring-slate-200' : 'border-gray-200'}`}
             >
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   {selectionMode && (
-                    <button
-                      onClick={() => toggleSelect(account.id)}
-                      className="flex-shrink-0"
-                    >
-                      {selectedIds.has(account.id) ? (
-                        <CheckSquare className="h-5 w-5 text-indigo-400" />
-                      ) : (
-                        <Square className="h-5 w-5 text-white/40" />
-                      )}
+                    <button onClick={() => toggleSelect(account.id)} className="flex-shrink-0">
+                      {selectedIds.has(account.id)
+                        ? <CheckSquare className="h-5 w-5 text-slate-700" />
+                        : <Square className="h-5 w-5 text-gray-400" />}
                     </button>
                   )}
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-2xl ${
-                    account.is_active ? 'bg-blue-500/20' : 'bg-white/10'
-                  }`}>
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 text-lg ${account.is_active ? 'bg-blue-50' : 'bg-gray-100'}`}>
                     {getPlatformIcon(account.platform)}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-white truncate">{account.platform_name}</h3>
-                    {account.username && (
-                      <p className="text-sm text-white/60 truncate">@{account.username}</p>
-                    )}
+                    <h3 className="font-semibold text-gray-900 truncate text-sm">{account.platform_name}</h3>
+                    {account.username && <p className="text-xs text-gray-500 truncate">@{account.username}</p>}
                   </div>
                 </div>
                 {!selectionMode && (
                   <button
                     onClick={() => toggleActive(account.id, account.is_active)}
-                    className={`p-2 rounded-lg transition-colors flex-shrink-0 ${
-                      account.is_active 
-                        ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' 
-                        : 'bg-white/10 text-white/40 hover:bg-white/20'
+                    className={`p-1.5 rounded-md transition-colors flex-shrink-0 ${
+                      account.is_active
+                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                     }`}
                     title={account.is_active ? 'Deactivate' : 'Activate'}
                   >
-                    {account.is_active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    {account.is_active ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                   </button>
                 )}
               </div>
 
-              {/* URL Display */}
-              <div className="mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
-                <div className="flex items-center gap-2 mb-2">
-                  <ExternalLink className="h-4 w-4 text-blue-400 flex-shrink-0" />
-                  <span className="text-xs text-white/60">Profile URL</span>
+              {/* URL */}
+              <div className="mb-3 p-2.5 bg-gray-50 rounded-md border border-gray-100">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <ExternalLink className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                  <span className="text-xs text-gray-400">Profile URL</span>
                 </div>
                 <a
                   href={account.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-blue-400 hover:text-blue-300 break-all block truncate"
+                  className="text-xs text-blue-600 hover:text-blue-800 block truncate"
                   title={account.url}
                 >
                   {account.url}
@@ -515,47 +380,47 @@ export const SocialMediaSettings: React.FC = () => {
               </div>
 
               {account.follower_count && (
-                <div className="mb-4 p-3 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-xl border border-amber-500/30">
-                  <p className="text-xs text-white/60 mb-1">Followers</p>
-                  <p className="text-lg font-semibold text-white">{account.follower_count.toLocaleString()}</p>
+                <div className="mb-3 px-2.5 py-2 bg-slate-50 rounded-md border border-slate-100 flex items-center justify-between">
+                  <p className="text-xs text-gray-500">Followers</p>
+                  <p className="text-sm font-semibold text-gray-900">{account.follower_count.toLocaleString()}</p>
                 </div>
               )}
 
               {account.description && (
-                <p className="text-sm text-white/70 mb-4 line-clamp-2">{account.description}</p>
+                <p className="text-xs text-gray-600 mb-3 line-clamp-2">{account.description}</p>
               )}
 
               {!selectionMode && (
-                <div className="flex items-center gap-2 pt-4 border-t border-white/10">
+                <div className="flex items-center gap-1.5 pt-3 border-t border-gray-100">
                   <button
                     onClick={() => moveAccount(account.id, 'up')}
                     disabled={index === 0}
-                    className="p-2 bg-white/10 text-white/60 rounded-lg hover:bg-white/20 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 bg-gray-100 text-gray-500 rounded-md hover:bg-gray-200 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     title="Move up"
                   >
-                    <ChevronUp className="h-4 w-4" />
+                    <ChevronUp className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => moveAccount(account.id, 'down')}
                     disabled={index === filteredAccounts.length - 1}
-                    className="p-2 bg-white/10 text-white/60 rounded-lg hover:bg-white/20 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 bg-gray-100 text-gray-500 rounded-md hover:bg-gray-200 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     title="Move down"
                   >
-                    <ChevronDown className="h-4 w-4" />
+                    <ChevronDown className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => openModal(account)}
-                    className="flex-1 px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 flex items-center justify-center gap-2 transition-colors border border-blue-500/30"
+                    className="flex-1 px-3 py-1.5 bg-slate-50 text-slate-700 rounded-md hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-colors border border-slate-200 text-xs font-medium"
                   >
-                    <Edit2 className="h-4 w-4" />
+                    <Edit2 className="h-3.5 w-3.5" />
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(account.id)}
-                    className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                    className="p-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors"
                     title="Delete"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               )}
@@ -565,14 +430,14 @@ export const SocialMediaSettings: React.FC = () => {
       )}
 
       {accounts.length === 0 && !loading && (
-        <div className="text-center py-12 bg-white/5 backdrop-blur-sm rounded-2xl border-2 border-dashed border-white/10">
-          <Share2 className="h-12 w-12 text-white/20 mx-auto mb-4" />
-          <p className="text-white/60 mb-4">No social media accounts added yet</p>
+        <div className="text-center py-12 bg-white border-2 border-dashed border-gray-200 rounded-lg">
+          <Share2 className="h-10 w-10 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-500 mb-4">No social media accounts added yet</p>
           <button
             onClick={() => openModal()}
-            className="px-6 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 inline-flex items-center gap-2 font-semibold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/20"
+            className="px-5 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg inline-flex items-center gap-2 font-medium transition-colors text-sm"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-4 w-4" />
             Add Your First Account
           </button>
         </div>
@@ -580,93 +445,88 @@ export const SocialMediaSettings: React.FC = () => {
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10">
-            <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-b border-white/10 px-6 py-4 flex items-center justify-between rounded-t-2xl sticky top-0 z-10">
-              <h2 className="text-xl font-bold text-white">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+            {/* Modal Header */}
+            <div className="bg-gray-50 border-b border-gray-200 px-5 py-3.5 flex items-center justify-between rounded-t-xl sticky top-0 z-10">
+              <h2 className="text-lg font-bold text-gray-900">
                 {editingAccount ? 'Edit' : 'Add'} Social Media Account
               </h2>
-              <button
-                onClick={closeModal}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
-              >
+              <button onClick={closeModal} className="p-1.5 hover:bg-gray-200 rounded-md transition-colors text-gray-500 hover:text-gray-700">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Platform *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Platform *</label>
                 <select
                   value={formData.platform}
                   onChange={(e) => handlePlatformChange(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-white transition-all"
+                  className={inputCls}
                   required
                 >
-                  <option value="" className="bg-gray-900">Select a platform</option>
+                  <option value="">Select a platform</option>
                   {platformOptions.map(option => (
-                    <option key={option.value} value={option.value} className="bg-gray-900">{option.label}</option>
+                    <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Profile URL *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Profile URL *</label>
                 <input
                   type="url"
                   value={formData.url}
                   onChange={(e) => setFormData(prev => ({ ...prev, url: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-white placeholder-white/40 transition-all"
+                  className={inputCls}
                   placeholder="https://facebook.com/yourpage"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Username/Handle</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Username / Handle</label>
                 <input
                   type="text"
                   value={formData.username}
                   onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-white placeholder-white/40 transition-all"
+                  className={inputCls}
                   placeholder="@yourhandle"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Follower Count</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Follower Count</label>
                 <input
                   type="number"
                   value={formData.follower_count}
                   onChange={(e) => setFormData(prev => ({ ...prev, follower_count: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-white placeholder-white/40 transition-all"
+                  className={inputCls}
                   placeholder="10000"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-white placeholder-white/40 transition-all resize-none"
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 text-sm text-gray-900 placeholder-gray-400 resize-none"
                   rows={3}
                   placeholder="Brief description about this account"
                 />
               </div>
             </div>
 
-            <div className="bg-white/5 px-6 py-4 flex items-center justify-end gap-3 border-t border-white/10 rounded-b-2xl sticky bottom-0">
-              <button
-                onClick={closeModal}
-                className="px-6 py-2 bg-white/10 border border-white/20 text-white rounded-xl hover:bg-white/20 transition-colors"
-              >
+            <div className="bg-gray-50 px-5 py-3.5 flex items-center justify-end gap-3 border-t border-gray-200 rounded-b-xl sticky bottom-0">
+              <button onClick={closeModal} className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={!formData.platform || !formData.url}
-                className="px-6 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors font-semibold"
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm font-medium"
               >
                 <Save className="h-4 w-4" />
                 {editingAccount ? 'Update' : 'Add'} Account
@@ -678,4 +538,3 @@ export const SocialMediaSettings: React.FC = () => {
     </div>
   );
 };
-

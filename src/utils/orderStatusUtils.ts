@@ -164,6 +164,29 @@ export const getStatusBadgeClasses = (status: string, isPayment: boolean = false
   return `${config.bgColor} ${config.color}`;
 };
 
+// Light-theme badge classes for admin dashboard
+const ORDER_STATUS_LIGHT: Record<string, string> = {
+  delivered:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+  shipped:    'bg-blue-50 text-blue-700 border-blue-200',
+  processing: 'bg-amber-50 text-amber-700 border-amber-200',
+  confirmed:  'bg-indigo-50 text-indigo-700 border-indigo-200',
+  pending:    'bg-orange-50 text-orange-700 border-orange-200',
+  cancelled:  'bg-red-50 text-red-700 border-red-200',
+  refunded:   'bg-gray-100 text-gray-600 border-gray-200',
+};
+
+const PAYMENT_STATUS_LIGHT: Record<string, string> = {
+  paid:     'bg-emerald-50 text-emerald-700 border-emerald-200',
+  pending:  'bg-orange-50 text-orange-700 border-orange-200',
+  failed:   'bg-red-50 text-red-700 border-red-200',
+  refunded: 'bg-gray-100 text-gray-600 border-gray-200',
+};
+
+export const getAdminStatusClasses = (status: string, isPayment = false): string => {
+  const map = isPayment ? PAYMENT_STATUS_LIGHT : ORDER_STATUS_LIGHT;
+  return map[status] ?? 'bg-gray-100 text-gray-500 border-gray-200';
+};
+
 export const formatOrderNumber = (id: string, orderNumber?: string): string => {
   if (orderNumber) return orderNumber;
   // Fallback: create a readable order number from UUID

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd.exe /c \"where bun 2>nul\")",
+      "Bash(cmd.exe /c \"where bun\")",
+      "Bash(cmd.exe /c \"cd /d \"\"C:\\\\Users\\\\cristy''s\\\\websites\\\\ecommerce\"\" && where bun && bun --version\")",
+      "Bash(npx tsc:*)",
+      "Bash(find /c/Users/cristy''s/websites/ecommerce/src/components/Admin -type f -name *.tsx -o -name *.ts)",
+      "Bash(find /c/Users/cristy''s/websites/ecommerce/src/pages -type f -name *.tsx)",
+      "Bash(grep -r \"ThemeSettings\\\\|ThemeSettingsList\\\\|DashboardHome\\\\|SettingsPage\\\\|CategoryForm[^P]\" c:/Users/cristy''s/websites/ecommerce/src --include=*.tsx --include=*.ts -l)"
+    ]
+  }
+}

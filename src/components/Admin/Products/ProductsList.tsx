@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Edit, Trash2, Package } from 'lucide-react';
-import { DataTable, Column } from '../../Common/DataTable';
+import { Plus, Search, Edit, Trash2, Package, CheckCircle, AlertTriangle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ConfirmModal } from '../../Common/Modal';
 import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
-import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
 import { isValidImageUrl, getFirstValidImage } from '../../../utils/imageUrlUtils';
 
 interface Product {
@@ -20,31 +18,125 @@ interface Product {
   created_at: string;
 }
 
+const StockBadge: React.FC<{ stock: number }> = ({ stock }) => (
+  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${
+    stock === 0
+      ? 'bg-red-50 text-red-700 border-red-100'
+      : stock < 10
+        ? 'bg-yellow-50 text-yellow-700 border-yellow-100'
+        : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+  }`}>
+    {stock === 0 ? 'Out of stock' : `Stock: ${stock}`}
+  </span>
+);
+
+const StatusBadge: React.FC<{ active: boolean }> = ({ active }) => (
+  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${
+    active
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+      : 'bg-gray-100 text-gray-500 border-gray-200'
+  }`}>
+    {active ? 'Active' : 'Inactive'}
+  </span>
+);
+
+const Pagination: React.FC<{
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (p: number) => void;
+}> = ({ currentPage, totalPages, totalItems, pageSize, onPageChange }) => {
+  const from = (currentPage - 1) * pageSize + 1;
+  const to = Math.min(currentPage * pageSize, totalItems);
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+      <p className="text-xs text-gray-500">{totalItems > 0 ? `${from}–${to} of ${totalItems}` : '0 results'}</p>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage <= 1}
+          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="px-2 text-xs font-medium text-gray-700">{currentPage} / {totalPages}</span>
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Module-level cache – survives SPA navigation, cleared on hard refresh
+let _productsCache: { products: Product[]; totalItems: number; totalPages: number } | null = null;
+let _productStatsCache: { active: number; lowStock: number; outOfStock: number } | null = null;
+
 export const ProductsList: React.FC = () => {
   const navigate = useNavigate();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>(_productsCache?.products ?? []);
+  const [loading, setLoading] = useState(_productsCache === null);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(_productsCache?.totalPages ?? 1);
+  const [totalItems, setTotalItems] = useState(_productsCache?.totalItems ?? 0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [productStats, setProductStats] = useState(_productStatsCache ?? { active: 0, lowStock: 0, outOfStock: 0 });
   const { showSuccess, showError } = useNotification();
-  const { settings } = useAdminDashboardSettings();
 
   const pageSize = 10;
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstMount = useRef(true);
+
+  const handleSearchChange = useCallback((value: string) => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+    }, 300);
+  }, []);
 
   useEffect(() => {
-    fetchProducts();
-  }, [currentPage, searchTerm, categoryFilter, statusFilter]);
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, []);
 
-  const fetchProducts = async () => {
+  useEffect(() => {
+    const background = isFirstMount.current && _productsCache !== null;
+    isFirstMount.current = false;
+    fetchProducts(background);
+  }, [currentPage, searchTerm, statusFilter]);
+  useEffect(() => {
+    const background = _productStatsCache !== null;
+    fetchProductStats(background);
+  }, []);
+
+  const fetchProductStats = async (background = false) => {
     try {
-      setLoading(true);
+      const [{ count: active }, { count: lowStock }, { count: outOfStock }] = await Promise.all([
+        supabase.from('products').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('products').select('*', { count: 'exact', head: true }).eq('is_active', true).gt('stock', 0).lt('stock', 10),
+        supabase.from('products').select('*', { count: 'exact', head: true }).eq('stock', 0),
+      ]);
+      const newStats = { active: active ?? 0, lowStock: lowStock ?? 0, outOfStock: outOfStock ?? 0 };
+      setProductStats(newStats);
+      _productStatsCache = newStats;
+    } catch {
+      // non-critical
+    }
+  };
+
+  const fetchProducts = async (background = false) => {
+    try {
+      if (!background) setLoading(true);
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
 
@@ -53,7 +145,6 @@ export const ProductsList: React.FC = () => {
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
 
-      if (categoryFilter) query = query.eq('category_id', categoryFilter);
       if (statusFilter === 'active') query = query.eq('is_active', true);
       if (statusFilter === 'inactive') query = query.eq('is_active', false);
       if (searchTerm) query = query.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,sku.ilike.%${searchTerm}%`);
@@ -69,7 +160,7 @@ export const ProductsList: React.FC = () => {
         (cats || []).forEach((c: any) => { categoryMap[c.id] = c.name; });
       }
 
-      const list = rows.map((p: any) => ({
+      const mappedProducts = rows.map((p: any) => ({
         id: p.id,
         name: p.name,
         price: String(p.price),
@@ -78,30 +169,36 @@ export const ProductsList: React.FC = () => {
         category_name: categoryMap[p.category_id] || '—',
         is_active: p.is_active ?? true,
         images: p.images || [],
-        created_at: p.created_at
+        created_at: p.created_at,
       }));
-
-      setProducts(list);
-      setTotalItems(count ?? 0);
-      setTotalPages(Math.max(1, Math.ceil((count ?? 0) / pageSize)));
+      const ti = count ?? 0;
+      const tp = Math.max(1, Math.ceil(ti / pageSize));
+      setProducts(mappedProducts);
+      setTotalItems(ti);
+      setTotalPages(tp);
+      // Cache only the default (page 1, no filters) result
+      if (currentPage === 1 && !searchTerm && !statusFilter) {
+        _productsCache = { products: mappedProducts, totalItems: ti, totalPages: tp };
+      }
     } catch (error: any) {
-      showError('Error', error.message || 'Failed to load products');
+      if (!background) showError('Error', error.message || 'Failed to load products');
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   };
 
   const handleDelete = async () => {
     if (!selectedProduct) return;
-
     try {
       setDeleteLoading(true);
       const { error } = await supabase.from('products').delete().eq('id', selectedProduct.id);
       if (error) throw error;
+      _productsCache = null; // Invalidate cache after mutation
       showSuccess('Success', 'Product deleted successfully');
       setShowDeleteModal(false);
       setSelectedProduct(null);
       fetchProducts();
+      fetchProductStats();
     } catch (error: any) {
       showError('Error', error.message || 'Failed to delete product');
     } finally {
@@ -109,164 +206,43 @@ export const ProductsList: React.FC = () => {
     }
   };
 
-  const handleEdit = (product: Product) => {
-    navigate(`/admin/products/edit/${product.id}`);
+  const { active: activeProducts, lowStock: lowStockProducts, outOfStock: outOfStockProducts } = productStats;
+
+  const ProductImage: React.FC<{ product: Product; size?: string }> = ({ product, size = 'w-12 h-12' }) => {
+    const imageUrl = getFirstValidImage(product.images || [], '/placeholder-image.jpg');
+    const isValid = isValidImageUrl(imageUrl);
+    return (
+      <div className={`${size} rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 flex items-center justify-center`}>
+        {isValid ? (
+          <img
+            src={imageUrl}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-image.jpg'; }}
+          />
+        ) : (
+          <Package className="w-5 h-5 text-gray-400" />
+        )}
+      </div>
+    );
   };
-
-  const handleAdd = () => {
-    navigate('/admin/products/add');
-  };
-
-  const columns: Column<Product>[] = [
-    {
-      key: 'images',
-      label: 'Image',
-      width: '60px',
-      render: (product) => {
-        // Use utility function to get first valid image
-        const imageUrl = getFirstValidImage(
-          product.images || [],
-          '/placeholder-image.jpg'
-        );
-        
-        const isValidImage = isValidImageUrl(imageUrl);
-        
-        return (
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center">
-            {isValidImage ? (
-              <img
-                src={imageUrl}
-                alt={product.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/placeholder-image.jpg';
-                }}
-              />
-            ) : (
-              <div className="w-full h-full bg-white/5 flex items-center justify-center text-white/40 text-xs">
-                No Image
-              </div>
-            )}
-          </div>
-        );
-      }
-    },
-    {
-      key: 'name',
-      label: 'Name',
-      sortable: true,
-      render: (product) => (
-        <div className="min-w-0">
-          <p className="font-medium text-xs sm:text-sm text-white truncate">{product.name}</p>
-          <p className="text-xs text-white/60 truncate">{product.category_name}</p>
-        </div>
-      )
-    },
-    {
-      key: 'price',
-      label: 'Price',
-      sortable: true,
-      render: (product) => (
-        <div>
-          <p className="font-semibold text-xs sm:text-sm text-white">₹{Number(product.price).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-          {product.original_price && (
-            <p className="text-xs text-white/60 line-through">
-              ₹{Number(product.original_price).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </p>
-          )}
-        </div>
-      )
-    },
-    {
-      key: 'stock',
-      label: 'Stock',
-      sortable: true,
-      render: (product) => (
-        <span
-          className={`px-2 py-0.5 sm:py-1 text-xs font-medium rounded-full border ${product.stock === 0
-            ? 'bg-red-500/20 text-red-300 border-red-500/40'
-            : product.stock < 10
-              ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
-              : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-            }`}
-        >
-          {product.stock}
-        </span>
-      )
-    },
-    {
-      key: 'is_active',
-      label: 'Status',
-      render: (product) => (
-        <span
-          className={`px-2 py-0.5 sm:py-1 text-xs font-medium rounded-full border ${product.is_active
-            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-            : 'bg-white/5 text-white/60 border-white/20'
-            }`}
-        >
-          {product.is_active ? 'Active' : 'Inactive'}
-        </span>
-      )
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      width: '80px',
-      render: (product) => (
-        <div className="flex items-center gap-1 sm:gap-2">
-          <button
-            onClick={() => handleEdit(product)}
-            className="p-1.5 sm:p-2 text-blue-400 hover:bg-blue-500/20 active:bg-blue-500/30 rounded-lg transition-all hover:scale-110 min-h-[44px] sm:min-h-auto flex items-center justify-center"
-            title="Edit"
-            aria-label="Edit product"
-          >
-            <Edit className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => {
-              setSelectedProduct(product);
-              setShowDeleteModal(true);
-            }}
-            className="p-1.5 sm:p-2 text-red-400 hover:bg-red-500/20 active:bg-red-500/30 rounded-lg transition-all hover:scale-110 min-h-[44px] sm:min-h-auto flex items-center justify-center"
-            title="Delete"
-            aria-label="Delete product"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      )
-    }
-  ];
-
-  const activeProducts = products.filter(p => p.is_active).length;
-  const lowStockProducts = products.filter(p => p.stock > 0 && p.stock < 10).length;
-  const outOfStockProducts = products.filter(p => p.stock === 0).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div 
-            className="w-12 h-12 rounded-xl flex items-center justify-center"
-            style={{
-              background: `linear-gradient(to bottom right, ${settings.primary_color_from}20, ${settings.primary_color_to}20)`
-            }}
-          >
-            <Package className="w-6 h-6" style={{ color: settings.primary_color_from }} />
+          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Package className="w-5 h-5 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Products</h1>
-            <p className="text-sm text-white/60 mt-0.5">Manage your product catalog</p>
+            <h1 className="text-xl font-bold text-gray-900">Products</h1>
+            <p className="text-sm text-gray-500">Manage your product catalog</p>
           </div>
         </div>
         <button
-          onClick={handleAdd}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-white transition-all hover:scale-105 active:scale-95 flex-shrink-0"
-          style={{
-            background: `linear-gradient(to right, ${settings.primary_color_from}, ${settings.primary_color_to})`
-          }}
+          onClick={() => navigate('/admin/products/add')}
+          className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold transition-colors min-h-[44px] shadow-sm flex-shrink-0"
         >
           <Plus className="h-5 w-5" />
           <span className="hidden sm:inline">Add Product</span>
@@ -275,142 +251,238 @@ export const ProductsList: React.FC = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div 
-          className="bg-gradient-to-br backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-white/20 transition-all group"
-          style={{
-            background: `linear-gradient(to bottom right, ${settings.primary_color_from}20, ${settings.primary_color_to}20)`
-          }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"
-              style={{
-                background: `${settings.primary_color_from}30`
-              }}
-            >
-              <Package className="w-5 h-5" style={{ color: settings.primary_color_from }} />
-            </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center mb-2">
+            <Package className="w-4 h-4 text-amber-600" />
           </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Total Products</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{totalItems}</p>
+          <p className="text-xs text-gray-500 font-medium">All Products</p>
+          <p className="text-2xl font-bold text-amber-700">{totalItems}</p>
         </div>
-
-        <div 
-          className="bg-gradient-to-br backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-white/20 transition-all group"
-          style={{
-            background: `linear-gradient(to bottom right, ${settings.secondary_color_from}20, ${settings.secondary_color_to}20)`
-          }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"
-              style={{
-                background: `${settings.secondary_color_from}30`
-              }}
-            >
-              <Package className="w-5 h-5" style={{ color: settings.secondary_color_from }} />
-            </div>
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center mb-2">
+            <CheckCircle className="w-4 h-4 text-emerald-600" />
           </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Active Products</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{activeProducts}</p>
+          <p className="text-xs text-gray-500 font-medium">Active</p>
+          <p className="text-2xl font-bold text-emerald-700">{activeProducts}</p>
         </div>
-
-        <div className="bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-yellow-500/40 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-yellow-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Package className="w-5 h-5 text-yellow-300" />
-            </div>
+        <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4">
+          <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center mb-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-600" />
           </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Low Stock</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{lowStockProducts}</p>
+          <p className="text-xs text-gray-500 font-medium">Low Stock</p>
+          <p className="text-2xl font-bold text-yellow-700">{lowStockProducts}</p>
         </div>
-
-        <div className="bg-gradient-to-br from-red-500/20 to-pink-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-red-500/40 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-red-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Package className="w-5 h-5 text-red-300" />
-            </div>
+        <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mb-2">
+            <XCircle className="w-4 h-4 text-red-600" />
           </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Out of Stock</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{outOfStockProducts}</p>
+          <p className="text-xs text-gray-500 font-medium">Out of Stock</p>
+          <p className="text-2xl font-bold text-red-700">{outOfStockProducts}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-5 h-5 text-white/60" />
-          <h3 className="text-lg font-semibold text-white">Filters</h3>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:border-white/20 text-sm text-white placeholder-white/40 transition-all"
-              style={{
-                '--tw-ring-color': `${settings.primary_color_from}50`
-              } as React.CSSProperties}
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); handleSearchChange(e.target.value); }}
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm text-gray-900 placeholder-gray-400"
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:border-white/20 text-sm text-white transition-all"
-            style={{
-              '--tw-ring-color': `${settings.primary_color_from}50`
-            } as React.CSSProperties}
+            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm text-gray-900 bg-white"
           >
-            <option value="" className="bg-gray-900">All Status</option>
-            <option value="active" className="bg-gray-900">Active</option>
-            <option value="inactive" className="bg-gray-900">Inactive</option>
+            <option value="">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
-          <button
-            onClick={() => {
-              setSearchTerm('');
-              setCategoryFilter('');
-              setStatusFilter('');
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm text-white transition-colors"
-          >
-            Clear Filters
-          </button>
+          {(searchInput || statusFilter) && (
+            <button
+              onClick={() => { setSearchInput(''); setSearchTerm(''); setStatusFilter(''); setCurrentPage(1); }}
+              className="px-3 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Table */}
-      <DataTable
-        data={products}
-        columns={columns}
-        loading={loading}
-        pagination={{
-          currentPage,
-          totalPages,
-          pageSize,
-          totalItems,
-          onPageChange: setCurrentPage
-        }}
-        emptyMessage="No products found"
-      />
+      {/* Mobile card list — hidden on md+ */}
+      <div className="md:hidden space-y-2">
+        {loading ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+            <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            <p className="text-sm text-gray-500">Loading...</p>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+            <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No products found</p>
+          </div>
+        ) : (
+          <>
+            {products.map((product) => (
+              <div key={product.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <ProductImage product={product} size="w-14 h-14" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm text-gray-900 truncate">{product.name}</p>
+                    <p className="text-xs text-gray-500 truncate mb-2">{product.category_name}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <StatusBadge active={product.is_active} />
+                      <StockBadge stock={product.stock} />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <p className="font-bold text-sm text-gray-900">
+                      ₹{Number(product.price).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </p>
+                    {product.original_price && (
+                      <p className="text-xs text-gray-400 line-through">
+                        ₹{Number(product.original_price).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </p>
+                    )}
+                    <div className="flex gap-1 mt-1">
+                      <button
+                        onClick={() => navigate(`/admin/products/edit/${product.id}`)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                        aria-label="Edit product"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => { setSelectedProduct(product); setShowDeleteModal(true); }}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                        aria-label="Delete product"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className="bg-white border border-gray-200 rounded-xl">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Desktop table — hidden on mobile */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-14">Image</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Price</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Stock</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center">
+                    <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Loading...</p>
+                  </td>
+                </tr>
+              ) : products.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center">
+                    <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No products found</p>
+                  </td>
+                </tr>
+              ) : (
+                products.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <ProductImage product={product} size="w-10 h-10" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-900 truncate max-w-[200px]">{product.name}</p>
+                      <p className="text-xs text-gray-400 truncate max-w-[200px]">{product.category_name}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-gray-900">₹{Number(product.price).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                      {product.original_price && (
+                        <p className="text-xs text-gray-400 line-through">₹{Number(product.original_price).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${
+                        product.stock === 0
+                          ? 'bg-red-50 text-red-700 border-red-100'
+                          : product.stock < 10
+                            ? 'bg-yellow-50 text-yellow-700 border-yellow-100'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                      }`}>
+                        {product.stock}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge active={product.is_active} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => navigate(`/admin/products/edit/${product.id}`)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                          title="Edit"
+                          aria-label="Edit product"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { setSelectedProduct(product); setShowDeleteModal(true); }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                          title="Delete"
+                          aria-label="Delete product"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {!loading && products.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+          />
+        )}
+      </div>
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setSelectedProduct(null);
-        }}
+        onClose={() => { setShowDeleteModal(false); setSelectedProduct(null); }}
         onConfirm={handleDelete}
         title="Delete Product"
         message={`Are you sure you want to delete "${selectedProduct?.name}"? This action cannot be undone.`}
@@ -421,4 +493,3 @@ export const ProductsList: React.FC = () => {
     </div>
   );
 };
-

@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
-import { Star, Heart, ShoppingCart, Check, Eye, Package, ArrowUpRight, Zap, Flame } from 'lucide-react';
+import React, { useMemo, useCallback, memo } from 'react';
+import { Star, Heart, ShoppingCart, Check, Zap } from 'lucide-react';
 import { Product } from '../../types';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import ProductImage from '../Common/ProductImage';
-import { useCartButtonState } from '../../hooks/useCartButtonState';
 import { AddToCartButton } from './AddToCartButton';
 
 interface ProductCardProps {
@@ -16,48 +14,47 @@ interface ProductCardProps {
   isComparing?: boolean;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ 
-  product, 
+export const ProductCard: React.FC<ProductCardProps> = memo(({
+  product,
   isListView = false,
   onCompareToggle,
   isComparing = false
 }) => {
   const { isInWishlist, addItem: addToWishlist } = useWishlist();
   const { addItem: addToCart } = useCart();
-  const { cartButtonState } = useCartButtonState(product);
-  const [isHovered, setIsHovered] = useState(false);
 
-  const discount = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
-    : 0;
-
-  const handleWishlistToggle = (e: React.MouseEvent) => {
+  const handleWishlistToggle = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     addToWishlist(product);
-  };
+  }, [addToWishlist, product]);
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (product.stock > 0) {
       addToCart(product, 1);
     }
-  };
+  }, [addToCart, product]);
 
-  const handleCompareClick = (e: React.MouseEvent) => {
+  const handleCompareClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (onCompareToggle) onCompareToggle(product.id);
-  };
+  }, [onCompareToggle, product.id]);
 
-  // Category specific styles
-  const isTech = product.categoryName?.toLowerCase().includes('electronics') || product.category?.toLowerCase().includes('electronics');
-  const isFashion = product.categoryName?.toLowerCase().includes('fashion') || product.category?.toLowerCase().includes('fashion');
+  // Memoize derived category flags — no string ops on every render
+  const { isTech, isFashion } = useMemo(() => {
+    const catName = (product.categoryName || product.category || '').toLowerCase();
+    return {
+      isTech: catName.includes('electronics'),
+      isFashion: catName.includes('fashion'),
+    };
+  }, [product.categoryName, product.category]);
 
   if (isListView) {
     return (
-      <div className="group flex flex-row gap-3 sm:gap-6 p-2.5 sm:p-4 bg-white rounded-xl sm:rounded-2xl border border-gray-100 hover:border-amber-200 transition-all duration-300 shadow-sm hover:shadow-xl relative">
+      <div className="group flex flex-row gap-3 sm:gap-6 p-2.5 sm:p-4 bg-white rounded-xl sm:rounded-2xl border border-gray-100 hover:border-green-200 transition-all duration-300 shadow-sm hover:shadow-xl relative">
         {/* Image Section - Fixed width on all screens */}
         <div className="relative w-28 sm:w-40 md:w-52 lg:w-64 flex-shrink-0 overflow-hidden rounded-xl bg-gray-50">
           <Link to={`/products/${product.id}`} className="block h-full">
@@ -67,24 +64,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               alt={product.name}
             />
           </Link>
-          {discount > 0 && (
-            <span className="absolute top-2 left-2 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shadow-lg z-10">
-              -{discount}%
-            </span>
-          )}
-          
-          {/* Comparison Checkbox - Hidden on mobile for cleaner look */}
-          <div className="absolute top-2 right-2 z-10 hidden sm:block">
-            <label className="flex items-center gap-1.5 bg-white/90 backdrop-blur px-2 py-1 rounded border border-gray-200 cursor-pointer shadow-sm hover:bg-white transition-colors">
-              <input 
-                type="checkbox" 
-                checked={isComparing}
-                onChange={() => onCompareToggle && onCompareToggle(product.id)}
-                className="w-3 h-3 text-amber-600 rounded focus:ring-amber-500"
-              />
-              <span className="text-[10px] font-bold text-gray-700 uppercase">Compare</span>
-            </label>
-          </div>
         </div>
         
         {/* Content Section */}
@@ -92,7 +71,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <div>
             {/* Category & Rating Row */}
             <div className="flex items-center gap-2 mb-1 sm:mb-2">
-              <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded bg-amber-50 text-amber-700 truncate max-w-[80px] sm:max-w-none">
+              <span className="text-[8px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded bg-green-50 text-green-800 truncate max-w-[80px] sm:max-w-none">
                 {product.categoryName || product.category || 'Discovery'}
               </span>
               <div className="flex items-center text-amber-400 ml-auto flex-shrink-0">
@@ -104,7 +83,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             
             {/* Product Name */}
             <Link to={`/products/${product.id}`}>
-              <h3 className="text-sm sm:text-lg md:text-xl font-bold text-gray-900 mb-1 sm:mb-2 group-hover:text-amber-600 transition-colors line-clamp-2 sm:line-clamp-1">
+              <h3 className="text-sm sm:text-lg md:text-xl font-bold text-gray-900 mb-1 sm:mb-2 group-hover:text-green-800 transition-colors line-clamp-2 sm:line-clamp-1">
                 {product.name}
               </h3>
             </Link>
@@ -152,49 +131,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   }
 
   return (
-    <motion.div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="group relative flex flex-col h-full bg-white rounded-md sm:rounded-xl border border-gray-200 hover:border-amber-400 transition-all duration-300 shadow-sm hover:shadow-md overflow-hidden"
-    >
+    <div className="group relative flex flex-col h-full bg-white rounded-md sm:rounded-xl border border-gray-200 hover:border-green-400 transition-all duration-300 shadow-sm hover:shadow-md overflow-hidden">
       <Link to={`/products/${product.id}`} className="block relative aspect-[1/1] overflow-hidden bg-white">
         <ProductImage
           product={product}
           className="w-full h-full object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-105"
           alt={product.name}
         />
-        
-        {/* Compare Checkbox - Small & Clean */}
-        <div className="absolute top-2 right-2 z-10">
-           <button 
-             onClick={handleCompareClick}
-             className={`w-6 h-6 rounded border transition-all flex items-center justify-center ${
-               isComparing ? 'bg-purple-600 border-purple-600 text-white' : 'bg-white/80 border-gray-300 text-transparent'
-             }`}
-           >
-             <Check className="w-4 h-4" />
-           </button>
-        </div>
 
-        {/* Floating Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-2">
-          {discount > 0 && (
-            <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm uppercase">
-              -{discount}%
-            </span>
-          )}
-          {product.isFeatured && (
-            <span className="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-sm uppercase flex items-center gap-1">
-              <Flame className="w-3 h-3" /> Popular
-            </span>
-          )}
-        </div>
       </Link>
 
       <div className="p-2 sm:p-3.5 flex flex-col flex-1">
         <div className="flex items-center gap-2 mb-1.5">
           <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-            isTech ? 'bg-blue-50 text-blue-600' : isFashion ? 'bg-pink-50 text-pink-600' : 'bg-gray-50 text-gray-600'
+            isTech ? 'bg-blue-50 text-blue-600' : isFashion ? 'bg-pink-50 text-pink-600' : 'bg-green-50 text-green-700'
           }`}>
             {product.categoryName || product.category || 'Essentials'}
           </span>
@@ -206,7 +156,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
         
         <Link to={`/products/${product.id}`} className="mb-1.5 sm:mb-2">
-          <h3 className="font-bold text-gray-900 line-clamp-2 text-xs sm:text-sm leading-tight hover:text-purple-600 transition-colors">
+          <h3 className="font-bold text-gray-900 line-clamp-2 text-xs sm:text-sm leading-tight hover:text-green-800 transition-colors">
             {product.name}
           </h3>
         </Link>
@@ -236,6 +186,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
-};
+});
+
+ProductCard.displayName = 'ProductCard';

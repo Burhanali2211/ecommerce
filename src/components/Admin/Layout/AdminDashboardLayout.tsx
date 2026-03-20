@@ -16,15 +16,14 @@ import {
   Bell,
   Shield,
   Globe,
-  Palette,
   Share2,
   Phone,
   Link2,
   ChevronDown,
   Crown,
-  Zap,
-  Mail,
-  Sparkles
+  Warehouse,
+  Store,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useAdminDashboardSettings } from '../../../hooks/useAdminDashboardSettings';
@@ -40,50 +39,62 @@ interface NavItem {
   name: string;
   path: string;
   icon: React.ElementType;
-  badge?: number;
   children?: { name: string; path: string; icon: React.ElementType }[];
 }
 
 const navItems: NavItem[] = [
   { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-  { name: 'Products', path: '/admin/products', icon: Package },
-  { name: 'Categories', path: '/admin/categories', icon: Tag },
+  {
+    name: 'Products',
+    path: '/admin/products',
+    icon: Package,
+    children: [
+      { name: 'All Products', path: '/admin/products', icon: Package },
+      { name: 'Categories', path: '/admin/categories', icon: Tag },
+      { name: 'Inventory', path: '/admin/inventory', icon: Warehouse },
+      { name: 'Quick Sale', path: '/admin/pos', icon: Store },
+    ],
+  },
   { name: 'Orders', path: '/admin/orders', icon: ShoppingCart },
-  { name: 'Users', path: '/admin/users', icon: Users },
-  { name: 'Contact Submissions', path: '/admin/contact-submissions', icon: Mail },
+  {
+    name: 'Customers',
+    path: '/admin/users',
+    icon: Users,
+    children: [
+      { name: 'All Users', path: '/admin/users', icon: Users },
+      { name: 'Inquiries', path: '/admin/contact-submissions', icon: MessageSquare },
+    ],
+  },
   { name: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
-  { 
-    name: 'Settings', 
-    path: '/admin/settings', 
+  {
+    name: 'Settings',
+    path: '/admin/settings',
     icon: Settings,
     children: [
       { name: 'Site Settings', path: '/admin/settings/site', icon: Globe },
-      { name: 'Theme', path: '/admin/settings/theme', icon: Palette },
-      { name: 'Dashboard', path: '/admin/settings/dashboard', icon: Sparkles },
       { name: 'Social Media', path: '/admin/settings/social-media', icon: Share2 },
       { name: 'Contact Info', path: '/admin/settings/contact', icon: Phone },
-      { name: 'Footer Links', path: '/admin/settings/footer-links', icon: Link2 }
-    ]
-  }
+      { name: 'Footer Links', path: '/admin/settings/footer-links', icon: Link2 },
+    ],
+  },
 ];
 
 export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   children,
   title,
-  subtitle
+  subtitle,
 }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['/admin/products']);
   const { settings } = useAdminDashboardSettings();
 
   useEffect(() => {
     setSidebarOpen(false);
-    // Auto-expand settings if on settings page
     if (location.pathname.includes('/admin/settings')) {
-      setExpandedItems(['/admin/settings']);
+      setExpandedItems(prev => prev.includes('/admin/settings') ? prev : [...prev, '/admin/settings']);
     }
   }, [location.pathname]);
 
@@ -93,8 +104,9 @@ export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   };
 
   const isActive = (path: string) => {
-    if (path === '/admin') {
-      return location.pathname === '/admin';
+    if (path === '/admin') return location.pathname === '/admin';
+    if (path === '/admin/users') {
+      return location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/contact-submissions');
     }
     return location.pathname.startsWith(path);
   };
@@ -112,385 +124,235 @@ export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
     return user?.email?.charAt(0).toUpperCase() || 'A';
   };
 
-  // Get backdrop blur class
-  const getBackdropBlurClass = () => {
-    switch (settings.backdrop_blur) {
-      case 'sm': return 'backdrop-blur-sm';
-      case 'md': return 'backdrop-blur-md';
-      case 'lg': return 'backdrop-blur-lg';
-      case 'xl': return 'backdrop-blur-xl';
-      default: return 'backdrop-blur-xl';
-    }
-  };
+  const SidebarContent = () => (
+    <>
+      {/* Sidebar Header */}
+      <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200 flex-shrink-0">
+        <Link to="/" className="flex items-center gap-2.5">
+          {settings.dashboard_logo_url && isValidImageUrl(settings.dashboard_logo_url) ? (
+            <img
+              src={settings.dashboard_logo_url}
+              alt="Logo"
+              className="w-9 h-9 rounded-xl object-contain"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-xl bg-slate-700 flex items-center justify-center shadow-sm flex-shrink-0">
+              <Crown className="w-5 h-5 text-white" />
+            </div>
+          )}
+          <span className="text-base font-bold text-gray-900 truncate">
+            {settings.dashboard_name || 'Admin Panel'}
+          </span>
+        </Link>
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="p-2 rounded-xl hover:bg-gray-100 transition-colors lg:hidden"
+          aria-label="Close menu"
+        >
+          <X className="w-5 h-5 text-gray-500" />
+        </button>
+      </div>
 
-  return (
-    <div 
-      className="min-h-screen"
-      data-admin-dashboard="true"
-      style={{
-        background: `linear-gradient(to bottom right, ${settings.background_gradient_from}, ${settings.background_gradient_via}, ${settings.background_gradient_to})`
-      }}
-    >
-      {/* Mobile Header */}
-      <header 
-        data-admin-header="true"
-        className={`lg:hidden sticky top-0 z-40 ${getBackdropBlurClass()} border-b border-white/10`}
-        style={{ backgroundColor: settings.header_background }}
+      {/* Admin Profile Card */}
+      <div className="p-3 flex-shrink-0">
+        <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-sm font-bold">{getInitials()}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-900 text-sm truncate">
+                {user?.fullName || 'Admin'}
+              </p>
+              <p className="text-xs text-slate-500 font-medium">Super Admin</p>
+            </div>
+            <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-slate-600 bg-slate-100 rounded-full">
+              <Shield className="w-3 h-3" />
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav
+        className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors"
-            aria-label="Open menu"
-          >
-            <Menu className="w-6 h-6 text-white" />
-          </button>
-          
-          <Link
-            to="/"
-            className="p-2 rounded-xl hover:bg-white/10 transition-colors"
-            aria-label="Go to home"
-          >
-            <Home className="w-5 h-5 text-white" />
-          </Link>
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.path);
+          const hasChildren = item.children && item.children.length > 0;
+          const isExpanded = expandedItems.includes(item.path);
 
-          <div className="flex items-center gap-2">
-              {settings.dashboard_logo_url && isValidImageUrl(settings.dashboard_logo_url) ? (
-                <img 
-                  src={settings.dashboard_logo_url} 
-                  alt="Logo" 
-                  className="w-8 h-8 rounded-lg object-contain"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-              ) : (
-                <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{
-                    background: `linear-gradient(to bottom right, ${settings.primary_color_from}, ${settings.primary_color_to})`
-                  }}
+          return (
+            <div key={item.path}>
+              {hasChildren ? (
+                <button
+                  onClick={() => toggleExpanded(item.path)}
+                  className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 min-h-[44px] ${
+                    active
+                      ? 'bg-slate-100 text-slate-900'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
                 >
-                  <Crown className="w-5 h-5 text-white" />
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-slate-700' : 'text-gray-500'}`} />
+                    <span className="font-medium text-sm">{item.name}</span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              ) : (
+                <Link
+                  to={item.path}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 min-h-[44px] ${
+                    active
+                      ? 'bg-slate-100 text-slate-900'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${active ? 'text-slate-700' : 'text-gray-500'}`} />
+                  <span className="font-medium text-sm flex-1">{item.name}</span>
+                  {active && <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                </Link>
+              )}
+
+              {hasChildren && isExpanded && (
+                <div className="ml-4 mt-0.5 mb-1 space-y-0.5 border-l-2 border-gray-200 pl-3">
+                  {item.children?.map((child) => {
+                    const ChildIcon = child.icon;
+                    const childActive = location.pathname.startsWith(child.path);
+                    return (
+                      <Link
+                        key={child.path}
+                        to={child.path}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all min-h-[42px] ${
+                          childActive
+                            ? 'bg-slate-100 text-slate-900'
+                            : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <ChildIcon className={`w-4 h-4 flex-shrink-0 ${childActive ? 'text-slate-700' : 'text-gray-400'}`} />
+                        <span className="text-sm">{child.name}</span>
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
-              <span className="text-lg font-bold text-white">{settings.dashboard_name}</span>
             </div>
+          );
+        })}
+      </nav>
 
-            <div
-            className="w-10 h-10 rounded-full flex items-center justify-center ring-2 ring-white/20"
-            style={{
-              background: `linear-gradient(to bottom right, ${settings.primary_color_from}, ${settings.primary_color_to})`
-            }}
+      {/* Bottom Actions */}
+      <div
+        className="p-3 border-t border-gray-200 space-y-0.5 flex-shrink-0"
+        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+      >
+        <Link
+          to="/"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors min-h-[44px]"
+        >
+          <Home className="w-5 h-5 text-gray-500 flex-shrink-0" />
+          <span className="font-medium text-sm">View Store</span>
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-600 hover:bg-red-50 transition-colors min-h-[44px]"
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          <span className="font-medium text-sm">Sign Out</span>
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-3 h-14">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 -ml-1 rounded-xl hover:bg-gray-100 transition-colors"
+            aria-label="Open menu"
           >
-            <span className="text-white text-sm font-semibold">{getInitials()}</span>
+            <Menu className="w-6 h-6 text-gray-700" />
+          </button>
+
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center">
+              <Crown className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-base font-bold text-gray-900">
+              {settings.dashboard_name || 'Admin'}
+            </span>
           </div>
+
+          <Link
+            to="/"
+            className="p-2 rounded-xl hover:bg-gray-100 transition-colors"
+            aria-label="View store"
+          >
+            <Home className="w-5 h-5 text-gray-600" />
+          </Link>
         </div>
       </header>
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
-        data-admin-sidebar="true"
-        className={`fixed top-0 left-0 z-50 h-full w-72 ${getBackdropBlurClass()} shadow-2xl transform transition-transform duration-300 ease-out lg:translate-x-0 border-r border-white/10 ${
+        className={`fixed top-0 left-0 z-50 h-full w-72 max-w-[85vw] bg-white border-r border-gray-200 shadow-xl transform transition-transform duration-300 ease-out flex flex-col lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
-        style={{ backgroundColor: settings.sidebar_background }}
       >
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <Link to="/" className="flex items-center gap-3">
-            {settings.dashboard_logo_url && isValidImageUrl(settings.dashboard_logo_url) ? (
-              <img 
-                src={settings.dashboard_logo_url} 
-                alt="Logo" 
-                className="w-10 h-10 rounded-xl object-contain"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            ) : (
-              <div 
-                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
-                style={{
-                  background: `linear-gradient(to bottom right, ${settings.primary_color_from}, ${settings.primary_color_to})`,
-                  boxShadow: `0 10px 15px -3px ${settings.primary_color_to}20`
-                }}
-              >
-                <Crown className="w-5 h-5 text-white" />
-              </div>
-            )}
-            <span 
-              className="text-xl font-bold bg-clip-text text-transparent"
-              style={{
-                background: `linear-gradient(to right, ${settings.primary_color_from}, ${settings.primary_color_to})`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}
-            >
-              {settings.dashboard_name}
-            </span>
-          </Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-2 rounded-xl hover:bg-white/10 transition-colors lg:hidden"
-            aria-label="Close menu"
-          >
-            <X className="w-5 h-5 text-white/60" />
-          </button>
-        </div>
-
-        {/* Admin Profile Card */}
-        <div className="p-4">
-          <div 
-            className="rounded-2xl p-4 border"
-            style={{
-              background: `linear-gradient(to bottom right, ${settings.primary_color_from}20, ${settings.primary_color_to}20)`,
-              borderColor: `${settings.primary_color_to}30`
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div 
-                className="w-12 h-12 rounded-full flex items-center justify-center ring-2 ring-white/20"
-                style={{
-                  background: `linear-gradient(to bottom right, ${settings.primary_color_from}, ${settings.primary_color_to})`
-                }}
-              >
-                <span className="text-lg font-bold text-white">{getInitials()}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white truncate">
-                  {user?.fullName || 'Admin'}
-                </p>
-                <p 
-                  className="text-sm truncate"
-                  style={{ color: settings.primary_color_from }}
-                >
-                  Super Admin
-                </p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <span 
-                className="px-2 py-1 text-xs font-medium rounded-full flex items-center gap-1"
-                style={{
-                  backgroundColor: `${settings.primary_color_to}20`,
-                  color: settings.primary_color_to,
-                  borderColor: `${settings.primary_color_to}30`,
-                  border: `1px solid ${settings.primary_color_to}30`
-                }}
-              >
-                <Shield className="w-3 h-3" /> Full Access
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto max-h-[calc(100vh-280px)]">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.path);
-            const hasChildren = item.children && item.children.length > 0;
-            const isExpanded = expandedItems.includes(item.path);
-            
-            return (
-              <div key={item.path}>
-                {hasChildren ? (
-                  <button
-                    onClick={() => toggleExpanded(item.path)}
-                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
-                      active ? 'text-white border' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                    }`}
-                    style={active ? {
-                      background: `linear-gradient(to right, ${settings.primary_color_from}20, ${settings.primary_color_to}20)`,
-                      borderColor: `${settings.primary_color_to}30`
-                    } : {}}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon 
-                        className="w-5 h-5 transition-colors"
-                        style={active ? { color: settings.primary_color_from } : {}}
-                      />
-                      <span className="font-medium">{item.name}</span>
-                    </div>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                  </button>
-                ) : (
-                  <Link
-                    to={item.path}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
-                      active ? 'text-white border' : 'text-white/60 hover:bg-white/5 hover:text-white'
-                    }`}
-                    style={active ? {
-                      background: `linear-gradient(to right, ${settings.primary_color_from}20, ${settings.primary_color_to}20)`,
-                      borderColor: `${settings.primary_color_to}30`
-                    } : {}}
-                  >
-                    <Icon 
-                      className="w-5 h-5 transition-colors"
-                      style={active ? { color: settings.primary_color_from } : {}}
-                    />
-                    <span className="font-medium">{item.name}</span>
-                    {item.badge && item.badge > 0 && (
-                      <span 
-                        className="ml-auto text-white text-xs font-bold px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: settings.primary_color_to }}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                    <ChevronRight 
-                      className={`w-4 h-4 ml-auto transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
-                      style={active ? { color: settings.primary_color_from } : {}}
-                    />
-                  </Link>
-                )}
-                
-                {/* Children */}
-                {hasChildren && isExpanded && (
-                  <div className="ml-4 mt-1 space-y-1 border-l-2 border-white/10 pl-4">
-                    {item.children?.map((child) => {
-                      const ChildIcon = child.icon;
-                      const childActive = location.pathname === child.path;
-                      return (
-                        <Link
-                          key={child.path}
-                          to={child.path}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                            childActive ? '' : 'text-white/50 hover:bg-white/5 hover:text-white'
-                          }`}
-                          style={childActive ? {
-                            backgroundColor: `${settings.primary_color_to}20`,
-                            color: settings.primary_color_from
-                          } : {}}
-                        >
-                          <ChildIcon className="w-4 h-4" />
-                          <span className="text-sm">{child.name}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-
-        {/* Quick Actions */}
-        <div className="p-3">
-          <div 
-            className="rounded-xl p-4 border"
-            style={{
-              background: `linear-gradient(to bottom right, ${settings.secondary_color_from}20, ${settings.secondary_color_to}20)`,
-              borderColor: `${settings.secondary_color_to}30`
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div 
-                className="w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{
-                  backgroundColor: `${settings.secondary_color_to}30`
-                }}
-              >
-                <Zap 
-                  className="w-5 h-5"
-                  style={{ color: settings.secondary_color_from }}
-                />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-white">Quick Actions</p>
-                <p className="text-xs text-white/60">Add product, user, etc.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Actions */}
-        <div className="p-3 border-t border-white/10 space-y-1">
-          <Link
-            to="/"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-white/60 hover:bg-white/5 hover:text-white transition-colors"
-          >
-            <Home className="w-5 h-5" />
-            <span className="font-medium">View Store</span>
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium">Sign Out</span>
-          </button>
-        </div>
+        <SidebarContent />
       </aside>
 
       {/* Main Content */}
-      <main className="lg:ml-72 min-h-screen">
+      <main className="lg:ml-72 min-h-screen flex flex-col">
         {/* Desktop Header */}
-        <header 
-          data-admin-header="true"
-          className={`hidden lg:block sticky top-0 z-30 ${getBackdropBlurClass()} border-b border-white/10`}
-          style={{ backgroundColor: settings.header_background }}
-        >
-          <div className="flex items-center justify-between px-8 py-4">
+        <header className="hidden lg:block sticky top-0 z-30 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 xl:px-8 py-4">
             <div>
-              <nav className="flex items-center gap-2 text-sm text-white/50 mb-1">
-                <Link 
-                  to="/admin" 
-                  className="transition-colors"
-                  style={{ '--hover-color': settings.primary_color_from } as React.CSSProperties & { '--hover-color': string }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = settings.primary_color_from}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)'}
-                >
+              <nav className="flex items-center gap-1.5 text-sm text-gray-400 mb-1">
+                <Link to="/admin" className="hover:text-slate-700 transition-colors">
                   Admin
                 </Link>
                 <ChevronRight className="w-4 h-4" />
-                <span className="text-white font-medium">{title}</span>
+                <span className="text-gray-700 font-medium">{title}</span>
               </nav>
-              <h1 className="text-2xl font-bold text-white">{title}</h1>
-              {subtitle && (
-                <p className="text-white/60 mt-1">{subtitle}</p>
-              )}
+              <h1 className="text-xl font-bold text-gray-900">{title}</h1>
+              {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Notifications */}
-              <button className="relative p-2 rounded-xl hover:bg-white/10 transition-colors">
-                <Bell className="w-5 h-5 text-white/60" />
-                <span 
-                  className="absolute top-1 right-1 w-2 h-2 rounded-full animate-pulse"
-                  style={{ backgroundColor: settings.primary_color_from }}
-                ></span>
+            <div className="flex items-center gap-3">
+              <button className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                <Bell className="w-5 h-5 text-gray-500" />
               </button>
 
               <Link
                 to="/"
-                className="flex items-center gap-2 px-4 py-2 text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors"
               >
-                <Home className="w-5 h-5" />
-                <span className="font-medium">Store</span>
+                <Home className="w-4 h-4" />
+                <span className="font-medium text-sm">Store</span>
               </Link>
-              
-              <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-                <div className="text-right">
-                  <p className="text-sm font-medium text-white">{user?.fullName || 'Admin'}</p>
-                  <p 
-                    className="text-xs"
-                    style={{ color: settings.primary_color_from }}
-                  >
-                    Super Admin
-                  </p>
+
+              <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
+                <div className="text-right hidden xl:block">
+                  <p className="text-sm font-semibold text-gray-900">{user?.fullName || 'Admin'}</p>
+                  <p className="text-xs text-slate-500">Super Admin</p>
                 </div>
-                <div 
-                  className="w-10 h-10 rounded-full flex items-center justify-center ring-2 ring-white/20"
-                  style={{
-                    background: `linear-gradient(to bottom right, ${settings.primary_color_from}, ${settings.primary_color_to})`
-                  }}
-                >
+                <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
                   <span className="text-white text-sm font-semibold">{getInitials()}</span>
                 </div>
               </div>
@@ -498,19 +360,14 @@ export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
           </div>
         </header>
 
-        {/* Mobile Title */}
-        <div 
-          className="lg:hidden px-4 py-4 backdrop-blur-sm border-b border-white/10"
-          style={{ backgroundColor: settings.header_background }}
-        >
-          <h1 className="text-xl font-bold text-white">{title}</h1>
-          {subtitle && (
-            <p className="text-sm text-white/60 mt-1">{subtitle}</p>
-          )}
+        {/* Mobile Page Title */}
+        <div className="lg:hidden px-4 py-3 bg-white border-b border-gray-200">
+          <h1 className="text-lg font-bold text-gray-900">{title}</h1>
+          {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
         </div>
 
         {/* Page Content */}
-        <div className="p-4 lg:p-8">
+        <div className="flex-1 p-4 lg:p-6 xl:p-8">
           {children}
         </div>
       </main>
@@ -519,4 +376,3 @@ export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
 };
 
 export default AdminDashboardLayout;
-

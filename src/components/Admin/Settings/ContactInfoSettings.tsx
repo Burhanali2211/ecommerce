@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, Plus, Edit2, Trash2, Save, X, RefreshCw, Mail, MapPin, MessageCircle, Star, Eye, EyeOff, CheckSquare, Square, Loader2, Filter, Search } from 'lucide-react';
+import { Phone, Plus, Edit2, Trash2, Save, X, Mail, MapPin, MessageCircle, Star, Eye, EyeOff, CheckSquare, Square, Loader2, Filter, Search } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
 
@@ -27,26 +27,17 @@ export const ContactInfoSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactInfo | null>(null);
-  const [formData, setFormData] = useState({
-    contact_type: '',
-    label: '',
-    value: '',
-    icon_name: ''
-  });
+  const [formData, setFormData] = useState({ contact_type: '', label: '', value: '', icon_name: '' });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const { showSuccess, showError } = useNotification();
 
-  // Fetch contacts
   const fetchContacts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('contact_information')
-        .select('*')
-        .order('display_order', { ascending: true });
+      const { data, error } = await supabase.from('contact_information').select('*').order('display_order', { ascending: true });
       if (error) throw error;
       setContacts((data || []).sort((a: ContactInfo, b: ContactInfo) => (a.display_order ?? 0) - (b.display_order ?? 0)));
     } catch (error: any) {
@@ -56,76 +47,39 @@ export const ContactInfoSettings: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchContacts();
-  }, []);
+  useEffect(() => { fetchContacts(); }, []);
 
-  // Open modal
   const openModal = (contact?: ContactInfo) => {
     if (contact) {
       setEditingContact(contact);
-      setFormData({
-        contact_type: contact.contact_type,
-        label: contact.label,
-        value: contact.value,
-        icon_name: contact.icon_name
-      });
+      setFormData({ contact_type: contact.contact_type, label: contact.label, value: contact.value, icon_name: contact.icon_name });
     } else {
       setEditingContact(null);
-      setFormData({
-        contact_type: '',
-        label: '',
-        value: '',
-        icon_name: ''
-      });
+      setFormData({ contact_type: '', label: '', value: '', icon_name: '' });
     }
     setShowModal(true);
   };
 
-  // Close modal
   const closeModal = () => {
     setShowModal(false);
     setEditingContact(null);
-    setFormData({
-      contact_type: '',
-      label: '',
-      value: '',
-      icon_name: ''
-    });
+    setFormData({ contact_type: '', label: '', value: '', icon_name: '' });
   };
 
-  // Handle type change
   const handleTypeChange = (type: string) => {
     const selected = contactTypes.find(t => t.value === type);
-    if (selected) {
-      setFormData(prev => ({
-        ...prev,
-        contact_type: type,
-        icon_name: type
-      }));
-    }
+    if (selected) setFormData(prev => ({ ...prev, contact_type: type, icon_name: type }));
   };
 
-  // Save contact
   const handleSave = async () => {
     try {
-      const payload = {
-        contact_type: formData.contact_type,
-        label: formData.label,
-        value: formData.value,
-        icon_name: formData.icon_name || formData.contact_type
-      };
+      const payload = { contact_type: formData.contact_type, label: formData.label, value: formData.value, icon_name: formData.icon_name || formData.contact_type };
       if (editingContact) {
-        const { error } = await supabase
-          .from('contact_information')
-          .update(payload)
-          .eq('id', editingContact.id);
+        const { error } = await supabase.from('contact_information').update(payload).eq('id', editingContact.id);
         if (error) throw error;
       } else {
         const maxOrder = contacts.length > 0 ? Math.max(...contacts.map(c => c.display_order ?? 0)) + 1 : 1;
-        const { error } = await supabase
-          .from('contact_information')
-          .insert({ ...payload, display_order: maxOrder, is_active: true, is_primary: false });
+        const { error } = await supabase.from('contact_information').insert({ ...payload, display_order: maxOrder, is_active: true, is_primary: false });
         if (error) throw error;
       }
       showSuccess(`Contact ${editingContact ? 'updated' : 'added'} successfully!`);
@@ -136,10 +90,8 @@ export const ContactInfoSettings: React.FC = () => {
     }
   };
 
-  // Delete contact
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this contact information?')) return;
-
     try {
       const { error } = await supabase.from('contact_information').delete().eq('id', id);
       if (error) throw error;
@@ -150,13 +102,10 @@ export const ContactInfoSettings: React.FC = () => {
     }
   };
 
-  // Bulk delete contacts
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
-
     const count = selectedIds.size;
     if (!confirm(`Are you sure you want to delete ${count} contact information entry/entries?`)) return;
-
     try {
       const { error } = await supabase.from('contact_information').delete().in('id', Array.from(selectedIds));
       if (error) throw error;
@@ -169,42 +118,14 @@ export const ContactInfoSettings: React.FC = () => {
     }
   };
 
-  // Toggle selection mode
-  const toggleSelectionMode = () => {
-    setSelectionMode(!selectionMode);
-    if (selectionMode) {
-      setSelectedIds(new Set());
-    }
-  };
+  const toggleSelectionMode = () => { setSelectionMode(!selectionMode); if (selectionMode) setSelectedIds(new Set()); };
+  const toggleSelect = (id: string) => { const s = new Set(selectedIds); s.has(id) ? s.delete(id) : s.add(id); setSelectedIds(s); };
+  const selectAll = () => setSelectedIds(new Set(contacts.map(c => c.id)));
+  const deselectAll = () => setSelectedIds(new Set());
 
-  // Toggle individual selection
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  // Select all contacts
-  const selectAll = () => {
-    setSelectedIds(new Set(contacts.map(contact => contact.id)));
-  };
-
-  // Deselect all contacts
-  const deselectAll = () => {
-    setSelectedIds(new Set());
-  };
-
-  // Toggle active
   const toggleActive = async (id: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('contact_information')
-        .update({ is_active: !currentStatus })
-        .eq('id', id);
+      const { error } = await supabase.from('contact_information').update({ is_active: !currentStatus }).eq('id', id);
       if (error) throw error;
       showSuccess(`Contact ${!currentStatus ? 'activated' : 'deactivated'}`);
       await fetchContacts();
@@ -213,19 +134,11 @@ export const ContactInfoSettings: React.FC = () => {
     }
   };
 
-  // Set as primary
   const setPrimary = async (id: string) => {
     try {
-      // Clear other primary flags then set this one
-      const { error: clearError } = await supabase
-        .from('contact_information')
-        .update({ is_primary: false })
-        .neq('id', id);
+      const { error: clearError } = await supabase.from('contact_information').update({ is_primary: false }).neq('id', id);
       if (clearError) throw clearError;
-      const { error } = await supabase
-        .from('contact_information')
-        .update({ is_primary: true })
-        .eq('id', id);
+      const { error } = await supabase.from('contact_information').update({ is_primary: true }).eq('id', id);
       if (error) throw error;
       showSuccess('Contact set as primary');
       await fetchContacts();
@@ -234,9 +147,8 @@ export const ContactInfoSettings: React.FC = () => {
     }
   };
 
-  // Filter contacts
   const filteredContacts = contacts.filter(contact => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       contact.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contact.value.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contact.contact_type.toLowerCase().includes(searchTerm.toLowerCase());
@@ -244,323 +156,196 @@ export const ContactInfoSettings: React.FC = () => {
     return matchesSearch && matchesType;
   });
 
-  // Group by type
   const groupedContacts = filteredContacts.reduce((acc, contact) => {
-    if (!acc[contact.contact_type]) {
-      acc[contact.contact_type] = [];
-    }
+    if (!acc[contact.contact_type]) acc[contact.contact_type] = [];
     acc[contact.contact_type].push(contact);
     return acc;
   }, {} as Record<string, ContactInfo[]>);
 
-  // Get unique types for filter
   const contactTypesList = Array.from(new Set(contacts.map(c => c.contact_type))).sort();
-
-  // Stats
   const totalContacts = contacts.length;
   const activeContacts = contacts.filter(c => c.is_active).length;
   const primaryContacts = contacts.filter(c => c.is_primary).length;
   const totalTypes = contactTypesList.length;
 
+  const getIcon = (type: string) => {
+    const iconMap: Record<string, any> = { phone: Phone, email: Mail, address: MapPin, whatsapp: MessageCircle };
+    return iconMap[type] || Phone;
+  };
+
+  const inputCls = 'w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300 focus:border-slate-400 text-sm text-gray-900 placeholder-gray-400 transition-all';
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-amber-400 animate-spin mx-auto mb-4" />
-          <p className="text-white/60">Loading contact information...</p>
+          <Loader2 className="w-8 h-8 text-slate-400 animate-spin mx-auto mb-2" />
+          <p className="text-sm text-gray-500">Loading contact information...</p>
         </div>
       </div>
     );
   }
 
-  const getIcon = (type: string) => {
-    const iconMap: Record<string, any> = {
-      phone: Phone,
-      email: Mail,
-      address: MapPin,
-      whatsapp: MessageCircle
-    };
-    return iconMap[type] || Phone;
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Header with Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-              <Phone className="w-6 h-6 text-emerald-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Contact Information</h1>
-              <p className="text-sm text-white/60 mt-0.5">Manage your contact details and information</p>
-            </div>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center border border-emerald-100">
+            <Phone className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Contact Information</h2>
+            <p className="text-xs text-gray-500">Manage your contact details</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           {selectionMode && selectedIds.size > 0 && (
-            <button
-              onClick={handleBulkDelete}
-              className="flex items-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-red-500/20"
-            >
-              <Trash2 className="h-5 w-5" />
-              <span className="hidden sm:inline">Delete ({selectedIds.size})</span>
-              <span className="sm:hidden">Delete</span>
+            <button onClick={handleBulkDelete} className="flex items-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
+              <Trash2 className="h-4 w-4" /><span>Delete ({selectedIds.size})</span>
             </button>
           )}
-          <button
-            onClick={toggleSelectionMode}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold transition-all hover:scale-105 active:scale-95 ${
-              selectionMode
-                ? 'bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-500/20'
-                : 'bg-white/10 text-white border border-white/20 hover:bg-white/20'
-            }`}
-          >
-            {selectionMode ? (
-              <>
-                <X className="h-5 w-5" />
-                <span className="hidden sm:inline">Cancel</span>
-              </>
-            ) : (
-              <>
-                <CheckSquare className="h-5 w-5" />
-                <span className="hidden sm:inline">Select</span>
-              </>
-            )}
+          <button onClick={toggleSelectionMode} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectionMode ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
+            {selectionMode ? <><X className="h-4 w-4" /><span>Cancel</span></> : <><CheckSquare className="h-4 w-4" /><span className="hidden sm:inline">Select</span></>}
           </button>
           {!selectionMode && (
-            <button
-              onClick={() => openModal()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/20"
-            >
-              <Plus className="h-5 w-5" />
-              <span>Add Contact</span>
+            <button onClick={() => openModal()} className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors">
+              <Plus className="h-4 w-4" /><span>Add Contact</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Stats List - 2 per row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-emerald-500/30 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 bg-emerald-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Phone className="w-6 h-6 text-emerald-400" />
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Contacts', value: totalContacts, icon: Phone, bg: 'bg-emerald-50', border: 'border-emerald-100', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', valueColor: 'text-emerald-800' },
+          { label: 'Active', value: activeContacts, icon: Eye, bg: 'bg-blue-50', border: 'border-blue-100', iconBg: 'bg-blue-100', iconColor: 'text-blue-600', valueColor: 'text-blue-800' },
+          { label: 'Primary', value: primaryContacts, icon: Star, bg: 'bg-amber-50', border: 'border-amber-100', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', valueColor: 'text-amber-800' },
+          { label: 'Types', value: totalTypes, icon: Filter, bg: 'bg-purple-50', border: 'border-purple-100', iconBg: 'bg-purple-100', iconColor: 'text-purple-600', valueColor: 'text-purple-800' },
+        ].map(({ label, value, icon: Icon, bg, border, iconBg, iconColor, valueColor }) => (
+          <div key={label} className={`${bg} border ${border} rounded-lg p-3`}>
+            <div className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center mb-2`}>
+              <Icon className={`w-4 h-4 ${iconColor}`} />
             </div>
+            <p className="text-xs text-gray-500 font-medium">{label}</p>
+            <p className={`text-xl font-bold ${valueColor}`}>{value}</p>
           </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Total Contacts</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{totalContacts}</p>
-        </div>
-        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-blue-500/30 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 bg-blue-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Eye className="w-6 h-6 text-blue-400" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Active Contacts</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{activeContacts}</p>
-        </div>
-        <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-amber-500/30 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 bg-amber-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Star className="w-6 h-6 text-amber-400" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Primary Contacts</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{primaryContacts}</p>
-        </div>
-        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-purple-500/30 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 bg-purple-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Filter className="w-6 h-6 text-purple-400" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Contact Types</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{totalTypes}</p>
-        </div>
+        ))}
       </div>
 
       {/* Filters */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-5 h-5 text-white/60" />
-          <h3 className="text-lg font-semibold text-white">Filters</h3>
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="w-4 h-4 text-gray-400" />
+          <h3 className="text-sm font-semibold text-gray-700">Filters</h3>
           {(searchTerm || typeFilter) && (
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setTypeFilter('');
-              }}
-              className="ml-auto flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
-              Clear
+            <button onClick={() => { setSearchTerm(''); setTypeFilter(''); }} className="ml-auto flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
+              <X className="w-3 h-3" />Clear
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
-            <input
-              type="text"
-              placeholder="Search contacts..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white placeholder-white/40 transition-all"
-            />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input type="text" placeholder="Search contacts..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300 text-sm text-gray-900 placeholder-gray-400" />
           </div>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all"
-          >
-            <option value="" className="bg-gray-900">All Types</option>
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+            className="px-3 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300 text-sm text-gray-900 sm:w-44">
+            <option value="">All Types</option>
             {contactTypesList.map((type) => (
-              <option key={type} value={type} className="bg-gray-900 capitalize">
-                {type}
-              </option>
+              <option key={type} value={type} className="capitalize">{type}</option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Selection Mode Controls */}
+      {/* Selection Controls */}
       {selectionMode && (
-        <div className="bg-indigo-500/20 border border-indigo-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-white">
-              {selectedIds.size} of {contacts.length} selected
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={selectAll}
-                className="px-3 py-1.5 text-sm bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 transition-colors"
-              >
-                Select All
-              </button>
-              <button
-                onClick={deselectAll}
-                className="px-3 py-1.5 text-sm bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 transition-colors"
-              >
-                Deselect All
-              </button>
-            </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span className="text-sm font-medium text-gray-700">{selectedIds.size} of {contacts.length} selected</span>
+          <div className="flex gap-2">
+            <button onClick={selectAll} className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">Select All</button>
+            <button onClick={deselectAll} className="px-3 py-1.5 text-xs bg-white border border-gray-200 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">Deselect All</button>
           </div>
         </div>
       )}
 
       {/* Grouped Contacts */}
       {Object.keys(groupedContacts).length === 0 ? (
-        <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-12 text-center">
-          <Phone className="w-12 h-12 text-white/20 mx-auto mb-3" />
-          <p className="text-white/60 mb-2">No contact information found</p>
-          {searchTerm || typeFilter ? (
-            <p className="text-sm text-white/40">Try adjusting your filters</p>
-          ) : (
-            <p className="text-sm text-white/40">Get started by adding your first contact</p>
-          )}
+        <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
+          <Phone className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm mb-1">No contact information found</p>
+          {searchTerm || typeFilter
+            ? <p className="text-xs text-gray-400">Try adjusting your filters</p>
+            : <p className="text-xs text-gray-400">Get started by adding your first contact</p>}
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {Object.entries(groupedContacts).map(([type, typeContacts]) => {
             const Icon = getIcon(type);
             return (
-              <div key={type} className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
-                <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 px-6 py-4 border-b border-white/10">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-emerald-400" />
-                    <h2 className="text-lg font-semibold text-white capitalize">{type}</h2>
-                    <span className="ml-auto text-sm text-white/60">{typeContacts.length} {typeContacts.length === 1 ? 'entry' : 'entries'}</span>
+              <div key={type} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="bg-slate-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
+                  <div className="w-7 h-7 bg-white border border-gray-200 rounded-lg flex items-center justify-center">
+                    <Icon className="h-3.5 w-3.5 text-slate-600" />
                   </div>
+                  <h2 className="text-sm font-semibold text-gray-900 capitalize">{type}</h2>
+                  <span className="ml-auto text-xs text-gray-400">{typeContacts.length} {typeContacts.length === 1 ? 'entry' : 'entries'}</span>
                 </div>
-
-                <div className="divide-y divide-white/10">
-                  {typeContacts
-                    .sort((a, b) => a.display_order - b.display_order)
-                    .map((contact) => (
-                      <div 
-                        key={contact.id} 
-                        className={`p-4 sm:p-6 hover:bg-white/5 transition-colors ${!contact.is_active ? 'opacity-60' : ''} ${selectionMode && selectedIds.has(contact.id) ? 'bg-indigo-500/20' : ''}`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            {selectionMode && (
-                              <button
-                                onClick={() => toggleSelect(contact.id)}
-                                className="mt-1 flex-shrink-0"
-                              >
-                                {selectedIds.has(contact.id) ? (
-                                  <CheckSquare className="h-5 w-5 text-indigo-400" />
-                                ) : (
-                                  <Square className="h-5 w-5 text-white/40" />
-                                )}
+                <div className="divide-y divide-gray-100">
+                  {typeContacts.sort((a, b) => a.display_order - b.display_order).map((contact) => (
+                    <div key={contact.id} className={`px-4 py-3 hover:bg-gray-50 transition-colors ${!contact.is_active ? 'opacity-60' : ''} ${selectionMode && selectedIds.has(contact.id) ? 'bg-slate-50' : ''}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          {selectionMode && (
+                            <button onClick={() => toggleSelect(contact.id)} className="mt-0.5 flex-shrink-0">
+                              {selectedIds.has(contact.id)
+                                ? <CheckSquare className="h-4 w-4 text-slate-700" />
+                                : <Square className="h-4 w-4 text-gray-400" />}
+                            </button>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="text-sm font-medium text-gray-900">{contact.label}</span>
+                              {contact.is_primary && (
+                                <span className="px-1.5 py-0.5 text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 rounded-full flex items-center gap-1">
+                                  <Star className="h-2.5 w-2.5 fill-current" />Primary
+                                </span>
+                              )}
+                              <span className={`px-1.5 py-0.5 text-xs font-medium rounded-full border ${contact.is_active ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                                {contact.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600 font-mono bg-gray-50 px-2.5 py-1.5 rounded-md break-all border border-gray-100">{contact.value}</p>
+                          </div>
+                        </div>
+                        {!selectionMode && (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {!contact.is_primary && contact.is_active && (
+                              <button onClick={() => setPrimary(contact.id)} title="Set as primary"
+                                className="p-1.5 bg-amber-50 text-amber-600 rounded-md hover:bg-amber-100 transition-colors border border-amber-200">
+                                <Star className="h-3.5 w-3.5" />
                               </button>
                             )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                <h3 className="text-sm sm:text-base font-medium text-white">{contact.label}</h3>
-                                {contact.is_primary && (
-                                  <span className="px-2 py-0.5 text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full flex items-center gap-1">
-                                    <Star className="h-3 w-3 fill-current" />
-                                    Primary
-                                  </span>
-                                )}
-                                {contact.is_active ? (
-                                  <span className="px-2 py-0.5 text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">
-                                    Active
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.5 text-xs font-medium bg-white/10 text-white/60 border border-white/10 rounded-full">
-                                    Inactive
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-white/80 font-mono bg-white/5 px-3 py-2 rounded-lg break-all">
-                                {contact.value}
-                              </p>
-                            </div>
+                            <button onClick={() => toggleActive(contact.id, contact.is_active)} title={contact.is_active ? 'Deactivate' : 'Activate'}
+                              className={`p-1.5 rounded-md transition-colors ${contact.is_active ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 border border-gray-200'}`}>
+                              {contact.is_active ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                            </button>
+                            <button onClick={() => openModal(contact)}
+                              className="p-1.5 bg-slate-50 text-slate-600 rounded-md hover:bg-slate-100 transition-colors border border-slate-200">
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button onClick={() => handleDelete(contact.id)} title="Delete"
+                              className="p-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors border border-red-200">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           </div>
-
-                          {!selectionMode && (
-                            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                              {!contact.is_primary && contact.is_active && (
-                                <button
-                                  onClick={() => setPrimary(contact.id)}
-                                  className="px-3 py-2 bg-amber-500/20 text-amber-400 rounded-lg hover:bg-amber-500/30 flex items-center gap-1 transition-colors text-sm border border-amber-500/30"
-                                  title="Set as primary"
-                                >
-                                  <Star className="h-4 w-4" />
-                                  <span className="hidden sm:inline">Set Primary</span>
-                                </button>
-                              )}
-                              <button
-                                onClick={() => toggleActive(contact.id, contact.is_active)}
-                                className={`p-2 rounded-lg transition-colors ${contact.is_active ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-white/10 text-white/40 hover:bg-white/20'
-                                  }`}
-                                title={contact.is_active ? 'Deactivate' : 'Activate'}
-                              >
-                                {contact.is_active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                              </button>
-                              <button
-                                onClick={() => openModal(contact)}
-                                className="px-3 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 flex items-center gap-2 transition-colors border border-blue-500/30"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                                <span className="hidden sm:inline">Edit</span>
-                              </button>
-                              <button
-                                onClick={() => handleDelete(contact.id)}
-                                className="p-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
-                    ))}
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -569,95 +354,51 @@ export const ContactInfoSettings: React.FC = () => {
       )}
 
       {contacts.length === 0 && !loading && (
-        <div className="text-center py-12 bg-white/5 backdrop-blur-sm rounded-2xl border-2 border-dashed border-white/10">
-          <Phone className="h-12 w-12 text-white/20 mx-auto mb-4" />
-          <p className="text-white/60 mb-4">No contact information added yet</p>
-          <button
-            onClick={() => openModal()}
-            className="px-6 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 inline-flex items-center gap-2 font-semibold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/20"
-          >
-            <Plus className="h-5 w-5" />
-            Add Your First Contact
+        <div className="text-center py-10 bg-white border-2 border-dashed border-gray-200 rounded-xl">
+          <Phone className="h-10 w-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm mb-3">No contact information added yet</p>
+          <button onClick={() => openModal()} className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-medium inline-flex items-center gap-2 transition-colors">
+            <Plus className="h-4 w-4" />Add Your First Contact
           </button>
         </div>
       )}
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full border border-white/10">
-            <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border-b border-white/10 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-              <h2 className="text-xl font-bold text-white">
-                {editingContact ? 'Edit' : 'Add'} Contact Information
-              </h2>
-              <button
-                onClick={closeModal}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
-              >
-                <X className="h-5 w-5" />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-200">
+            <div className="bg-gray-50 border-b border-gray-200 px-5 py-4 flex items-center justify-between rounded-t-xl">
+              <h2 className="text-base font-bold text-gray-900">{editingContact ? 'Edit' : 'Add'} Contact Information</h2>
+              <button onClick={closeModal} className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors text-gray-500">
+                <X className="h-4 w-4" />
               </button>
             </div>
-
-            <div className="p-6 space-y-4">
+            <div className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Contact Type *</label>
-                <select
-                  value={formData.contact_type}
-                  onChange={(e) => handleTypeChange(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-white transition-all"
-                  required
-                >
-                  <option value="" className="bg-gray-900">Select a type</option>
-                  {contactTypes.map(type => (
-                    <option key={type.value} value={type.value} className="bg-gray-900">{type.label}</option>
-                  ))}
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Contact Type *</label>
+                <select value={formData.contact_type} onChange={(e) => handleTypeChange(e.target.value)} className={inputCls} required>
+                  <option value="">Select a type</option>
+                  {contactTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
                 </select>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Label *</label>
-                <input
-                  type="text"
-                  value={formData.label}
-                  onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-white placeholder-white/40 transition-all"
-                  placeholder="e.g., Customer Support, Main Office"
-                  required
-                />
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Label *</label>
+                <input type="text" value={formData.label} onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
+                  className={inputCls} placeholder="e.g., Customer Support, Main Office" required />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Value *</label>
-                <input
-                  type="text"
-                  value={formData.value}
-                  onChange={(e) => setFormData(prev => ({ ...prev, value: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-white placeholder-white/40 transition-all"
-                  placeholder={
-                    formData.contact_type === 'email' ? 'email@example.com' :
-                      formData.contact_type === 'phone' ? '+1 234 567 8900' :
-                        formData.contact_type === 'address' ? '123 Main St, City, Country' :
-                          'Contact value'
-                  }
-                  required
-                />
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Value *</label>
+                <input type="text" value={formData.value} onChange={(e) => setFormData(prev => ({ ...prev, value: e.target.value }))}
+                  className={inputCls}
+                  placeholder={formData.contact_type === 'email' ? 'email@example.com' : formData.contact_type === 'phone' ? '+1 234 567 8900' : formData.contact_type === 'address' ? '123 Main St, City' : 'Contact value'}
+                  required />
               </div>
             </div>
-
-            <div className="bg-white/5 px-6 py-4 flex items-center justify-end gap-3 border-t border-white/10 rounded-b-2xl">
-              <button
-                onClick={closeModal}
-                className="px-6 py-2 bg-white/10 border border-white/20 text-white rounded-xl hover:bg-white/20 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={!formData.contact_type || !formData.label || !formData.value}
-                className="px-6 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors font-semibold"
-              >
-                <Save className="h-4 w-4" />
-                {editingContact ? 'Update' : 'Add'} Contact
+            <div className="bg-gray-50 px-5 py-3.5 flex items-center justify-end gap-2 border-t border-gray-200 rounded-b-xl">
+              <button onClick={closeModal} className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm">Cancel</button>
+              <button onClick={handleSave} disabled={!formData.contact_type || !formData.label || !formData.value}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors text-sm font-medium">
+                <Save className="h-3.5 w-3.5" />{editingContact ? 'Update' : 'Add'} Contact
               </button>
             </div>
           </div>
@@ -666,4 +407,3 @@ export const ContactInfoSettings: React.FC = () => {
     </div>
   );
 };
-

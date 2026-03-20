@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { CartSidebar } from '../Cart/CartSidebar';
+import { BottomNav } from './BottomNav';
 
 
 interface LayoutProps {
@@ -11,8 +12,10 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
+  // Only mount CartSidebar after it has been opened once — avoids rendering it on every page load
+  const cartEverOpened = useRef(false);
+  if (isCartOpen) cartEverOpened.current = true;
   const location = useLocation();
-  const isHomePage = location.pathname === '/';
   const isDashboardPage = location.pathname.startsWith('/dashboard');
   const isAuthPage = location.pathname === '/auth';
 
@@ -26,18 +29,24 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         />
       )}
 
-      <main className={`${!isHomePage && !isDashboardPage && !isAuthPage ? "pt-24" : ""} relative`}>
-        <div className="min-h-[calc(100vh-200px)]">
+      <main className={`${!isDashboardPage && !isAuthPage ? "pt-[98px] md:pt-[92px]" : ""} relative`}>
+        <div className={`min-h-[calc(100vh-200px)] ${!isDashboardPage && !isAuthPage ? "pb-16 md:pb-0" : ""}`}>
           {children}
         </div>
       </main>
 
       {!isDashboardPage && !isAuthPage && <Footer />}
 
-      <CartSidebar
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-      />
+      {!isDashboardPage && !isAuthPage && (
+        <BottomNav onCartClick={() => setIsCartOpen(true)} />
+      )}
+
+      {cartEverOpened.current && (
+        <CartSidebar
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+        />
+      )}
     </div>
   );
 };

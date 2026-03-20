@@ -1,5 +1,6 @@
 // Home Components Barrel Exports
 export { Hero } from './Hero';
+export { CategoryChips } from './CategoryChips';
 export { CategorySection } from './CategorySection';
 export { FeaturedProducts } from './FeaturedProducts';
 export { TrendingSection } from './TrendingSection';

@@ -1,365 +1,224 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import React, {
+  createContext, useContext, useState, ReactNode,
+  useCallback, useEffect, useRef,
+} from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle, AlertTriangle, Info, X, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
-// Notification types
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
 interface Notification {
   id: string;
   type: NotificationType;
   title: string;
-  message: string;
+  message?: string;
   duration?: number;
 }
 
 interface NotificationContextType {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
-  showSuccess: (title: string, message: string) => void;
-  showError: (title: string, message: string) => void;
-  showWarning: (title: string, message: string) => void;
-  showInfo: (title: string, message: string) => void;
+  showSuccess: (title: string, message?: string) => void;
+  showError: (title: string, message?: string) => void;
+  showWarning: (title: string, message?: string) => void;
+  showInfo: (title: string, message?: string) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const useNotification = () => {
-  const context = useContext(NotificationContext);
-  if (!context) {
-    throw new Error('useNotification must be used within NotificationProvider');
-  }
-  return context;
+  const ctx = useContext(NotificationContext);
+  if (!ctx) throw new Error('useNotification must be used within NotificationProvider');
+  return ctx;
 };
 
-interface NotificationProviderProps {
-  children: ReactNode;
-}
-
-export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
+/* ─── Provider ─── */
+export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const removeNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  const remove = useCallback((id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
-  const showNotification = useCallback((notification: Omit<Notification, 'id'>) => {
-    const id = `notification-${Date.now()}-${Math.random()}`;
-    const newNotification: Notification = {
-      ...notification,
-      id,
-      duration: notification.duration || 5000,
-    };
+  const show = useCallback((notification: Omit<Notification, 'id'>) => {
+    const id = `n-${Date.now()}-${Math.random()}`;
+    const duration = notification.duration ?? 3000;
+    setNotifications(prev => {
+      // On mobile keep only 1 toast at a time; desktop max 3
+      const isMobile = window.innerWidth < 768;
+      const max = isMobile ? 1 : 3;
+      const trimmed = prev.length >= max ? prev.slice(prev.length - max + 1) : prev;
+      return [...trimmed, { ...notification, id, duration }];
+    });
+    setTimeout(() => remove(id), duration);
+  }, [remove]);
 
-    setNotifications((prev) => [...prev, newNotification]);
-
-    // Auto remove after duration
-    setTimeout(() => {
-      removeNotification(id);
-    }, newNotification.duration);
-  }, [removeNotification]);
-
-  const showSuccess = useCallback((title: string, message: string) => {
-    showNotification({ type: 'success', title, message });
-  }, [showNotification]);
-
-  const showError = useCallback((title: string, message: string) => {
-    showNotification({ type: 'error', title, message });
-  }, [showNotification]);
-
-  const showWarning = useCallback((title: string, message: string) => {
-    showNotification({ type: 'warning', title, message });
-  }, [showNotification]);
-
-  const showInfo = useCallback((title: string, message: string) => {
-    showNotification({ type: 'info', title, message });
-  }, [showNotification]);
+  const showSuccess = useCallback((title: string, message?: string) => show({ type: 'success', title, message }), [show]);
+  const showError   = useCallback((title: string, message?: string) => show({ type: 'error',   title, message }), [show]);
+  const showWarning = useCallback((title: string, message?: string) => show({ type: 'warning', title, message }), [show]);
+  const showInfo    = useCallback((title: string, message?: string) => show({ type: 'info',    title, message }), [show]);
 
   return (
-    <NotificationContext.Provider
-      value={{
-        showNotification,
-        showSuccess,
-        showError,
-        showWarning,
-        showInfo,
-      }}
-    >
+    <NotificationContext.Provider value={{ showNotification: show, showSuccess, showError, showWarning, showInfo }}>
       {children}
-      {createPortal(
-        <NotificationContainer notifications={notifications} onRemove={removeNotification} />,
-        document.body
-      )}
+      {createPortal(<ToastStack notifications={notifications} onRemove={remove} />, document.body)}
     </NotificationContext.Provider>
   );
 };
 
-// Notification Container Component
-interface NotificationContainerProps {
-  notifications: Notification[];
-  onRemove: (id: string) => void;
-}
+/* ─── Stack container ─── */
+const ToastStack: React.FC<{ notifications: Notification[]; onRemove: (id: string) => void }> = ({
+  notifications, onRemove,
+}) => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-const NotificationContainer: React.FC<NotificationContainerProps> = ({ notifications, onRemove }) => {
-  const [isMobile, setIsMobile] = useState(false);
-  const [showAll, setShowAll] = useState(false);
-
-  // Detect screen size on mount and resize
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    // Check on mount
-    checkMobile();
-
-    // Listen for resize
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    const check = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', check, { passive: true });
+    return () => window.removeEventListener('resize', check);
   }, []);
 
   if (notifications.length === 0) return null;
 
-  // Limit visible notifications (max 3 on desktop, 2 on mobile)
-  const maxVisible = isMobile ? 2 : 3;
-  const visibleNotifications = showAll ? notifications : notifications.slice(0, maxVisible);
-  const hiddenCount = notifications.length - maxVisible;
-
-  // Render only ONE container based on screen size
   return (
     <div
       style={{
         position: 'fixed',
-        bottom: isMobile ? '1rem' : '1.5rem',
+        // Mobile: bottom-center above bottom nav (64px) + gap. Desktop: top-right.
+        bottom: isMobile ? '76px' : 'auto',
+        top: isMobile ? 'auto' : '100px',
         left: isMobile ? '50%' : 'auto',
-        right: isMobile ? 'auto' : '1.5rem',
+        right: isMobile ? 'auto' : '20px',
         transform: isMobile ? 'translateX(-50%)' : 'none',
         zIndex: 99999,
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.75rem',
-        maxWidth: isMobile ? 'calc(100vw - 2rem)' : '400px',
-        width: '100%',
+        gap: '8px',
+        alignItems: isMobile ? 'center' : 'flex-end',
         pointerEvents: 'none',
-        maxHeight: isMobile ? 'calc(100vh - 2rem)' : '80vh',
-        overflowY: showAll ? 'auto' : 'visible',
+        // Mobile: constrain width to pill; desktop: card width
+        width: isMobile ? 'auto' : '340px',
+        maxWidth: isMobile ? 'calc(100vw - 32px)' : '340px',
       }}
     >
-      {visibleNotifications.map((notification) => (
-        <Toast key={notification.id} notification={notification} onRemove={onRemove} isMobile={isMobile} />
+      {notifications.map(n => (
+        <Toast key={n.id} notification={n} onRemove={onRemove} isMobile={isMobile} />
       ))}
-      
-      {/* Show "View All" button if there are hidden notifications */}
-      {!showAll && hiddenCount > 0 && (
-        <button
-          onClick={() => setShowAll(true)}
-          style={{
-            pointerEvents: 'auto',
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #d1d5db',
-            borderRadius: isMobile ? '0.5rem' : '0.75rem',
-            padding: isMobile ? '0.75rem' : '0.875rem',
-            textAlign: 'center',
-            fontSize: '0.875rem',
-            fontWeight: 600,
-            color: '#374151',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#e5e7eb';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#f3f4f6';
-          }}
-        >
-          View {hiddenCount} more notification{hiddenCount !== 1 ? 's' : ''}
-        </button>
-      )}
-      
-      {/* Show "Show Less" button when showing all */}
-      {showAll && notifications.length > maxVisible && (
-        <button
-          onClick={() => setShowAll(false)}
-          style={{
-            pointerEvents: 'auto',
-            backgroundColor: '#f3f4f6',
-            border: '1px solid #d1d5db',
-            borderRadius: isMobile ? '0.5rem' : '0.75rem',
-            padding: isMobile ? '0.75rem' : '0.875rem',
-            textAlign: 'center',
-            fontSize: '0.875rem',
-            fontWeight: 600,
-            color: '#374151',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#e5e7eb';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#f3f4f6';
-          }}
-        >
-          Show Less
-        </button>
-      )}
     </div>
   );
 };
 
-// Individual Toast Component
-interface ToastProps {
-  notification: Notification;
-  onRemove: (id: string) => void;
-  isMobile?: boolean;
-}
+/* ─── Type config ─── */
+const TYPE_CONFIG = {
+  success: { icon: CheckCircle, dot: '#22c55e', label: 'Success' },
+  error:   { icon: AlertCircle,  dot: '#ef4444', label: 'Error'   },
+  warning: { icon: AlertTriangle,dot: '#f59e0b', label: 'Warning' },
+  info:    { icon: Info,         dot: '#3b82f6', label: 'Info'    },
+};
 
-const Toast: React.FC<ToastProps> = ({ notification, onRemove, isMobile = false }) => {
+/* ─── Individual Toast ─── */
+const Toast: React.FC<{ notification: Notification; onRemove: (id: string) => void; isMobile: boolean }> = ({
+  notification, onRemove, isMobile,
+}) => {
   const { id, type, title, message } = notification;
+  const { icon: Icon, dot } = TYPE_CONFIG[type];
 
-  const getIcon = () => {
-    switch (type) {
-      case 'success':
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'error':
-        return <AlertCircle className="h-5 w-5 text-red-600" />;
-      case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
-      case 'info':
-        return <Info className="h-5 w-5 text-blue-600" />;
-    }
+  // Touch-to-dismiss: swipe up or tap
+  const touchStartY = useRef<number | null>(null);
+  const [leaving, setLeaving] = useState(false);
+
+  const dismiss = useCallback(() => {
+    setLeaving(true);
+    setTimeout(() => onRemove(id), 250);
+  }, [id, onRemove]);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const delta = e.changedTouches[0].clientY - touchStartY.current;
+    if (delta > 20) dismiss(); // swipe down ≥ 20px → dismiss
+    touchStartY.current = null;
   };
 
-  const getStyles = () => {
-    switch (type) {
-      case 'success':
-        return {
-          bg: '#f0fdf4',
-          border: '#86efac',
-          text: '#166534',
-        };
-      case 'error':
-        return {
-          bg: '#fef2f2',
-          border: '#fca5a5',
-          text: '#991b1b',
-        };
-      case 'warning':
-        return {
-          bg: '#fffbeb',
-          border: '#fcd34d',
-          text: '#92400e',
-        };
-      case 'info':
-        return {
-          bg: '#eff6ff',
-          border: '#93c5fd',
-          text: '#1e40af',
-        };
-      default:
-        return {
-          bg: '#f3f4f6',
-          border: '#d1d5db',
-          text: '#374151',
-        };
-    }
-  };
+  if (isMobile) {
+    /* ── iOS pill style ── */
+    return (
+      <div
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onClick={dismiss}
+        style={{
+          pointerEvents: 'auto',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          backgroundColor: 'rgba(28, 28, 30, 0.93)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: '9999px',
+          padding: message ? '10px 16px 10px 12px' : '9px 16px 9px 12px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.22)',
+          cursor: 'pointer',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          animation: leaving ? 'toastOut 0.25s ease-in forwards' : 'toastUp 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards',
+          whiteSpace: 'nowrap',
+          maxWidth: 'calc(100vw - 32px)',
+        }}
+      >
+        {/* Colored dot */}
+        <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: dot, flexShrink: 0 }} />
 
-  const styles = getStyles();
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', lineHeight: 1.3 }}>
+            {title}
+          </span>
+          {message && (
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.3, marginTop: '1px' }}>
+              {message}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
+  /* ── Desktop card style ── */
   return (
     <div
+      onClick={dismiss}
       style={{
-        backgroundColor: styles.bg,
-        border: `1px solid ${styles.border}`,
-        borderRadius: isMobile ? '0.5rem' : '0.75rem',
-        padding: isMobile ? '0.875rem' : '1rem',
-        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        pointerEvents: 'auto',
+        width: '100%',
         display: 'flex',
         alignItems: 'flex-start',
-        gap: '0.75rem',
-        pointerEvents: 'auto',
-        animation: isMobile ? 'slideUp 0.3s ease-out' : 'slideIn 0.3s ease-out',
-        width: '100%',
-        minHeight: isMobile ? '60px' : 'auto',
+        gap: '10px',
+        backgroundColor: '#1c1c1e',
+        borderRadius: '12px',
+        padding: '12px 14px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+        cursor: 'pointer',
+        userSelect: 'none',
+        animation: leaving ? 'toastOutRight 0.25s ease-in forwards' : 'toastRight 0.28s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        borderLeft: `3px solid ${dot}`,
       }}
     >
-      <div style={{ flexShrink: 0, marginTop: '0.125rem' }}>{getIcon()}</div>
+      <Icon style={{ width: 16, height: 16, color: dot, flexShrink: 0, marginTop: 1 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h4
-          style={{
-            fontSize: '0.875rem',
-            fontWeight: 600,
-            color: styles.text,
-            marginBottom: '0.25rem',
-          }}
-        >
-          {title}
-        </h4>
-        <p
-          style={{
-            fontSize: '0.875rem',
-            color: styles.text,
-            opacity: 0.8,
-          }}
-        >
-          {message}
-        </p>
+        <p style={{ fontSize: '13px', fontWeight: 600, color: '#ffffff', margin: 0, lineHeight: 1.4 }}>{title}</p>
+        {message && (
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.55)', margin: '2px 0 0', lineHeight: 1.4 }}>{message}</p>
+        )}
       </div>
       <button
-        onClick={() => onRemove(id)}
-        style={{
-          flexShrink: 0,
-          padding: isMobile ? '0.5rem' : '0.25rem',
-          borderRadius: '0.375rem',
-          border: 'none',
-          background: 'transparent',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'background-color 0.2s',
-          minWidth: isMobile ? '44px' : 'auto',
-          minHeight: isMobile ? '44px' : 'auto',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
-        }}
-        aria-label="Close notification"
+        onClick={(e) => { e.stopPropagation(); dismiss(); }}
+        style={{ flexShrink: 0, background: 'none', border: 'none', padding: '2px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+        aria-label="Dismiss"
       >
-        <X className={isMobile ? "h-5 w-5" : "h-4 w-4"} style={{ color: styles.text, opacity: 0.6 }} />
+        <X style={{ width: 13, height: 13, color: 'rgba(255,255,255,0.4)' }} />
       </button>
-      <style>
-        {`
-          @keyframes slideIn {
-            from {
-              transform: translateX(100%);
-              opacity: 0;
-            }
-            to {
-              transform: translateX(0);
-              opacity: 1;
-            }
-          }
 
-          @keyframes slideUp {
-            from {
-              transform: translateY(100%);
-              opacity: 0;
-            }
-            to {
-              transform: translateY(0);
-              opacity: 1;
-            }
-          }
-        `}
-      </style>
     </div>
   );
 };
-

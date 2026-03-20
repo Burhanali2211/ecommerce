@@ -83,7 +83,7 @@ export const ContactSubmissionDetails: React.FC<ContactSubmissionDetailsProps> =
           <button
             onClick={() => handleQuickAction('read')}
             disabled={isUpdating || status === 'read'}
-            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
+            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition disabled:opacity-50"
           >
             Mark as Read
           </button>
@@ -110,7 +110,7 @@ export const ContactSubmissionDetails: React.FC<ContactSubmissionDetailsProps> =
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as any)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-300 focus:border-slate-400"
               >
                 <option value="new">New</option>
                 <option value="read">Read</option>
@@ -133,7 +133,7 @@ export const ContactSubmissionDetails: React.FC<ContactSubmissionDetailsProps> =
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-300 focus:border-slate-400 resize-none"
                   placeholder="Add internal notes about this submission..."
                 />
               </div>
@@ -141,7 +141,7 @@ export const ContactSubmissionDetails: React.FC<ContactSubmissionDetailsProps> =
               <button
                 onClick={handleSave}
                 disabled={isUpdating}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition disabled:opacity-50"
               >
                 <Save className="h-4 w-4" />
                 Save Changes
@@ -169,7 +169,7 @@ export const ContactSubmissionDetails: React.FC<ContactSubmissionDetailsProps> =
                   <div className="text-sm text-gray-500">Email</div>
                   <a 
                     href={`mailto:${submission.email}`}
-                    className="text-sm font-medium text-amber-600 hover:text-amber-700"
+                    className="text-sm font-medium text-slate-700 hover:text-slate-900"
                   >
                     {submission.email}
                   </a>
@@ -182,7 +182,7 @@ export const ContactSubmissionDetails: React.FC<ContactSubmissionDetailsProps> =
                     <div className="text-sm text-gray-500">Phone</div>
                     <a 
                       href={`tel:${submission.phone}`}
-                      className="text-sm font-medium text-amber-600 hover:text-amber-700"
+                      className="text-sm font-medium text-slate-700 hover:text-slate-900"
                     >
                       {submission.phone}
                     </a>
@@ -208,10 +208,10 @@ export const ContactSubmissionDetails: React.FC<ContactSubmissionDetailsProps> =
                 <div className="text-sm text-gray-500">Current Status</div>
                 <div className="mt-1">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                    status === 'new' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
-                    status === 'read' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-                    status === 'replied' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                    'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                    status === 'new' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                    status === 'read' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                    status === 'replied' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                    'bg-gray-100 text-gray-600 border-gray-200'
                   }`}>
                     {status.charAt(0).toUpperCase() + status.slice(1)}
                   </span>

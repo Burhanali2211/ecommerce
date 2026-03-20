@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -6,14 +6,17 @@ import {
   Edit,
   Trash2,
   Tag,
-  Filter,
+  CheckCircle,
+  Layers,
   X,
   Loader2,
+  ChevronUp,
+  ChevronDown as ChevronDownIcon,
 } from 'lucide-react';
 import { ConfirmModal } from '../../Common/Modal';
 import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
-import { normalizeImageUrl, isValidImageUrl, getSafeImageUrl } from '../../../utils/imageUrlUtils';
+import { getSafeImageUrl, isValidImageUrl } from '../../../utils/imageUrlUtils';
 
 interface Category {
   id: string;
@@ -29,44 +32,67 @@ interface Category {
   created_at: string;
 }
 
+// Module-level cache – survives SPA navigation, cleared on hard refresh
+let _categoriesCache: Category[] | null = null;
+
 export const CategoriesList: React.FC = () => {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>(_categoriesCache ?? []);
+  const [loading, setLoading] = useState(_categoriesCache === null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [sortKey, setSortKey] = useState<'name' | 'parent_name' | 'product_count' | 'is_active' | null>('name');
+  const [sortKey, setSortKey] = useState<'name' | 'parent_name' | 'product_count' | 'is_active'>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const { showSuccess, showError } = useNotification();
+  const isFirstMount = useRef(true);
 
   useEffect(() => {
-    fetchCategories();
-  }, [searchTerm, statusFilter]);
+    const background = isFirstMount.current && _categoriesCache !== null;
+    isFirstMount.current = false;
+    fetchCategories(background);
+  }, []);
 
-  const fetchCategories = async () => {
+  const fetchCategories = async (background = false) => {
     try {
-      setLoading(true);
-      const { data, error } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
+      if (!background) setLoading(true);
+      const [{ data: cats, error }, { data: products }] = await Promise.all([
+        supabase.from('categories').select('*').order('sort_order', { ascending: true }),
+        supabase.from('products').select('category_id'),
+      ]);
       if (error) throw error;
-      setCategories((data || []).map((c: any) => ({ ...c, parent_name: null, product_count: c.product_count ?? 0 })));
+
+      // Build product count map
+      const countMap = (products || []).reduce((acc: Record<string, number>, p: any) => {
+        if (p.category_id) acc[p.category_id] = (acc[p.category_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Resolve parent names client-side
+      const mapped = (cats || []).map((c: any) => ({
+        ...c,
+        parent_name: (cats || []).find((p: any) => p.id === c.parent_id)?.name || null,
+        product_count: countMap[c.id] || 0,
+      }));
+      setCategories(mapped);
+      _categoriesCache = mapped;
     } catch (error: any) {
-      showError('Error', error.message || 'Failed to load categories');
+      if (!background) showError('Error', error.message || 'Failed to load categories');
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   };
 
   const handleDelete = async () => {
     if (!selectedCategory) return;
-
     try {
       setDeleteLoading(true);
       const { error } = await supabase.from('categories').delete().eq('id', selectedCategory.id);
       if (error) throw error;
-      showSuccess('Success', 'Category deleted successfully');
+      _categoriesCache = null; // Invalidate cache after mutation
+      showSuccess('Success', 'Category deleted');
       setShowDeleteModal(false);
       setSelectedCategory(null);
       fetchCategories();
@@ -77,12 +103,13 @@ export const CategoriesList: React.FC = () => {
     }
   };
 
-  const handleEdit = (category: Category) => {
-    navigate(`/admin/categories/edit/${category.id}`);
-  };
-
-  const handleAdd = () => {
-    navigate('/admin/categories/add');
+  const handleSort = (key: typeof sortKey) => {
+    if (sortKey === key) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
   };
 
   const filteredCategories = useMemo(() => {
@@ -90,369 +117,312 @@ export const CategoriesList: React.FC = () => {
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter((cat) =>
-        cat.name.toLowerCase().includes(term) ||
-        cat.slug.toLowerCase().includes(term)
+      result = result.filter(
+        cat => cat.name.toLowerCase().includes(term) || cat.slug.toLowerCase().includes(term)
       );
     }
 
     if (statusFilter) {
-      const isActive = statusFilter === 'active';
-      result = result.filter((cat) => cat.is_active === isActive);
+      result = result.filter(cat => cat.is_active === (statusFilter === 'active'));
     }
 
-    if (sortKey) {
-      result.sort((a, b) => {
-        const aVal = a[sortKey];
-        const bVal = b[sortKey];
-
-        // Normalize values for comparison
-        const aNorm = typeof aVal === 'string' ? aVal.toLowerCase() : aVal;
-        const bNorm = typeof bVal === 'string' ? bVal.toLowerCase() : bVal;
-
-        if (aNorm === bNorm) return 0;
-        if (aNorm == null) return 1;
-        if (bNorm == null) return -1;
-
-        const comparison = aNorm > bNorm ? 1 : -1;
-        return sortDirection === 'asc' ? comparison : -comparison;
-      });
-    }
+    result.sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      const aN = typeof aVal === 'string' ? aVal.toLowerCase() : aVal;
+      const bN = typeof bVal === 'string' ? bVal.toLowerCase() : bVal;
+      if (aN === bN) return 0;
+      if (aN == null) return 1;
+      if (bN == null) return -1;
+      const cmp = aN > bN ? 1 : -1;
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
 
     return result;
   }, [categories, searchTerm, statusFilter, sortKey, sortDirection]);
 
   const totalCategories = categories.length;
-  const activeCategories = categories.filter((c) => c.is_active).length;
-  const topLevelCategories = categories.filter((c) => !c.parent_id).length;
+  const activeCategories = categories.filter(c => c.is_active).length;
+  const topLevelCategories = categories.filter(c => !c.parent_id).length;
+  const subCategories = totalCategories - topLevelCategories;
 
-  const getValidImageUrl = (category: Category) => {
-    // Use utility function to normalize and validate image URL
-    const normalizedUrl = getSafeImageUrl(
-      category.image_url,
-      '/placeholder-image.jpg'
+  const SortIcon = ({ col }: { col: typeof sortKey }) =>
+    sortKey === col ? (
+      sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDownIcon className="w-3 h-3" />
+    ) : (
+      <span className="w-3 h-3 opacity-30">↕</span>
     );
-    const isValid = isValidImageUrl(normalizedUrl);
-
-    return {
-      src: normalizedUrl,
-      isValid: isValid,
-    };
-  };
-
-  const hasActiveFilters = searchTerm || statusFilter;
-
-  const handleSort = (key: 'name' | 'parent_name' | 'product_count' | 'is_active') => {
-    setSortKey((currentKey) => {
-      if (currentKey === key) {
-        // Toggle direction when clicking the same column
-        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-        return currentKey;
-      }
-
-      // Switch to a new sort column, reset to ascending
-      setSortDirection('asc');
-      return key;
-    });
-  };
-
-  const getSortIndicator = (key: 'name' | 'parent_name' | 'product_count' | 'is_active') => {
-    if (sortKey !== key) {
-      return '↕';
-    }
-    return sortDirection === 'asc' ? '↑' : '↓';
-  };
 
   return (
-    <div className="space-y-6">
-      {/* Header with icon */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center">
-            <Tag className="w-6 h-6 text-amber-400" />
+          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+            <Tag className="w-5 h-5 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Categories</h1>
-            <p className="text-sm text-white/60 mt-0.5">
-              Organize and manage your product categories
-            </p>
+            <h1 className="text-xl font-bold text-gray-900">Categories</h1>
+            <p className="text-sm text-gray-500">Organize your product categories</p>
           </div>
         </div>
         <button
-          onClick={handleAdd}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/20 min-h-[44px]"
+          onClick={() => navigate('/admin/categories/add')}
+          className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-semibold transition-colors min-h-[44px] shadow-sm"
         >
           <Plus className="h-5 w-5" />
-          <span className="hidden sm:inline">Add Category</span>
-          <span className="sm:hidden">Add</span>
+          <span>Add Category</span>
         </button>
       </div>
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-amber-500/40 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-amber-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Tag className="w-5 h-5 text-amber-300" />
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total', value: totalCategories, icon: Tag, bg: 'bg-amber-50', border: 'border-amber-100', icon_c: 'text-amber-600', val_c: 'text-amber-700' },
+          { label: 'Active', value: activeCategories, icon: CheckCircle, bg: 'bg-emerald-50', border: 'border-emerald-100', icon_c: 'text-emerald-600', val_c: 'text-emerald-700' },
+          { label: 'Top-level', value: topLevelCategories, icon: Layers, bg: 'bg-blue-50', border: 'border-blue-100', icon_c: 'text-blue-600', val_c: 'text-blue-700' },
+          { label: 'Sub-categories', value: subCategories, icon: Layers, bg: 'bg-purple-50', border: 'border-purple-100', icon_c: 'text-purple-600', val_c: 'text-purple-700' },
+        ].map(({ label, value, icon: Icon, bg, border, icon_c, val_c }) => (
+          <div key={label} className={`${bg} border ${border} rounded-xl p-4`}>
+            <div className={`w-8 h-8 ${bg} rounded-lg flex items-center justify-center mb-2`}>
+              <Icon className={`w-4 h-4 ${icon_c}`} />
             </div>
+            <p className="text-xs text-gray-500 font-medium">{label}</p>
+            <p className={`text-2xl font-bold ${val_c}`}>{value}</p>
           </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Total Categories</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{totalCategories}</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-emerald-500/40 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-emerald-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Tag className="w-5 h-5 text-emerald-300" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Active Categories</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{activeCategories}</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-blue-500/40 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-blue-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Tag className="w-5 h-5 text-blue-300" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Top-level Categories</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{topLevelCategories}</p>
-        </div>
-
-        <div className="hidden lg:block bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-purple-500/40 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-10 h-10 bg-purple-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Tag className="w-5 h-5 text-purple-300" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Sub-categories</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">
-            {totalCategories - topLevelCategories}
-          </p>
-        </div>
+        ))}
       </div>
 
       {/* Filters */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-5 h-5 text-white/60" />
-          <h3 className="text-lg font-semibold text-white">Filters</h3>
-          {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('');
-              }}
-              className="ml-auto flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
-              Clear All
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search categories..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white placeholder-white/40 transition-all"
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm text-gray-900 placeholder-gray-400"
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all"
+            onChange={e => setStatusFilter(e.target.value)}
+            className="px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm text-gray-900 bg-white min-w-[140px]"
           >
-            <option value="" className="bg-gray-900">
-              All Status
-            </option>
-            <option value="active" className="bg-gray-900">
-              Active
-            </option>
-            <option value="inactive" className="bg-gray-900">
-              Inactive
-            </option>
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
+          {(searchTerm || statusFilter) && (
+            <button
+              onClick={() => { setSearchTerm(''); setStatusFilter(''); }}
+              className="flex items-center gap-1.5 px-3 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors"
+            >
+              <X className="w-4 h-4" /> Clear
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
+      {/* List */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="w-12 h-12 text-amber-400 animate-spin mx-auto mb-4" />
-            <p className="text-white/60">Loading categories...</p>
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 text-amber-500 animate-spin mb-3" />
+            <p className="text-gray-500 text-sm">Loading categories...</p>
           </div>
         ) : filteredCategories.length === 0 ? (
-          <div className="p-12 text-center">
-            <Tag className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60">No categories found</p>
+          <div className="flex flex-col items-center justify-center py-16">
+            <Tag className="w-10 h-10 text-gray-300 mb-3" />
+            <p className="text-gray-500 text-sm">No categories found</p>
+            {(searchTerm || statusFilter) && (
+              <button
+                onClick={() => { setSearchTerm(''); setStatusFilter(''); }}
+                className="mt-2 text-amber-600 text-sm hover:underline"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-white/5 border-b border-white/10">
-                  <th className="text-left text-white/60 text-sm font-medium p-4 w-[60px]">
-                    Image
-                  </th>
-                  <th className="text-left text-white/60 text-sm font-medium p-4">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('name')}
-                      className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                    >
-                      <span>Name</span>
-                      <span className="text-xs opacity-70">
-                        {getSortIndicator('name')}
-                      </span>
-                    </button>
-                  </th>
-                  <th className="text-left text-white/60 text-sm font-medium p-4">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('parent_name')}
-                      className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                    >
-                      <span>Parent</span>
-                      <span className="text-xs opacity-70">
-                        {getSortIndicator('parent_name')}
-                      </span>
-                    </button>
-                  </th>
-                  <th className="text-left text-white/60 text-sm font-medium p-4">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('product_count')}
-                      className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                    >
-                      <span>Products</span>
-                      <span className="text-xs opacity-70">
-                        {getSortIndicator('product_count')}
-                      </span>
-                    </button>
-                  </th>
-                  <th className="text-left text-white/60 text-sm font-medium p-4">
-                    <button
-                      type="button"
-                      onClick={() => handleSort('is_active')}
-                      className="inline-flex items-center gap-1 hover:text-white transition-colors"
-                    >
-                      <span>Status</span>
-                      <span className="text-xs opacity-70">
-                        {getSortIndicator('is_active')}
-                      </span>
-                    </button>
-                  </th>
-                  <th className="text-left text-white/60 text-sm font-medium p-4 w-[90px]">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10">
-                {filteredCategories.map((category) => {
-                  const image = getValidImageUrl(category);
-                  return (
-                    <tr
-                      key={category.id}
-                      className="hover:bg-white/5 transition-colors"
-                    >
-                      <td className="p-4">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center">
-                          {image.isValid ? (
-                            <img
-                              src={image.src}
-                              alt={category.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = '/placeholder-image.jpg';
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-white/40 text-xs">
-                              No Image
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="min-w-0">
-                          <p className="font-medium text-xs sm:text-sm text-white truncate">
-                            {category.name}
-                          </p>
-                          <p className="text-xs text-white/60 truncate">
-                            {category.slug}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span className="text-xs sm:text-sm text-white/80 truncate">
-                          {category.parent_name || '-'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                          {category.product_count || 0}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full border ${
-                            category.is_active
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : 'bg-white/5 text-white/60 border-white/20'
-                          }`}
+          <>
+            {/* ── MOBILE: card list (hidden sm+) ── */}
+            <div className="sm:hidden divide-y divide-gray-100">
+              {filteredCategories.map(category => {
+                const imgSrc = getSafeImageUrl(category.image_url, '');
+                const hasImage = isValidImageUrl(imgSrc);
+                return (
+                  <div key={category.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    {/* Row 1: image + name + actions */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 flex items-center justify-center">
+                        {hasImage ? (
+                          <img src={imgSrc} alt={category.name} className="w-full h-full object-cover"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : (
+                          <Tag className="w-5 h-5 text-gray-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{category.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{category.slug}</p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => navigate(`/admin/categories/edit/${category.id}`)}
+                          className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                          aria-label="Edit"
                         >
-                          {category.is_active ? 'Active' : 'Inactive'}
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { setSelectedCategory(category); setShowDeleteModal(true); }}
+                          className="p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                    {/* Row 2: badges */}
+                    <div className="flex flex-wrap items-center gap-2 mt-2.5 ml-15">
+                      {category.parent_name ? (
+                        <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-xs">
+                          ↳ {category.parent_name}
                         </span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-1 sm:gap-2">
-                          <button
-                            onClick={() => handleEdit(category)}
-                            className="p-2 text-blue-400 hover:bg-blue-500/20 active:bg-blue-500/30 rounded-lg transition-all hover:scale-110"
-                            title="Edit"
-                            aria-label="Edit category"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedCategory(category);
-                              setShowDeleteModal(true);
-                            }}
-                            className="p-2 text-red-400 hover:bg-red-500/20 active:bg-red-500/30 rounded-lg transition-all hover:scale-110"
-                            title="Delete"
-                            aria-label="Delete category"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">
+                          Top-level
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold border border-indigo-100">
+                        {category.product_count} products
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                        category.is_active
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                          : 'bg-gray-100 text-gray-500 border-gray-200'
+                      }`}>
+                        {category.is_active ? '● Active' : '○ Inactive'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── DESKTOP: table (hidden on mobile) ── */}
+            <div className="hidden sm:block">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 w-14">Img</th>
+                    <th className="text-left px-4 py-3">
+                      <button type="button" onClick={() => handleSort('name')}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
+                        Name <SortIcon col="name" />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 hidden md:table-cell">
+                      <button type="button" onClick={() => handleSort('parent_name')}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
+                        Parent <SortIcon col="parent_name" />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <button type="button" onClick={() => handleSort('product_count')}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
+                        Products <SortIcon col="product_count" />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3">
+                      <button type="button" onClick={() => handleSort('is_active')}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700">
+                        Status <SortIcon col="is_active" />
+                      </button>
+                    </th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredCategories.map(category => {
+                    const imgSrc = getSafeImageUrl(category.image_url, '');
+                    const hasImage = isValidImageUrl(imgSrc);
+                    return (
+                      <tr key={category.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0 flex items-center justify-center">
+                            {hasImage ? (
+                              <img src={imgSrc} alt={category.name} className="w-full h-full object-cover"
+                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            ) : (
+                              <Tag className="w-4 h-4 text-gray-400" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-sm text-gray-900 truncate max-w-[200px]">{category.name}</p>
+                          <p className="text-xs text-gray-400 truncate max-w-[200px]">{category.slug}</p>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          {category.parent_name ? (
+                            <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs">
+                              {category.parent_name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">Top-level</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                            {category.product_count}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                            category.is_active
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              : 'bg-gray-100 text-gray-500 border-gray-200'
+                          }`}>
+                            {category.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => navigate(`/admin/categories/edit/${category.id}`)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit" aria-label="Edit category"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setSelectedCategory(category); setShowDeleteModal(true); }}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete" aria-label="Delete category"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setSelectedCategory(null);
-        }}
+        onClose={() => { setShowDeleteModal(false); setSelectedCategory(null); }}
         onConfirm={handleDelete}
         title="Delete Category"
-        message={`Are you sure you want to delete "${selectedCategory?.name}"? This action cannot be undone.`}
+        message={`Delete "${selectedCategory?.name}"? This cannot be undone.`}
         confirmText="Delete"
         variant="danger"
         loading={deleteLoading}
@@ -460,4 +430,3 @@ export const CategoriesList: React.FC = () => {
     </div>
   );
 };
-

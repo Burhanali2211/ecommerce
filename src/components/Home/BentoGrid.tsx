@@ -53,6 +53,7 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ categories, loading }) => 
             <img
               src={getCatImage(featuredCat, 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800')}
               alt={featuredCat.name}
+              crossOrigin="anonymous"
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800'; }}
             />
@@ -82,6 +83,7 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ categories, loading }) => 
             <img
               src={getCatImage(secondaryCats[0], fallbackImages[0])}
               alt={secondaryCats[0].name}
+              crossOrigin="anonymous"
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               onError={(e) => { (e.target as HTMLImageElement).src = fallbackImages[0]; }}
             />
@@ -101,6 +103,7 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ categories, loading }) => 
             <img
               src={getCatImage(secondaryCats[1], fallbackImages[1])}
               alt={secondaryCats[1].name}
+              crossOrigin="anonymous"
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               onError={(e) => { (e.target as HTMLImageElement).src = fallbackImages[1]; }}
             />
@@ -140,6 +143,7 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ categories, loading }) => 
             <img
               src={getCatImage(secondaryCats[2], fallbackImages[2])}
               alt={secondaryCats[2].name}
+              crossOrigin="anonymous"
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               onError={(e) => { (e.target as HTMLImageElement).src = fallbackImages[2]; }}
             />
@@ -159,6 +163,7 @@ export const BentoGrid: React.FC<BentoGridProps> = ({ categories, loading }) => 
             <img
               src={getCatImage(secondaryCats[4], fallbackImages[4])}
               alt={secondaryCats[4].name}
+              crossOrigin="anonymous"
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               onError={(e) => { (e.target as HTMLImageElement).src = fallbackImages[4]; }}
             />

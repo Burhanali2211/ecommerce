@@ -1,6 +1,6 @@
 import React from 'react';
 import { Shield, Truck, Clock, Award, Users, Globe, Zap, Star } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 const stats = [
   { label: "Happy Customers", value: "50k+", icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
@@ -33,7 +33,7 @@ const features = [
 ];
 
 export const LovedByThousands: React.FC = () => {
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -43,9 +43,9 @@ export const LovedByThousands: React.FC = () => {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } }
   };
 
   return (

@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link, Routes, Route } from 'react-router-dom';
+import { Link, Routes, Route, useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Edit, Trash2, Eye, MoreVertical, Package, TrendingUp, AlertTriangle } from 'lucide-react';
 import { SellerDashboardLayout } from '../Layout/SellerDashboardLayout';
 import { DataTable, Column } from '../../Common/DataTable';
 import { ConfirmModal } from '../../Common/Modal';
 import { apiClient } from '../../../lib/apiClient';
 import { useNotification } from '../../../contexts/NotificationContext';
-import { ProductForm } from '../../Admin/Products/ProductForm';
 
 interface Product {
   id: string;
@@ -23,6 +22,7 @@ interface Product {
 }
 
 const ProductsList: React.FC = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,7 +30,6 @@ const ProductsList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -162,10 +161,7 @@ const ProductsList: React.FC = () => {
       render: (product) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              setSelectedProduct(product);
-              setShowFormModal(true);
-            }}
+            onClick={() => navigate(`/admin/products/edit/${product.id}`)}
             className="p-2 text-cyan-400 hover:bg-cyan-500/20 rounded-lg transition-colors"
             title="Edit"
           >
@@ -251,10 +247,7 @@ const ProductsList: React.FC = () => {
               <p className="text-white/60 text-sm">Manage your products</p>
             </div>
             <button
-              onClick={() => {
-                setSelectedProduct(null);
-                setShowFormModal(true);
-              }}
+              onClick={() => navigate('/admin/products/add')}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl font-medium hover:from-cyan-600 hover:to-blue-600 transition-all"
             >
               <Plus className="h-5 w-5" />
@@ -319,23 +312,6 @@ const ProductsList: React.FC = () => {
           />
         </div>
       </div>
-
-      {/* Product Form Modal */}
-      {showFormModal && (
-        <ProductForm
-          product={selectedProduct}
-          onClose={() => {
-            setShowFormModal(false);
-            setSelectedProduct(null);
-          }}
-          onSuccess={() => {
-            setShowFormModal(false);
-            setSelectedProduct(null);
-            fetchProducts();
-          }}
-          endpointPrefix="/seller"
-        />
-      )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal

@@ -81,21 +81,51 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSettings = useCallback(async () => {
+  const CACHE_KEY = 'public_settings_cache';
+  const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+  const readCache = (): PublicSettings | null => {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const { data, expiresAt } = JSON.parse(raw);
+      if (Date.now() > expiresAt) { sessionStorage.removeItem(CACHE_KEY); return null; }
+      return data;
+    } catch { return null; }
+  };
+
+  const writeCache = (data: PublicSettings) => {
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, expiresAt: Date.now() + CACHE_TTL_MS }));
+    } catch { /* sessionStorage full — skip */ }
+  };
+
+  const fetchSettings = useCallback(async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = readCache();
+      if (cached) {
+        setSettings(cached);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
       setLoading(true);
       setError(null);
-      
+
       const settingsData = await db.getAllPublicSettings();
-      
+
       if (settingsData) {
-        setSettings({
+        const resolved: PublicSettings = {
           siteSettings: settingsData.siteSettings || [],
           socialMedia: settingsData.socialMedia || [],
           contactInfo: settingsData.contactInfo || [],
           footerLinks: settingsData.footerLinks || [],
           businessHours: settingsData.businessHours || []
-        });
+        };
+        setSettings(resolved);
+        writeCache(resolved);
       }
     } catch (err: any) {
       console.error('Error fetching public settings:', err);
@@ -116,7 +146,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     fetchSettings();
 
     const handleSettingsUpdate = () => {
-      fetchSettings();
+      sessionStorage.removeItem('public_settings_cache');
+      fetchSettings(true); // force refetch bypassing cache
     };
 
     window.addEventListener('settingsUpdated', handleSettingsUpdate);

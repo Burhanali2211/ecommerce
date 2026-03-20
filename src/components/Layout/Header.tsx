@@ -1,371 +1,238 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, User, Menu, Heart, LogOut, ChevronDown, X } from 'lucide-react';
+import { Search, ShoppingCart, User, Heart, ChevronDown, LogOut, Leaf } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
-import { SearchOverlay } from './SearchOverlay';
-import { useSettings } from '../../contexts/SettingsContext';
 import { useProducts } from '../../contexts/ProductContext';
-import MobileNavigation from './MobileNavigation';
-import { SiteLogo } from '../Common/SiteLogo';
+import { SearchOverlay } from './SearchOverlay';
 
 interface HeaderProps {
   onAuthClick: () => void;
   onCartClick: () => void;
 }
 
-interface DropdownItem {
-  name: string;
-  href: string;
-}
-
-interface NavigationItem {
-  name: string;
-  href: string;
-  hasDropdown?: boolean;
-  dropdownItems?: DropdownItem[];
-}
-
 export const Header: React.FC<HeaderProps> = ({ onAuthClick, onCartClick }) => {
   const { user, logout } = useAuth();
   const { itemCount } = useCart();
   const { items: wishlistItems } = useWishlist();
-  const { getSiteSetting } = useSettings();
   const { categories } = useProducts();
-
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isShopDropdownOpen, setIsShopDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-
   const location = useLocation();
   const navigate = useNavigate();
-
   const userMenuRef = useRef<HTMLDivElement>(null);
   const shopDropdownRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  const siteName = getSiteSetting('site_name') || 'Himalayan Spices Exports';
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/products?q=${encodeURIComponent(searchQuery)}`);
       setSearchQuery('');
-      setIsSearchExpanded(false);
     }
   };
 
-  const navigationItems: NavigationItem[] = useMemo(() => {
-    const items: NavigationItem[] = [
-      { name: 'Home', href: '/' },
-      {
-        name: 'Shop',
-        href: '/products',
-        hasDropdown: categories.length > 0,
-        dropdownItems: categories.length > 0 ? categories
-          .filter(category => category.isActive !== false)
-          .map(category => ({
-            name: category.name,
-            href: `/products?category=${category.slug || category.id}`
-          })) : undefined
-      },
-      { name: 'New Arrivals', href: '/new-arrivals' },
-      { name: 'Offers', href: '/deals' },
-      { name: 'About', href: '/about' },
-    ];
-    return items;
-  }, [categories]);
-
-  const isActiveLink = (href: string) => {
-    if (href === '/') return location.pathname === '/';
-    return location.pathname.startsWith(href);
-  };
-
-  // Detect scroll
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    setIsUserMenuOpen(false);
+    setIsShopDropdownOpen(false);
+  }, [location.pathname]);
 
-  // Close dropdowns on outside click
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
-      if (shopDropdownRef.current && !shopDropdownRef.current.contains(event.target as Node)) {
-        setIsShopDropdownOpen(false);
-      }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setIsUserMenuOpen(false);
+      if (shopDropdownRef.current && !shopDropdownRef.current.contains(e.target as Node)) setIsShopDropdownOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Close menus on route change
   useEffect(() => {
-    setIsUserMenuOpen(false);
-    setIsShopDropdownOpen(false);
-    setIsSearchExpanded(false);
-    setIsSearchOpen(false);
-  }, [location.pathname]);
-
-  // Escape key handler
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsUserMenuOpen(false);
-        setIsShopDropdownOpen(false);
-        setIsSearchExpanded(false);
-        setIsSearchOpen(false);
-      }
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        setIsScrolled(window.scrollY > 4);
+        ticking = false;
+      });
     };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Focus search input when expanded
-  useEffect(() => {
-    if (isSearchExpanded && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [isSearchExpanded]);
+  const categoryItems = useMemo(() => categories.filter(c => c.isActive !== false), [categories]);
+  const isActive = (path: string) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
   return (
     <>
-      <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled
-            ? 'bg-white/95 backdrop-blur-md shadow-sm'
-            : 'bg-white'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto">
-          {/* Main Header Row */}
-          <div className="flex items-center justify-between h-16 px-4 lg:px-6">
-            {/* Left: Logo */}
+      <header className={`fixed top-0 left-0 right-0 z-50 bg-white transition-shadow duration-200 ${isScrolled ? 'shadow-md' : 'border-b border-gray-100'}`}>
+
+        {/* ROW 1: Logo · Search · Icons */}
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex items-center gap-3 h-14">
+
+          {/* Logo wordmark */}
+          <Link
+            to="/"
+            className="flex items-center gap-2 flex-shrink-0"
+            onClick={() => window.scrollTo(0, 0)}
+          >
+            <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center flex-shrink-0">
+              <Leaf className="w-4 h-4 text-white" />
+            </div>
+            <div className="leading-none">
+              <span className="block text-[13px] font-black text-gray-900 tracking-tight">Aligarh</span>
+              <span className="block text-[10px] font-semibold text-gray-400 tracking-widest uppercase">Attars</span>
+            </div>
+          </Link>
+
+          {/* Desktop search */}
+          <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 mx-4">
+            <div className="relative flex w-full max-w-xl">
+              <input
+                type="text"
+                placeholder="Search spices, herbs, teas, gifts..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-4 pr-12 py-2 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:bg-white focus:border-gray-300 transition-all placeholder-gray-400"
+              />
+              <button
+                type="submit"
+                className="absolute right-0 top-0 bottom-0 px-3.5 text-gray-500 hover:text-gray-800 transition-colors"
+              >
+                <Search className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
+
+          {/* Action icons */}
+          <div className="flex items-center gap-1 ml-auto">
+
+            {/* Wishlist — desktop only */}
             <Link
-              to="/"
-              className="flex items-center gap-2 flex-shrink-0 group"
-              onClick={() => window.scrollTo(0, 0)}
+              to="/wishlist"
+              className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all hidden sm:flex"
+              aria-label="Wishlist"
             >
-              <SiteLogo size="md" />
-              <span className="font-semibold text-base sm:text-lg text-gray-900 tracking-tight">
-                {siteName.split(' ').slice(0, 2).join(' ')}
-              </span>
+              <Heart className="h-5 w-5" />
+              {wishlistItems.length > 0 && (
+                <span className="absolute top-1 right-1 h-3.5 w-3.5 bg-gray-900 text-white text-[8px] font-black rounded-full flex items-center justify-center leading-none">
+                  {wishlistItems.length > 9 ? '9+' : wishlistItems.length}
+                </span>
+              )}
             </Link>
 
-            {/* Center: Navigation (Desktop) */}
-            <nav className="hidden lg:flex items-center gap-1">
-              {navigationItems.map((item) => (
-                <div key={item.name} className="relative" ref={item.hasDropdown ? shopDropdownRef : undefined}>
-                  {item.hasDropdown ? (
-                    <>
-                      <button
-                        onClick={() => setIsShopDropdownOpen(!isShopDropdownOpen)}
-                        className={`flex items-center gap-1 px-4 py-2 text-sm font-medium rounded-full transition-all ${
-                          isActiveLink(item.href)
-                            ? 'text-amber-700 bg-amber-50'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                        }`}
-                      >
-                        {item.name}
-                        <ChevronDown className={`h-4 w-4 transition-transform ${isShopDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      
-                      {/* Shop Dropdown */}
-                      {isShopDropdownOpen && (
-                        <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-                          <Link
-                            to={item.href}
-                            className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
-                            onClick={() => setIsShopDropdownOpen(false)}
-                          >
-                            All Products
-                          </Link>
-                          {item.dropdownItems?.map((dropdownItem) => (
-                            <Link
-                              key={dropdownItem.name}
-                              to={dropdownItem.href}
-                              className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-amber-50 hover:text-amber-700 transition-colors"
-                              onClick={() => setIsShopDropdownOpen(false)}
-                            >
-                              {dropdownItem.name}
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <Link
-                      to={item.href}
-                      className={`px-4 py-2 text-sm font-medium rounded-full transition-all ${
-                        isActiveLink(item.href)
-                          ? 'text-amber-700 bg-amber-50'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                      }`}
-                    >
-                      {item.name}
-                    </Link>
-                  )}
-                </div>
-              ))}
-            </nav>
-
-            {/* Right: Actions */}
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* Desktop Search */}
-              <div className="hidden md:flex items-center">
-                {isSearchExpanded ? (
-                  <form onSubmit={handleSearchSubmit} className="flex items-center">
-                    <div className="relative">
-                      <input
-                        ref={searchInputRef}
-                        type="text"
-                        placeholder="Search products..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-64 pl-4 pr-10 py-2 text-sm bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100 transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSearchExpanded(false);
-                          setSearchQuery('');
-                        }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <button
-                    onClick={() => setIsSearchExpanded(true)}
-                    className="p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
-                    aria-label="Search"
-                  >
-                    <Search className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Wishlist */}
-              <Link
-                to="/wishlist"
-                className="relative p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all hidden sm:flex"
-                aria-label="Wishlist"
+            {/* User — desktop only */}
+            <div className="relative hidden sm:block" ref={userMenuRef}>
+              <button
+                onClick={() => user ? setIsUserMenuOpen(!isUserMenuOpen) : navigate('/auth')}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                aria-label={user ? 'My account' : 'Sign in'}
               >
-                <Heart className="h-5 w-5" />
-                {wishlistItems.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-rose-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                    {wishlistItems.length > 9 ? '9+' : wishlistItems.length}
-                  </span>
-                )}
+                <User className="h-4.5 w-4.5 h-[18px] w-[18px]" />
+                <span className="text-xs font-medium hidden lg:block">
+                  {user ? (user.name?.split(' ')[0] || 'Account') : 'Sign in'}
+                </span>
+              </button>
+
+              {isUserMenuOpen && user && (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+                  <div className="px-4 pb-2 mb-1 border-b border-gray-100">
+                    <p className="font-semibold text-sm text-gray-900 truncate">{user.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                  </div>
+                  <Link to="/dashboard" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900" onClick={() => setIsUserMenuOpen(false)}>
+                    <User className="h-4 w-4" /> My Profile
+                  </Link>
+                  <Link to="/orders" className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900" onClick={() => setIsUserMenuOpen(false)}>
+                    <ShoppingCart className="h-4 w-4" /> My Orders
+                  </Link>
+                  <div className="border-t border-gray-100 mt-1 pt-1">
+                    <button onClick={() => { logout(); setIsUserMenuOpen(false); }} className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50">
+                      <LogOut className="h-4 w-4" /> Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Cart */}
+            <button
+              onClick={onCartClick}
+              className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+              aria-label="Cart"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {itemCount > 0 && (
+                <span className="absolute top-1 right-1 h-4 w-4 bg-gray-900 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none">
+                  {itemCount > 9 ? '9+' : itemCount}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* MOBILE ROW 2: Search bar */}
+        <div className="md:hidden px-4 pb-2.5">
+          <form onSubmit={handleSearchSubmit}>
+            <div className="relative flex">
+              <input
+                type="text"
+                placeholder="Search spices, herbs, teas..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-4 pr-12 py-2 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:bg-white focus:border-gray-300 transition-all placeholder-gray-400"
+              />
+              <button type="submit" className="absolute right-0 top-0 bottom-0 px-3.5 text-gray-500 hover:text-gray-800 transition-colors">
+                <Search className="h-4 w-4" />
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* DESKTOP ROW 2: Nav bar */}
+        <div className="hidden md:block border-t border-gray-100">
+          <div className="max-w-7xl mx-auto px-6">
+            <nav className="flex items-center h-9 gap-1 text-sm">
+              <Link to="/" className={`px-3 h-full flex items-center font-medium border-b-2 transition-colors ${isActive('/') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}>
+                Home
               </Link>
-
-              {/* User Menu */}
-              <div className="relative" ref={userMenuRef}>
+              <div className="relative h-full flex items-center" ref={shopDropdownRef}>
                 <button
-                  onClick={() => user ? setIsUserMenuOpen(!isUserMenuOpen) : navigate('/auth')}
-                  className="p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all hidden sm:flex"
-                  aria-label={user ? 'Account menu' : 'Sign in'}
+                  onClick={() => setIsShopDropdownOpen(!isShopDropdownOpen)}
+                  className={`flex items-center gap-1 px-3 h-full font-medium border-b-2 transition-colors ${isActive('/products') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}
                 >
-                  <User className="h-5 w-5" />
+                  Shop <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isShopDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
-
-                {/* User Dropdown */}
-                {isUserMenuOpen && user && (
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 py-3 z-50">
-                    <div className="px-4 pb-3 border-b border-gray-100">
-                      <p className="font-semibold text-gray-900">{user.name}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
-                    </div>
-                    <div className="py-2">
-                      <Link
-                        to="/dashboard"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                        onClick={() => setIsUserMenuOpen(false)}
-                      >
-                        <User className="h-4 w-4" />
-                        My Profile
+                {isShopDropdownOpen && (
+                  <div className="absolute top-full left-0 w-52 bg-white shadow-xl border border-gray-100 rounded-xl py-2 z-50 mt-0.5">
+                    <Link to="/products" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 font-medium" onClick={() => setIsShopDropdownOpen(false)}>All Products</Link>
+                    <div className="border-t border-gray-100 my-1" />
+                    {categoryItems.slice(0, 8).map(cat => (
+                      <Link key={cat.id} to={`/products?category=${cat.slug || cat.id}`} className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900" onClick={() => setIsShopDropdownOpen(false)}>
+                        {cat.name}
                       </Link>
-                      <Link
-                        to="/orders"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                        onClick={() => setIsUserMenuOpen(false)}
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                        My Orders
-                      </Link>
-                    </div>
-                    <div className="pt-2 border-t border-gray-100">
-                      <button
-                        onClick={() => {
-                          logout();
-                          setIsUserMenuOpen(false);
-                        }}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        Sign Out
-                      </button>
-                    </div>
+                    ))}
                   </div>
                 )}
               </div>
-
-              {/* Cart */}
-              <button
-                onClick={onCartClick}
-                className="relative p-1.5 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
-                aria-label="Cart"
-              >
-                <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
-                {itemCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                    {itemCount > 9 ? '9+' : itemCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Mobile: Search Button */}
-              <button
-                onClick={() => setIsSearchOpen(true)}
-                className="p-1.5 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all md:hidden"
-                aria-label="Search"
-              >
-                <Search className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
-
-              {/* Mobile: Menu Button */}
-              <button
-                onClick={() => setIsMenuOpen(true)}
-                className="p-1.5 sm:p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all lg:hidden"
-                aria-label="Menu"
-              >
-                <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
-            </div>
+              <Link to="/new-arrivals" className={`px-3 h-full flex items-center font-medium border-b-2 transition-colors ${isActive('/new-arrivals') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}>
+                New Arrivals
+              </Link>
+              <Link to="/deals" className={`px-3 h-full flex items-center font-medium border-b-2 transition-colors ${isActive('/deals') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}>
+                Deals
+              </Link>
+              <Link to="/about" className={`px-3 h-full flex items-center font-medium border-b-2 transition-colors ${isActive('/about') ? 'text-gray-900 border-gray-900' : 'text-gray-500 border-transparent hover:text-gray-900 hover:border-gray-300'}`}>
+                About
+              </Link>
+            </nav>
           </div>
         </div>
+
       </header>
 
-      {/* Mobile Navigation Drawer */}
-      <MobileNavigation
-        isOpen={isMenuOpen}
-        onClose={() => setIsMenuOpen(false)}
-        onCartClick={onCartClick}
-      />
-
-      {/* Mobile Search Overlay */}
       <SearchOverlay isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   );

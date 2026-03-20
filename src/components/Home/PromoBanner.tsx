@@ -1,8 +1,9 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { ArrowRight, Gift, Clock, Truck, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export const PromoBanner: React.FC = () => {
+export const PromoBanner: React.FC = React.memo(() => {
   return (
     <section className="py-16 bg-gradient-to-r from-emerald-600 to-teal-600 text-white relative overflow-hidden">
       {/* Background Pattern */}
@@ -23,7 +24,7 @@ export const PromoBanner: React.FC = () => {
             viewport={{ once: true }}
             className="inline-flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6"
           >
-            <Gift className="h-5 w-5 animate-bounce" />
+            <Gift className="h-5 w-5" />
             <span className="font-semibold">Limited Time Offer</span>
           </motion.div>
 
@@ -106,4 +107,6 @@ export const PromoBanner: React.FC = () => {
       </div>
     </section>
   );
-};
+});
+
+PromoBanner.displayName = 'PromoBanner';

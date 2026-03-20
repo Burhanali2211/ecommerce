@@ -19,7 +19,8 @@ import {
   Link2,
   Mail,
   Warehouse,
-  Store
+  Store,
+  MessageSquare,
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -46,43 +47,61 @@ const navItems: NavItem[] = [
   {
     name: 'Dashboard',
     path: '/admin',
-    icon: <LayoutDashboard className="h-5 w-5" />
+    icon: <LayoutDashboard className="h-5 w-5" />,
   },
   {
     name: 'Products',
     path: '/admin/products',
-    icon: <Package className="h-5 w-5" />
+    icon: <Package className="h-5 w-5" />,
+    subItems: [
+      {
+        name: 'All Products',
+        path: '/admin/products',
+        icon: <Package className="h-4 w-4" />,
+      },
+      {
+        name: 'Categories',
+        path: '/admin/categories',
+        icon: <Tag className="h-4 w-4" />,
+      },
+      {
+        name: 'Inventory',
+        path: '/admin/inventory',
+        icon: <Warehouse className="h-4 w-4" />,
+      },
+      {
+        name: 'Quick Sale',
+        path: '/admin/pos',
+        icon: <Store className="h-4 w-4" />,
+      },
+    ],
   },
-    {
-      name: 'Categories',
-      path: '/admin/categories',
-      icon: <Tag className="h-5 w-5" />
-    },
-    {
-      name: 'Inventory',
-      path: '/admin/inventory',
-      icon: <Warehouse className="h-5 w-5" />
-    },
-    {
-      name: 'POS (Selling)',
-      path: '/admin/pos',
-      icon: <Store className="h-5 w-5" />
-    },
-    {
-      name: 'Orders',
-      path: '/admin/orders',
-      icon: <ShoppingCart className="h-5 w-5" />
-    },
-
   {
-    name: 'Users',
+    name: 'Orders',
+    path: '/admin/orders',
+    icon: <ShoppingCart className="h-5 w-5" />,
+  },
+  {
+    name: 'Customers',
     path: '/admin/users',
-    icon: <Users className="h-5 w-5" />
+    icon: <Users className="h-5 w-5" />,
+    subItems: [
+      {
+        name: 'All Users',
+        path: '/admin/users',
+        icon: <Users className="h-4 w-4" />,
+      },
+      {
+        name: 'Inquiries',
+        path: '/admin/contact-submissions',
+        icon: <MessageSquare className="h-4 w-4" />,
+      },
+    ],
   },
   {
-    name: 'Contact Submissions',
-    path: '/admin/contact-submissions',
-    icon: <Mail className="h-5 w-5" />
+    name: 'Analytics',
+    path: '/admin/analytics',
+    icon: <BarChart3 className="h-5 w-5" />,
   },
   {
     name: 'Settings',
@@ -92,35 +111,30 @@ const navItems: NavItem[] = [
       {
         name: 'Site Settings',
         path: '/admin/settings/site',
-        icon: <Globe className="h-4 w-4" />
+        icon: <Globe className="h-4 w-4" />,
       },
       {
         name: 'Theme',
         path: '/admin/settings/theme',
-        icon: <Palette className="h-4 w-4" />
+        icon: <Palette className="h-4 w-4" />,
       },
       {
         name: 'Social Media',
         path: '/admin/settings/social-media',
-        icon: <Share2 className="h-4 w-4" />
+        icon: <Share2 className="h-4 w-4" />,
       },
       {
         name: 'Contact Info',
         path: '/admin/settings/contact',
-        icon: <Phone className="h-4 w-4" />
+        icon: <Phone className="h-4 w-4" />,
       },
       {
         name: 'Footer Links',
         path: '/admin/settings/footer-links',
-        icon: <Link2 className="h-4 w-4" />
-      }
-    ]
+        icon: <Link2 className="h-4 w-4" />,
+      },
+    ],
   },
-  {
-    name: 'Analytics',
-    path: '/admin/analytics',
-    icon: <BarChart3 className="h-5 w-5" />
-  }
 ];
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
@@ -130,11 +144,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   onMobileToggle
 }) => {
   const location = useLocation();
-  const [expandedItems, setExpandedItems] = useState<string[]>(['/admin/settings']);
+  const [expandedItems, setExpandedItems] = useState<string[]>(['/admin/products', '/admin/settings']);
 
   const isActive = (path: string) => {
     if (path === '/admin') {
       return location.pathname === '/admin' || location.pathname === '/dashboard';
+    }
+    // Customers group: active when on users OR contact-submissions
+    if (path === '/admin/users') {
+      return location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/contact-submissions');
     }
     return location.pathname.startsWith(path);
   };
@@ -295,7 +313,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
           {navItems.map((item) => (
             <div key={item.path}>
               {item.subItems ? (

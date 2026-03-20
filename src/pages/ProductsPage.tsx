@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, memo } from 'react';
 import { useSearchParams, useParams, Link, useNavigate } from 'react-router-dom';
 import {
     Search, Grid3X3, LayoutList, Star, Heart, ShoppingCart, 
@@ -42,6 +42,16 @@ const ProductsPage: React.FC = () => {
         discount: false,
         availability: false
     });
+
+    // Separate price slider state so dragging doesn't trigger full re-filter on every pixel
+    const [priceSliderValue, setPriceSliderValue] = useState(100000);
+    const priceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (priceDebounceRef.current) clearTimeout(priceDebounceRef.current);
+        };
+    }, []);
 
     // Filter State
     const [filters, setFilters] = useState<FilterState>({
@@ -125,70 +135,7 @@ const ProductsPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-[#f7f8f8]">
-            {/* Marketplace Top Section */}
-            <div className="bg-white border-b border-gray-200">
-                <div className="max-w-[1600px] mx-auto px-4 py-3 sm:py-4 md:py-8">
-                   <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
-                      <Link to="/" className="hover:text-[#131921]">Home</Link>
-                      <ChevronRight className="h-3 w-3" />
-                      <span className="text-[#131921]">All Products</span>
-                   </div>
-                   
-                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div>
-                        <h1 className="text-2xl md:text-3xl font-black text-[#131921]">Marketplace Collection</h1>
-                        <p className="text-sm text-gray-500 mt-1">Found {sortedProducts.length} results</p>
-                      </div>
-                      
-                      <div className="flex items-center gap-3">
-                         <div className="relative flex-1 md:w-64">
-                             <input 
-                                type="text"
-                                placeholder="Filter within results..."
-                                value={filters.search}
-                                onChange={(e) => handleFilterChange('search', e.target.value)}
-                                className="w-full h-8 sm:h-10 pl-9 sm:pl-10 pr-3 sm:pr-4 bg-gray-50 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 outline-none"
-                             />
-                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                         </div>
-                         <div className="flex border border-gray-200 rounded-lg overflow-hidden h-8 sm:h-10">
-                            <button 
-                                onClick={() => setViewMode('grid')}
-                                className={`px-2.5 sm:px-3 flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-[#131921] text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
-                            >
-                                <Grid3X3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                            </button>
-                            <button 
-                                onClick={() => setViewMode('list')}
-                                className={`px-2.5 sm:px-3 flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-[#131921] text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
-                            >
-                                <LayoutList className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                            </button>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-            </div>
-
-            <div className="max-w-[1600px] mx-auto px-4 py-4 sm:py-6 lg:py-8 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
-                {/* Mobile Filter Toggle */}
-                <div className="lg:hidden">
-                    <button
-                        onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className="w-full flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 bg-white rounded-lg sm:rounded-xl border border-gray-200 shadow-sm"
-                    >
-                        <div className="flex items-center gap-2">
-                            <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-600" />
-                            <span className="text-xs sm:text-sm font-semibold text-gray-900">Filters</span>
-                            {(filters.category || filters.rating > 0 || filters.discount > 0 || filters.availability !== 'all') && (
-                                <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                                    Active
-                                </span>
-                            )}
-                        </div>
-                        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform duration-300 ${isFilterOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                </div>
+            <div className="max-w-[1600px] mx-auto px-4 pt-3 pb-0 flex flex-col lg:flex-row gap-4 sm:gap-6 lg:gap-8">
 
                 {/* Faceted Sidebar - Hidden on mobile unless open */}
                 <aside className={`w-full lg:w-64 flex-shrink-0 ${isFilterOpen ? 'block' : 'hidden lg:block'}`}>
@@ -265,18 +212,25 @@ const ProductsPage: React.FC = () => {
                             onToggle={() => setExpandedFilters(p => ({ ...p, price: !p.price }))}
                         >
                             <div className="space-y-4 pt-4 px-1">
-                                <input 
-                                    type="range" 
-                                    min="0" 
-                                    max="100000" 
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100000"
                                     step="500"
-                                    value={filters.priceRange[1]}
-                                    onChange={(e) => handleFilterChange('priceRange', [0, parseInt(e.target.value)])}
+                                    value={priceSliderValue}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value);
+                                        setPriceSliderValue(val);
+                                        if (priceDebounceRef.current) clearTimeout(priceDebounceRef.current);
+                                        priceDebounceRef.current = setTimeout(() => {
+                                            handleFilterChange('priceRange', [0, val]);
+                                        }, 300);
+                                    }}
                                     className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#131921]"
                                 />
                                 <div className="flex justify-between text-[10px] font-black text-gray-600">
                                     <span>₹0</span>
-                                    <span>₹{filters.priceRange[1].toLocaleString()}</span>
+                                    <span>₹{priceSliderValue.toLocaleString()}</span>
                                 </div>
                                 <div className="flex gap-2">
                                    <div className="relative flex-1">
@@ -331,23 +285,48 @@ const ProductsPage: React.FC = () => {
 
                 {/* Main Product Area */}
                 <main className="flex-1">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                        <div className="flex items-center gap-4 text-xs font-bold text-gray-500">
-                           <span className="bg-amber-100 text-[#131921] px-2 py-0.5 rounded">Himalayan Spices Exports Best Sellers</span>
-                           <span>Featured Brands</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sort:</span>
-                            <select 
-                                value={filters.sortBy}
-                                onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                                className="h-8 sm:h-9 bg-white border border-gray-200 rounded-lg text-[11px] sm:text-xs font-bold px-2.5 sm:px-3 focus:ring-2 focus:ring-amber-500 outline-none cursor-pointer"
+                    <div className="flex items-center gap-2 mb-3">
+                        {/* Filter icon */}
+                        <button
+                            onClick={() => setIsFilterOpen(!isFilterOpen)}
+                            className={`flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs font-medium transition-colors ${isFilterOpen ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                        >
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Filter</span>
+                            {(filters.category || filters.rating > 0 || filters.discount > 0 || filters.availability !== 'all') && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            )}
+                        </button>
+
+                        {/* Result count */}
+                        <span className="text-xs text-gray-400 flex-1">{sortedProducts.length} products</span>
+
+                        {/* Sort */}
+                        <select
+                            value={filters.sortBy}
+                            onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                            className="h-8 bg-white border border-gray-200 rounded-lg text-xs font-medium px-2.5 focus:outline-none cursor-pointer text-gray-700"
+                        >
+                            <option value="newest">Newest</option>
+                            <option value="price-low-high">Price ↑</option>
+                            <option value="price-high-low">Price ↓</option>
+                            <option value="rating">Top Rated</option>
+                        </select>
+
+                        {/* Grid / List toggle */}
+                        <div className="flex border border-gray-200 rounded-lg overflow-hidden h-8">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`px-2.5 flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
                             >
-                                <option value="newest">Newest Arrivals</option>
-                                <option value="price-low-high">Price: Low to High</option>
-                                <option value="price-high-low">Price: High to Low</option>
-                                <option value="rating">Highest Rated</option>
-                            </select>
+                                <Grid3X3 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`px-2.5 flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-gray-900 text-white' : 'bg-white text-gray-400 hover:bg-gray-50'}`}
+                            >
+                                <LayoutList className="h-3.5 w-3.5" />
+                            </button>
                         </div>
                     </div>
 
@@ -369,20 +348,14 @@ const ProductsPage: React.FC = () => {
                         </div>
                     ) : (
                         <div className={viewMode === 'grid' ? "grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4" : "space-y-3 sm:space-y-4"}>
-                            {sortedProducts.map((product, index) => (
-                                <motion.div
+                            {sortedProducts.map((product) => (
+                                <ProductCard
                                     key={product.id}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: (index % 6) * 0.05 }}
-                                >
-                                    <ProductCard 
-                                        product={product} 
-                                        isListView={viewMode === 'list'} 
-                                        onCompareToggle={toggleCompare}
-                                        isComparing={comparingIds.includes(product.id)}
-                                    />
-                                </motion.div>
+                                    product={product}
+                                    isListView={viewMode === 'list'}
+                                    onCompareToggle={toggleCompare}
+                                    isComparing={comparingIds.includes(product.id)}
+                                />
                             ))}
                         </div>
                     )}
@@ -391,7 +364,7 @@ const ProductsPage: React.FC = () => {
                     {pagination.pages > 1 && (
                         <div className="mt-12 flex justify-center items-center gap-2">
                             <button 
-                                onClick={() => { fetchProducts(pagination.page - 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo(0,0); }}
+                                onClick={() => { fetchProducts(pagination.page - 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                                 disabled={pagination.page === 1}
                                 className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 transition-colors"
                             >
@@ -401,7 +374,7 @@ const ProductsPage: React.FC = () => {
                                 {Array.from({ length: pagination.pages }).map((_, i) => (
                                     <button 
                                         key={i}
-                                        onClick={() => { fetchProducts(i + 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo(0,0); }}
+                                        onClick={() => { fetchProducts(i + 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                                         className={`w-10 h-10 rounded-lg text-sm font-black transition-all ${pagination.page === i + 1 ? 'bg-[#131921] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
                                     >
                                         {i + 1}
@@ -409,7 +382,7 @@ const ProductsPage: React.FC = () => {
                                 ))}
                             </div>
                             <button 
-                                onClick={() => { fetchProducts(pagination.page + 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo(0,0); }}
+                                onClick={() => { fetchProducts(pagination.page + 1, 20, { categoryId: filters.category || undefined, search: filters.search || undefined }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                                 disabled={pagination.page === pagination.pages}
                                 className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-30 transition-colors"
                             >
@@ -481,7 +454,7 @@ const ProductsPage: React.FC = () => {
     );
 };
 
-const FilterSection: React.FC<{ title: string; expanded: boolean; onToggle: () => void; children: React.ReactNode }> = ({ title, expanded, onToggle, children }) => (
+const FilterSection: React.FC<{ title: string; expanded: boolean; onToggle: () => void; children: React.ReactNode }> = memo(({ title, expanded, onToggle, children }) => (
     <div className="border-b border-gray-200 pb-6 mb-6 last:border-0">
         <button onClick={onToggle} className="flex items-center justify-between w-full group">
             <span className="text-sm font-black text-[#131921] group-hover:text-amber-600 transition-colors uppercase tracking-tight">{title}</span>
@@ -501,6 +474,7 @@ const FilterSection: React.FC<{ title: string; expanded: boolean; onToggle: () =
             )}
         </AnimatePresence>
     </div>
-);
+));
+FilterSection.displayName = 'FilterSection';
 
 export default ProductsPage;

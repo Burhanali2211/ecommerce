@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Search, Edit, Trash2, Power, Users as UsersIcon, Filter, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { DataTable, Column } from '../../Common/DataTable';
+import React, { useEffect, useRef, useState } from 'react';
+import { Plus, Search, Edit, Trash2, Power, Users as UsersIcon, Filter, X, Loader2, ChevronLeft, ChevronRight, Shield, ShoppingBag } from 'lucide-react';
 import { ConfirmModal } from '../../Common/Modal';
 import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
@@ -18,80 +17,92 @@ interface User {
   total_spent: string;
 }
 
+const getRoleBadge = (role: string) => {
+  const map: Record<string, string> = {
+    admin: 'bg-purple-100 text-purple-700 border border-purple-200',
+    seller: 'bg-blue-100 text-blue-700 border border-blue-200',
+    customer: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  };
+  return map[role] || 'bg-gray-100 text-gray-600 border border-gray-200';
+};
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+
+// Module-level cache – survives SPA navigation, cleared on hard refresh
+let _usersCache: { users: User[]; totalItems: number; totalPages: number } | null = null;
+
 export const UsersList: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>(_usersCache?.users ?? []);
+  const [loading, setLoading] = useState(_usersCache === null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(_usersCache?.totalPages ?? 1);
+  const [totalItems, setTotalItems] = useState(_usersCache?.totalItems ?? 0);
   const [showFormModal, setShowFormModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const { showSuccess, showError } = useNotification();
+  const isFirstMount = useRef(true);
 
   const pageSize = 10;
 
   useEffect(() => {
-    fetchUsers();
+    const background = isFirstMount.current && _usersCache !== null;
+    isFirstMount.current = false;
+    fetchUsers(background);
   }, [currentPage, searchTerm, roleFilter, statusFilter]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (background = false) => {
     try {
-      setLoading(true);
+      if (!background) setLoading(true);
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
-
       let query = supabase
         .from('profiles')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });
-
       if (roleFilter) query = query.eq('role', roleFilter);
       if (statusFilter === 'active') query = query.eq('is_active', true);
       if (statusFilter === 'inactive') query = query.eq('is_active', false);
       if (searchTerm) query = query.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
-
       const { data, error, count } = await query.range(from, to);
       if (error) throw error;
-
       const rows = (data || []).map((p: any) => ({
-        id: p.id,
-        email: p.email || '',
-        full_name: p.full_name || '',
-        role: p.role || 'customer',
-        is_active: p.is_active !== false,
-        email_verified: true,
-        created_at: p.created_at,
-        order_count: 0,
-        total_spent: '0'
+        id: p.id, email: p.email || '', full_name: p.full_name || '',
+        role: p.role || 'customer', is_active: p.is_active !== false,
+        email_verified: true, created_at: p.created_at, order_count: 0, total_spent: '0'
       }));
+      const ti = count ?? 0;
+      const tp = Math.max(1, Math.ceil(ti / pageSize));
       setUsers(rows);
-      setTotalItems(count ?? 0);
-      setTotalPages(Math.max(1, Math.ceil((count ?? 0) / pageSize)));
+      setTotalItems(ti);
+      setTotalPages(tp);
+      if (currentPage === 1 && !searchTerm && !roleFilter && !statusFilter) {
+        _usersCache = { users: rows, totalItems: ti, totalPages: tp };
+      }
     } catch (error: any) {
-      showError(error.message || 'Failed to load users');
+      if (!background) showError('Error', error.message || 'Failed to load users');
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   };
 
   const handleDelete = async () => {
     if (!selectedUser) return;
-
     try {
       setDeleteLoading(true);
       const { error } = await supabase.from('profiles').update({ is_active: false }).eq('id', selectedUser.id);
       if (error) throw error;
-      showSuccess('User deactivated successfully');
+      showSuccess('Done', 'User deactivated successfully');
       setShowDeleteModal(false);
       setSelectedUser(null);
       fetchUsers();
     } catch (error: any) {
-      showError(error.message || 'Failed to deactivate user');
+      showError('Error', error.message || 'Failed to deactivate user');
     } finally {
       setDeleteLoading(false);
     }
@@ -101,409 +112,287 @@ export const UsersList: React.FC = () => {
     try {
       const { error } = await supabase.from('profiles').update({ is_active: !user.is_active }).eq('id', user.id);
       if (error) throw error;
-      showSuccess(`User ${user.is_active ? 'deactivated' : 'activated'} successfully`);
+      showSuccess('Updated', `User ${user.is_active ? 'deactivated' : 'activated'} successfully`);
       fetchUsers();
     } catch (error: any) {
-      showError(error.message || 'Failed to update user status');
+      showError('Error', error.message || 'Failed to update user status');
     }
   };
 
-  const handleEdit = (user: User) => {
-    setSelectedUser(user);
-    setShowFormModal(true);
-  };
-
-  const handleAdd = () => {
-    setSelectedUser(null);
-    setShowFormModal(true);
-  };
-
-  const handleFormSuccess = () => {
-    setShowFormModal(false);
-    setSelectedUser(null);
-    fetchUsers();
-  };
-
-  const getRoleBadgeColor = (role: string) => {
-    const colors: Record<string, string> = {
-      admin: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-      seller: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      customer: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-    };
-    return colors[role] || 'bg-white/10 text-white/60 border-white/10';
-  };
-
-  const columns: Column<User>[] = [
-    {
-      key: 'full_name',
-      label: 'Name',
-      sortable: true,
-      render: (user) => (
-        <div className="min-w-0">
-          <p className="font-medium text-xs sm:text-sm text-white truncate">{user.full_name}</p>
-          <p className="text-xs text-white/60 truncate">{user.email}</p>
-        </div>
-      )
-    },
-    {
-      key: 'role',
-      label: 'Role',
-      render: (user) => (
-        <span className={`px-2 py-1 text-xs font-medium rounded-lg border ${getRoleBadgeColor(user.role)}`}>
-          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-        </span>
-      )
-    },
-    {
-      key: 'order_count',
-      label: 'Orders',
-      sortable: true,
-      render: (user) => (
-        <span className="text-xs sm:text-sm text-white/80">{user.order_count || 0}</span>
-      )
-    },
-    {
-      key: 'total_spent',
-      label: 'Spent',
-      sortable: true,
-      render: (user) => (
-        <span className="text-xs sm:text-sm font-semibold text-amber-400">
-          ₹{Number(user.total_spent || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-        </span>
-      )
-    },
-    {
-      key: 'is_active',
-      label: 'Status',
-      render: (user) => (
-        <span
-          className={`px-2 py-1 text-xs font-medium rounded-lg border ${user.is_active
-            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-            : 'bg-red-500/20 text-red-400 border-red-500/30'
-            }`}
-        >
-          {user.is_active ? 'Active' : 'Inactive'}
-        </span>
-      )
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      width: '100px',
-      render: (user) => (
-        <div className="flex items-center gap-1 sm:gap-2">
-          <button
-            onClick={() => handleToggleStatus(user)}
-            className={`p-2 rounded-lg transition-all hover:scale-110 ${user.is_active
-              ? 'text-orange-400 hover:bg-orange-500/20 active:bg-orange-500/30'
-              : 'text-emerald-400 hover:bg-emerald-500/20 active:bg-emerald-500/30'
-              }`}
-            title={user.is_active ? 'Deactivate' : 'Activate'}
-            aria-label={user.is_active ? 'Deactivate user' : 'Activate user'}
-          >
-            <Power className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => handleEdit(user)}
-            className="p-2 text-blue-400 hover:bg-blue-500/20 active:bg-blue-500/30 rounded-lg transition-all hover:scale-110"
-            title="Edit"
-            aria-label="Edit user"
-          >
-            <Edit className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => {
-              setSelectedUser(user);
-              setShowDeleteModal(true);
-            }}
-            className="p-2 text-red-400 hover:bg-red-500/20 active:bg-red-500/30 rounded-lg transition-all hover:scale-110"
-            title="Delete"
-            aria-label="Delete user"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      )
-    }
-  ];
-
+  const clearFilters = () => { setSearchTerm(''); setRoleFilter(''); setStatusFilter(''); setCurrentPage(1); };
   const hasActiveFilters = searchTerm || roleFilter || statusFilter;
 
+  const activeCount = users.filter(u => u.is_active).length;
+  const adminCount = users.filter(u => u.role === 'admin').length;
+  const sellerCount = users.filter(u => u.role === 'seller').length;
+
+  const statCards = [
+    { label: 'Total', value: totalItems, icon: UsersIcon, iconCls: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200' },
+    { label: 'Active', value: activeCount, icon: UsersIcon, iconCls: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+    { label: 'Admins', value: adminCount, icon: Shield, iconCls: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200' },
+    { label: 'Sellers', value: sellerCount, icon: ShoppingBag, iconCls: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' },
+  ];
+
+  const Pagination = () => (
+    totalPages > 1 ? (
+      <div className="px-4 py-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <p className="text-xs text-gray-500">
+          Showing <span className="font-medium text-gray-700">{(currentPage - 1) * pageSize + 1}</span>–<span className="font-medium text-gray-700">{Math.min(currentPage * pageSize, totalItems)}</span> of <span className="font-medium text-gray-700">{totalItems}</span>
+        </p>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1}
+            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <ChevronLeft className="h-4 w-4 text-gray-500" />
+          </button>
+          {[...Array(totalPages)].map((_, i) => {
+            const p = i + 1;
+            if (p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)) {
+              return (
+                <button key={p} onClick={() => setCurrentPage(p)}
+                  className={`px-2.5 py-1 rounded-lg text-sm font-medium transition-colors ${p === currentPage ? 'bg-slate-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                  {p}
+                </button>
+              );
+            }
+            if (p === currentPage - 2 || p === currentPage + 2) return <span key={p} className="px-1 text-gray-400 text-sm">…</span>;
+            return null;
+          })}
+          <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages}
+            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <ChevronRight className="h-4 w-4 text-gray-500" />
+          </button>
+        </div>
+      </div>
+    ) : null
+  );
+
   return (
-    <div className="space-y-6">
-      {/* Header with Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-indigo-500/20 rounded-xl flex items-center justify-center">
-              <UsersIcon className="w-6 h-6 text-indigo-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Users</h1>
-              <p className="text-sm text-white/60 mt-0.5">Manage user accounts and permissions</p>
-            </div>
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+            <UsersIcon className="w-5 h-5 text-slate-600" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Users</h1>
+            <p className="text-sm text-gray-500">Manage user accounts and permissions</p>
           </div>
         </div>
         <button
-          onClick={handleAdd}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-amber-500/20"
+          onClick={() => { setSelectedUser(null); setShowFormModal(true); }}
+          className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-medium transition-colors"
         >
-          <Plus className="h-5 w-5" />
-          <span>Add User</span>
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">Add User</span>
+          <span className="sm:hidden">Add</span>
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-indigo-500/20 to-purple-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-indigo-500/30 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 bg-indigo-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <UsersIcon className="w-6 h-6 text-indigo-400" />
+      {/* Stat Cards — compact 4-col always */}
+      <div className="grid grid-cols-4 gap-2 sm:gap-4">
+        {statCards.map((s) => (
+          <div key={s.label} className={`${s.bg} border ${s.border} rounded-xl p-3 sm:p-4`}>
+            <div className={`w-7 h-7 sm:w-8 sm:h-8 bg-white rounded-lg flex items-center justify-center mb-2 shadow-sm`}>
+              <s.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${s.iconCls}`} />
             </div>
+            <p className="text-lg sm:text-2xl font-bold text-gray-900 leading-none">{s.value}</p>
+            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
           </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Total Users</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">{totalItems}</p>
-        </div>
-        <div className="bg-gradient-to-br from-emerald-500/20 to-teal-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-emerald-500/30 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 bg-emerald-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <UsersIcon className="w-6 h-6 text-emerald-400" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Active Users</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">
-            {users.filter(u => u.is_active).length}
-          </p>
-        </div>
-        <div className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-blue-500/30 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 bg-blue-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <UsersIcon className="w-6 h-6 text-blue-400" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Admins</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">
-            {users.filter(u => u.role === 'admin').length}
-          </p>
-        </div>
-        <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-purple-500/30 transition-all group">
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 bg-purple-500/30 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <UsersIcon className="w-6 h-6 text-purple-400" />
-            </div>
-          </div>
-          <p className="text-white/60 text-sm font-medium mb-1">Sellers</p>
-          <p className="text-2xl lg:text-3xl font-bold text-white">
-            {users.filter(u => u.role === 'seller').length}
-          </p>
-        </div>
+        ))}
       </div>
 
       {/* Filters */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-5 h-5 text-white/60" />
-          <h3 className="text-lg font-semibold text-white">Filters</h3>
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="w-4 h-4 text-gray-400" />
+          <span className="text-sm font-medium text-gray-700">Filters</span>
           {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setRoleFilter('');
-                setStatusFilter('');
-                setCurrentPage(1);
-              }}
-              className="ml-auto flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-              <X className="w-4 h-4" />
-              Clear All
+            <button onClick={clearFilters} className="ml-auto flex items-center gap-1 px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-3.5 h-3.5" /> Clear
             </button>
           )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="relative sm:col-span-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search users..."
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white placeholder-white/40 transition-all"
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 text-sm text-gray-900 placeholder-gray-400"
             />
           </div>
-          <select
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all"
-          >
-            <option value="" className="bg-gray-900">All Roles</option>
-            <option value="admin" className="bg-gray-900">Admin</option>
-            <option value="seller" className="bg-gray-900">Seller</option>
-            <option value="customer" className="bg-gray-900">Customer</option>
+          <select value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setCurrentPage(1); }}
+            className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 text-sm text-gray-900">
+            <option value="">All Roles</option>
+            <option value="admin">Admin</option>
+            <option value="seller">Seller</option>
+            <option value="customer">Customer</option>
           </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all"
-          >
-            <option value="" className="bg-gray-900">All Status</option>
-            <option value="active" className="bg-gray-900">Active</option>
-            <option value="inactive" className="bg-gray-900">Inactive</option>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-300 text-sm text-gray-900">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="w-12 h-12 text-amber-400 animate-spin mx-auto mb-4" />
-            <p className="text-white/60">Loading users...</p>
+      {/* Content */}
+      {loading ? (
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Loader2 className="w-8 h-8 text-slate-400 animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Loading users...</p>
+        </div>
+      ) : users.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <UsersIcon className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">No users found</p>
+          {hasActiveFilters && <p className="text-sm text-gray-400 mt-1">Try adjusting your filters</p>}
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          {/* Mobile Cards */}
+          <div className="md:hidden divide-y divide-gray-100">
+            {users.map((user) => (
+              <div key={user.id} className="p-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-semibold text-slate-600">
+                        {(user.full_name || user.email).charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-gray-900 truncate">{user.full_name || '—'}</p>
+                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => handleToggleStatus(user)}
+                      className={`p-2 rounded-lg transition-colors ${user.is_active ? 'text-orange-600 hover:bg-orange-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                      title={user.is_active ? 'Deactivate' : 'Activate'}>
+                      <Power className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => { setSelectedUser(user); setShowFormModal(true); }}
+                      className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => { setSelectedUser(user); setShowDeleteModal(true); }}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-lg ${getRoleBadge(user.role)}`}>
+                    {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                  </span>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-lg border ${user.is_active ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                    {user.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  <span className="text-xs text-gray-400 ml-auto">{formatDate(user.created_at)}</span>
+                </div>
+              </div>
+            ))}
           </div>
-        ) : users.length === 0 ? (
-          <div className="p-12 text-center">
-            <UsersIcon className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60">No users found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
+
+          {/* Desktop Table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-white/5 border-b border-white/10">
-                  {columns.map((column) => (
-                    <th
-                      key={column.key}
-                      className="text-left text-white/60 text-sm font-medium p-4"
-                      style={{ width: column.width }}
-                    >
-                      {column.label}
-                    </th>
-                  ))}
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">User</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Role</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Orders</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Spent</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Status</th>
+                  <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Joined</th>
+                  <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wide px-5 py-3">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/10">
+              <tbody className="divide-y divide-gray-50">
                 {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-white/5 transition-colors">
-                    {columns.map((column) => (
-                      <td key={column.key} className="p-4">
-                        {column.render ? column.render(user) : (user as any)[column.key]}
-                      </td>
-                    ))}
+                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-semibold text-slate-600">
+                            {(user.full_name || user.email).charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm text-gray-900 truncate">{user.full_name || '—'}</p>
+                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`px-2.5 py-1 text-xs font-medium rounded-lg ${getRoleBadge(user.role)}`}>
+                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-700">{user.order_count || 0}</td>
+                    <td className="px-5 py-4">
+                      <span className="text-sm font-semibold text-gray-900">
+                        ₹{Number(user.total_spent || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`px-2.5 py-1 text-xs font-medium rounded-lg border ${user.is_active ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                        {user.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-500">{formatDate(user.created_at)}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-1 justify-end">
+                        <button onClick={() => handleToggleStatus(user)}
+                          className={`p-2 rounded-lg transition-colors ${user.is_active ? 'text-orange-600 hover:bg-orange-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
+                          title={user.is_active ? 'Deactivate' : 'Activate'}>
+                          <Power className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => { setSelectedUser(user); setShowFormModal(true); }}
+                          className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors" title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => { setSelectedUser(user); setShowDeleteModal(true); }}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white/5 px-6 py-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="text-sm text-white/60">
-              Showing{' '}
-              <span className="font-medium text-white">
-                {(currentPage - 1) * pageSize + 1}
-              </span>{' '}
-              to{' '}
-              <span className="font-medium text-white">
-                {Math.min(currentPage * pageSize, totalItems)}
-              </span>{' '}
-              of <span className="font-medium text-white">{totalItems}</span> users
-            </div>
-
-            <div className="flex items-center justify-center gap-2">
-              <button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white/60 hover:text-white"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, index) => {
-                  const page = index + 1;
-                  if (
-                    page === 1 ||
-                    page === totalPages ||
-                    (page >= currentPage - 1 && page <= currentPage + 1)
-                  ) {
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                          page === currentPage
-                            ? 'bg-amber-500 text-white'
-                            : 'text-white/60 hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  } else if (
-                    page === currentPage - 2 ||
-                    page === currentPage + 2
-                  ) {
-                    return (
-                      <span key={page} className="px-2 text-white/40">
-                        ...
-                      </span>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white/60 hover:text-white"
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+          <Pagination />
+        </div>
+      )}
 
       {/* User Form Modal */}
       {showFormModal && (
         <UserForm
           user={selectedUser}
-          onClose={() => {
-            setShowFormModal(false);
-            setSelectedUser(null);
-          }}
-          onSuccess={handleFormSuccess}
+          onClose={() => { setShowFormModal(false); setSelectedUser(null); }}
+          onSuccess={() => { setShowFormModal(false); setSelectedUser(null); fetchUsers(); }}
         />
       )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setSelectedUser(null);
-        }}
+        onClose={() => { setShowDeleteModal(false); setSelectedUser(null); }}
         onConfirm={handleDelete}
-        title="Delete User"
-        message={`Are you sure you want to delete "${selectedUser?.full_name}"? This action cannot be undone.`}
-        confirmText="Delete"
+        title="Deactivate User"
+        message={`Are you sure you want to deactivate "${selectedUser?.full_name}"?`}
+        confirmText="Deactivate"
         variant="danger"
         loading={deleteLoading}
       />
     </div>
   );
 };
-

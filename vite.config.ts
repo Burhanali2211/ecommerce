@@ -23,6 +23,32 @@ export default defineConfig({
     exclude: [], // Ensure all deps are optimized
   },
   build: {
-    chunkSizeWarningLimit: 2000000,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Core React — smallest chunk, loaded first
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router-dom/') || id.includes('node_modules/scheduler/')) {
+            return 'vendor-react';
+          }
+          // Heavy animation lib — separate so pages that don't need it skip it
+          if (id.includes('node_modules/framer-motion/')) {
+            return 'vendor-motion';
+          }
+          // Icon lib — large, shared across all pages
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'vendor-icons';
+          }
+          // Supabase — only loaded on data-fetching paths
+          if (id.includes('node_modules/@supabase/')) {
+            return 'vendor-supabase';
+          }
+          // Recharts — admin dashboard only; public pages should never load this
+          if (id.includes('node_modules/recharts/') || id.includes('node_modules/d3-') || id.includes('node_modules/victory-')) {
+            return 'vendor-charts';
+          }
+        },
+      },
+    },
   },
 });

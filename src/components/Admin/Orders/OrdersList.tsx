@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Search, Eye, Filter, X, ShoppingCart, DollarSign, Clock, 
-  TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
-  Package, Truck, CheckCircle, AlertCircle, Loader2, ChevronLeft, ChevronRight,
-  BarChart3, RefreshCw
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import {
+  Search, Eye, Filter, X, ShoppingCart, DollarSign, Clock,
+  AlertCircle, Loader2, ChevronLeft, ChevronRight,
+  BarChart3, RefreshCw, ArrowUpRight
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useNotification } from '../../../contexts/NotificationContext';
@@ -12,10 +11,9 @@ import {
   getOrderStatusConfig,
   getPaymentStatusConfig,
   getPaymentMethodConfig,
+  getAdminStatusClasses,
   ORDER_STATUS_CONFIG,
   PAYMENT_STATUS_CONFIG,
-  OrderStatus,
-  PaymentStatus
 } from '../../../utils/orderStatusUtils';
 
 interface Order {
@@ -42,70 +40,98 @@ interface OrderStats {
   statusBreakdown: Record<string, number>;
 }
 
+// Module-level cache – survives SPA navigation, cleared on hard refresh
+let _ordersCache: { orders: Order[]; totalItems: number; totalPages: number } | null = null;
+let _orderStatsCache: OrderStats | null = null;
+
 export const OrdersList: React.FC = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [stats, setStats] = useState<OrderStats | null>(null);
+  const [orders, setOrders] = useState<Order[]>(_ordersCache?.orders ?? []);
+  const [loading, setLoading] = useState(_ordersCache === null);
+  const [statsLoading, setStatsLoading] = useState(_orderStatsCache === null);
+  const [stats, setStats] = useState<OrderStats | null>(_orderStatsCache);
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(_ordersCache?.totalPages ?? 1);
+  const [totalItems, setTotalItems] = useState(_ordersCache?.totalItems ?? 0);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const { showNotification } = useNotification();
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstMount = useRef(true);
+
+  const handleSearchChange = useCallback((value: string) => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, []);
 
   const pageSize = 10;
 
   useEffect(() => {
-    fetchOrders();
-    fetchStats();
+    const background = isFirstMount.current && _orderStatsCache !== null;
+    fetchStats(background);
+  }, []);
+  useEffect(() => {
+    const background = isFirstMount.current && _ordersCache !== null;
+    isFirstMount.current = false;
+    fetchOrders(background);
   }, [currentPage, searchTerm, statusFilter, paymentStatusFilter]);
 
-  const fetchStats = async () => {
+  const fetchStats = async (background = false) => {
     try {
-      setStatsLoading(true);
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('status, total_amount, payment_status, created_at')
-        .limit(200);
-      const orders = ordersData || [];
+      if (!background) setStatsLoading(true);
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const [
+        { count: totalOrders },
+        { count: pendingOrders },
+        { count: ordersToday },
+        { data: revenueRows },
+        { data: todayRevenueRows },
+        { data: paidRows },
+        { data: statusRows },
+      ] = await Promise.all([
+        supabase.from('orders').select('*', { count: 'exact', head: true }),
+        supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('orders').select('*', { count: 'exact', head: true }).gte('created_at', todayStart.toISOString()),
+        supabase.from('orders').select('total_amount').in('status', ['delivered', 'shipped']),
+        supabase.from('orders').select('total_amount').in('status', ['delivered', 'shipped']).gte('created_at', todayStart.toISOString()),
+        supabase.from('orders').select('total_amount').eq('payment_status', 'paid'),
+        supabase.from('orders').select('status'),
+      ]);
+
+      const totalRevenue = (revenueRows || []).reduce((s, o: any) => s + parseFloat(o.total_amount || '0'), 0);
+      const revenueToday = (todayRevenueRows || []).reduce((s, o: any) => s + parseFloat(o.total_amount || '0'), 0);
+      const paidTotal = (paidRows || []).reduce((s, o: any) => s + parseFloat(o.total_amount || '0'), 0);
+      const avgOrderValue = paidRows && paidRows.length > 0 ? paidTotal / paidRows.length : 0;
+
       const statusBreakdown: Record<string, number> = {};
-      orders.forEach((o: Order) => {
+      (statusRows || []).forEach((o: any) => {
         statusBreakdown[o.status] = (statusBreakdown[o.status] || 0) + 1;
       });
-      const paidOrders = orders.filter((o: Order) => o.payment_status === 'paid');
-      const totalPaidAmount = paidOrders.reduce((sum: number, o: Order) => sum + parseFloat(o.total_amount || '0'), 0);
-      const avgOrderValue = paidOrders.length > 0 ? totalPaidAmount / paidOrders.length : 0;
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      const ordersToday = orders.filter((o: any) => o.created_at && new Date(o.created_at) >= todayStart).length;
-      const revenueToday = orders
-        .filter((o: any) => o.created_at && new Date(o.created_at) >= todayStart && (o.status === 'delivered' || o.status === 'shipped'))
-        .reduce((s: number, o: Order) => s + parseFloat(o.total_amount || '0'), 0);
-      const totalRevenue = orders
-        .filter((o: Order) => o.status === 'delivered' || o.status === 'shipped')
-        .reduce((s: number, o: Order) => s + parseFloat(o.total_amount || '0'), 0);
 
-      setStats({
-        totalOrders: orders.length,
-        totalRevenue,
-        pendingOrders: statusBreakdown['pending'] || 0,
-        ordersToday,
-        revenueToday,
-        avgOrderValue,
-        statusBreakdown
-      });
-    } catch (error: any) {
-      console.error('Failed to load stats:', error);
+      const newStats: OrderStats = { totalOrders: totalOrders ?? 0, totalRevenue, pendingOrders: pendingOrders ?? 0, ordersToday: ordersToday ?? 0, revenueToday, avgOrderValue, statusBreakdown };
+      setStats(newStats);
+      _orderStatsCache = newStats;
+    } catch {
+      // non-critical
     } finally {
-      setStatsLoading(false);
+      if (!background) setStatsLoading(false);
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (background = false) => {
     try {
-      setLoading(true);
+      if (!background) setLoading(true);
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
 
@@ -116,7 +142,7 @@ export const OrdersList: React.FC = () => {
 
       if (statusFilter) query = query.eq('status', statusFilter);
       if (paymentStatusFilter) query = query.eq('payment_status', paymentStatusFilter);
-      if (searchTerm) query = query.or(`order_number.ilike.%${searchTerm}%,id.ilike.%${searchTerm}%`);
+      if (searchTerm) query = query.ilike('order_number', `%${searchTerm}%`);
 
       const { data, error, count } = await query.range(from, to);
       if (error) throw error;
@@ -129,63 +155,40 @@ export const OrdersList: React.FC = () => {
         (profiles || []).forEach((p: any) => { profileMap[p.id] = p; });
       }
 
-      const ordersWithCustomer = ordersRaw.map((o: any) => ({
+      const mappedOrders = ordersRaw.map((o: any) => ({
         ...o,
         customer_name: profileMap[o.user_id]?.full_name || 'Guest',
-        customer_email: profileMap[o.user_id]?.email || ''
+        customer_email: profileMap[o.user_id]?.email || '',
       }));
-
-      setOrders(ordersWithCustomer);
-      setTotalItems(count ?? 0);
-      setTotalPages(Math.max(1, Math.ceil((count ?? 0) / pageSize)));
+      const ti = count ?? 0;
+      const tp = Math.max(1, Math.ceil(ti / pageSize));
+      setOrders(mappedOrders);
+      setTotalItems(ti);
+      setTotalPages(tp);
+      // Cache only the default (page 1, no filters) result
+      if (currentPage === 1 && !searchTerm && !statusFilter && !paymentStatusFilter) {
+        _ordersCache = { orders: mappedOrders, totalItems: ti, totalPages: tp };
+      }
     } catch (error: any) {
-      showNotification({
-        type: 'error',
-        title: 'Error',
-        message: error.message || 'Failed to load orders'
-      });
+      if (!background) showNotification({ type: 'error', title: 'Error', message: error.message || 'Failed to load orders' });
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   };
 
-  const formatCurrency = (amount: number | string) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+  const fmt = (amount: number | string) => {
+    const n = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'shipped': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'processing': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'confirmed': return 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
-      case 'pending': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'refunded': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-white/10 text-white/60 border-white/10';
-    }
-  };
-
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'pending': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'failed': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'refunded': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-white/10 text-white/60 border-white/10';
-    }
-  };
-
-  const renderStatusBadge = (status: string, isPayment: boolean = false) => {
+  const renderStatusBadge = (status: string, isPayment = false) => {
     const config = isPayment ? getPaymentStatusConfig(status) : getOrderStatusConfig(status);
     const Icon = config.icon;
-    const colorClasses = isPayment ? getPaymentStatusColor(status) : getStatusColor(status);
-
+    const cls = getAdminStatusClasses(status, isPayment);
     return (
-      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium ${colorClasses}`}>
+      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium ${cls}`}>
         <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="truncate">{config.label}</span>
+        <span>{config.label}</span>
       </div>
     );
   };
@@ -193,197 +196,126 @@ export const OrdersList: React.FC = () => {
   const renderPaymentMethod = (method: string) => {
     const config = getPaymentMethodConfig(method);
     const Icon = config.icon;
-
     return (
       <div className="inline-flex items-center gap-1.5">
-        <Icon className="h-4 w-4 text-white/60 flex-shrink-0" />
-        <span className="text-xs text-white/80 truncate">{config.label}</span>
+        <Icon className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />
+        <span className="text-xs text-gray-700">{config.label}</span>
       </div>
     );
   };
-
 
   if (selectedOrderId) {
     return (
       <OrderDetails
         orderId={selectedOrderId}
-        onClose={() => {
-          setSelectedOrderId(null);
-          fetchOrders();
-          fetchStats();
-        }}
+        onClose={() => { setSelectedOrderId(null); fetchOrders(); fetchStats(); }}
       />
     );
   }
 
-  const hasActiveFilters = searchTerm || statusFilter || paymentStatusFilter;
+  const hasActiveFilters = searchInput || statusFilter || paymentStatusFilter;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center">
-              <ShoppingCart className="w-6 h-6 text-amber-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Orders</h1>
-              <p className="text-sm text-white/60 mt-0.5">Manage and track all customer orders</p>
-            </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <ShoppingCart className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Orders</h1>
+            <p className="text-sm text-gray-500">Manage and track customer orders</p>
           </div>
         </div>
         <button
-          onClick={() => {
-            fetchOrders();
-            fetchStats();
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-medium text-white transition-all hover:scale-105 active:scale-95"
+          onClick={() => { fetchOrders(); fetchStats(); }}
+          className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl font-medium text-sm text-gray-700 transition-colors min-h-[44px] flex-shrink-0"
         >
-          <RefreshCw className="h-5 w-5" />
-          <span>Refresh</span>
+          <RefreshCw className="h-4 w-4" />
+          <span className="hidden sm:inline">Refresh</span>
         </button>
       </div>
 
-      {/* Stats List - Horizontal Design */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
-          {/* Total Orders */}
-          <div className="p-6 hover:bg-white/5 transition-colors group">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center group-hover:bg-amber-500/30 transition-colors">
-                  <ShoppingCart className="w-5 h-5 text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Total Orders</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {statsLoading ? (
-                      <span className="inline-block w-16 h-7 bg-white/10 rounded animate-pulse" />
-                    ) : (
-                      stats?.totalOrders || 0
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-            {stats && stats.ordersToday > 0 && (
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30">
-                  <ArrowUpRight className="w-3 h-3" />
-                  <span className="font-medium">{stats.ordersToday} today</span>
-                </div>
-              </div>
-            )}
+      {/* Stats grid — matches Products/Categories style */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+          <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center mb-2">
+            <ShoppingCart className="w-4 h-4 text-amber-600" />
           </div>
+          <p className="text-xs text-gray-500 font-medium">Total Orders</p>
+          {statsLoading
+            ? <div className="h-8 w-16 bg-amber-100 rounded animate-pulse mt-1" />
+            : <p className="text-2xl font-bold text-amber-700">{stats?.totalOrders ?? 0}</p>
+          }
+          {stats && stats.ordersToday > 0 && (
+            <p className="text-xs text-amber-600 mt-1 flex items-center gap-0.5">
+              <ArrowUpRight className="w-3 h-3" />{stats.ordersToday} today
+            </p>
+          )}
+        </div>
 
-          {/* Total Revenue */}
-          <div className="p-6 hover:bg-white/5 transition-colors group">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center group-hover:bg-emerald-500/30 transition-colors">
-                  <DollarSign className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Total Revenue</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {statsLoading ? (
-                      <span className="inline-block w-24 h-7 bg-white/10 rounded animate-pulse" />
-                    ) : (
-                      stats ? formatCurrency(stats.totalRevenue) : '₹0'
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-            {stats && stats.revenueToday > 0 && (
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30">
-                  <ArrowUpRight className="w-3 h-3" />
-                  <span className="font-medium">{formatCurrency(stats.revenueToday)} today</span>
-                </div>
-              </div>
-            )}
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center mb-2">
+            <DollarSign className="w-4 h-4 text-emerald-600" />
           </div>
+          <p className="text-xs text-gray-500 font-medium">Revenue</p>
+          {statsLoading
+            ? <div className="h-8 w-20 bg-emerald-100 rounded animate-pulse mt-1" />
+            : <p className="text-2xl font-bold text-emerald-700">{fmt(stats?.totalRevenue ?? 0)}</p>
+          }
+          {stats && stats.revenueToday > 0 && (
+            <p className="text-xs text-emerald-600 mt-1 flex items-center gap-0.5">
+              <ArrowUpRight className="w-3 h-3" />{fmt(stats.revenueToday)} today
+            </p>
+          )}
+        </div>
 
-          {/* Pending Orders */}
-          <div className="p-6 hover:bg-white/5 transition-colors group">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center group-hover:bg-orange-500/30 transition-colors">
-                  <Clock className="w-5 h-5 text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Pending Orders</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {statsLoading ? (
-                      <span className="inline-block w-16 h-7 bg-white/10 rounded animate-pulse" />
-                    ) : (
-                      stats?.pendingOrders || 0
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-            {stats && stats.pendingOrders > 0 && (
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 rounded-lg border border-orange-500/30">
-                  <AlertCircle className="w-3 h-3" />
-                  <span className="font-medium">Needs attention</span>
-                </div>
-              </div>
-            )}
+        <div className="bg-orange-50 border border-orange-100 rounded-xl p-4">
+          <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mb-2">
+            <Clock className="w-4 h-4 text-orange-600" />
           </div>
+          <p className="text-xs text-gray-500 font-medium">Pending</p>
+          {statsLoading
+            ? <div className="h-8 w-12 bg-orange-100 rounded animate-pulse mt-1" />
+            : <p className="text-2xl font-bold text-orange-700">{stats?.pendingOrders ?? 0}</p>
+          }
+          {stats && stats.pendingOrders > 0 && (
+            <p className="text-xs text-orange-600 mt-1">Need attention</p>
+          )}
+        </div>
 
-          {/* Avg Order Value */}
-          <div className="p-6 hover:bg-white/5 transition-colors group">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center group-hover:bg-blue-500/30 transition-colors">
-                  <BarChart3 className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Avg Order Value</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {statsLoading ? (
-                      <span className="inline-block w-24 h-7 bg-white/10 rounded animate-pulse" />
-                    ) : (
-                      stats ? formatCurrency(stats.avgOrderValue) : '₹0'
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-            {stats && stats.avgOrderValue > 0 && (
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-blue-400 rounded-lg border border-blue-500/30">
-                  <TrendingUp className="w-3 h-3" />
-                  <span className="font-medium">Per order</span>
-                </div>
-              </div>
-            )}
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+          <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
+            <BarChart3 className="w-4 h-4 text-blue-600" />
           </div>
+          <p className="text-xs text-gray-500 font-medium">Avg Order</p>
+          {statsLoading
+            ? <div className="h-8 w-16 bg-blue-100 rounded animate-pulse mt-1" />
+            : <p className="text-2xl font-bold text-blue-700">{fmt(stats?.avgOrderValue ?? 0)}</p>
+          }
         </div>
       </div>
 
-      {/* Order Status Distribution */}
-      {stats && stats.statusBreakdown && Object.keys(stats.statusBreakdown).length > 0 && (
-        <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-          <h3 className="text-lg font-semibold text-white mb-4">Order Status Distribution</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      {/* Status breakdown chips */}
+      {stats && Object.keys(stats.statusBreakdown).length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Status Breakdown</p>
+          <div className="flex flex-wrap gap-2">
             {Object.entries(stats.statusBreakdown).map(([status, count]) => {
               const config = getOrderStatusConfig(status);
+              const cls = getAdminStatusClasses(status, false);
               const Icon = config.icon;
-              const colorClasses = getStatusColor(status);
-              
               return (
-                <div key={status} className={`${colorClasses} rounded-xl p-3 border`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Icon className="h-4 w-4" />
-                    <span className="text-xs font-medium">{config.label}</span>
-                  </div>
-                  <p className="text-xl font-bold">{count}</p>
-                </div>
+                <button
+                  key={status}
+                  onClick={() => { setStatusFilter(statusFilter === status ? '' : status); setCurrentPage(1); }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${cls} ${statusFilter === status ? 'ring-2 ring-offset-1 ring-amber-400' : 'hover:opacity-80'}`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {config.label}
+                  <span className="font-bold ml-0.5">{count}</span>
+                </button>
               );
             })}
           </div>
@@ -391,316 +323,235 @@ export const OrdersList: React.FC = () => {
       )}
 
       {/* Filters */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5 text-white/60" />
-            <h3 className="text-lg font-semibold text-white">Filters</h3>
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by order number..."
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); handleSearchChange(e.target.value); }}
+              className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm text-gray-900 placeholder-gray-400"
+            />
           </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm text-gray-900 bg-white"
+          >
+            <option value="">All Status</option>
+            {Object.entries(ORDER_STATUS_CONFIG).map(([key, cfg]) => (
+              <option key={key} value={key}>{cfg.label}</option>
+            ))}
+          </select>
+          <select
+            value={paymentStatusFilter}
+            onChange={(e) => { setPaymentStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm text-gray-900 bg-white"
+          >
+            <option value="">All Payments</option>
+            {Object.entries(PAYMENT_STATUS_CONFIG).map(([key, cfg]) => (
+              <option key={key} value={key}>{cfg.label}</option>
+            ))}
+          </select>
           {hasActiveFilters && (
             <button
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('');
-                setPaymentStatusFilter('');
-                setCurrentPage(1);
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              onClick={() => { setSearchInput(''); setSearchTerm(''); setStatusFilter(''); setPaymentStatusFilter(''); setCurrentPage(1); }}
+              className="flex items-center gap-1.5 px-3 py-2.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors"
             >
               <X className="h-4 w-4" />
-              Clear All
+              Clear
             </button>
           )}
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="relative col-span-1 sm:col-span-2 lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/40" />
-            <input
-              type="text"
-              placeholder="Search orders..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white placeholder-white/40 transition-all"
-            />
-          </div>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all"
-          >
-            <option value="" className="bg-gray-900">All Order Status</option>
-            {Object.entries(ORDER_STATUS_CONFIG).map(([key, config]) => (
-              <option key={key} value={key} className="bg-gray-900">{config.label}</option>
-            ))}
-          </select>
-
-          <select
-            value={paymentStatusFilter}
-            onChange={(e) => {
-              setPaymentStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500/50 text-sm text-white transition-all"
-          >
-            <option value="" className="bg-gray-900">All Payment Status</option>
-            {Object.entries(PAYMENT_STATUS_CONFIG).map(([key, config]) => (
-              <option key={key} value={key} className="bg-gray-900">{config.label}</option>
-            ))}
-          </select>
-
-          <div className="flex items-center justify-end sm:justify-start">
-            <span className="text-sm text-white/60">
-              {totalItems > 0 ? `${totalItems} order${totalItems !== 1 ? 's' : ''}` : 'No orders'}
-            </span>
-          </div>
-        </div>
+        {totalItems > 0 && (
+          <p className="text-xs text-gray-400 mt-2">{totalItems} order{totalItems !== 1 ? 's' : ''} found</p>
+        )}
       </div>
 
-      {/* Orders List - Responsive Design */}
-      <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
+      {/* Mobile card list */}
+      <div className="lg:hidden space-y-2">
         {loading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="w-12 h-12 text-amber-400 animate-spin mx-auto mb-4" />
-            <p className="text-white/60">Loading orders...</p>
+          <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+            <Loader2 className="w-6 h-6 text-amber-500 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-gray-500">Loading orders...</p>
           </div>
         ) : orders.length === 0 ? (
-          <div className="p-12 text-center">
-            <ShoppingCart className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60">No orders found</p>
+          <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+            <ShoppingCart className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No orders found</p>
           </div>
         ) : (
           <>
-            {/* Mobile/Tablet Card View */}
-            <div className="block lg:hidden divide-y divide-white/10">
-              {orders.map((order) => (
-                <div
-                  key={order.id}
-                  className="p-4 hover:bg-white/5 transition-colors"
-                  onClick={() => setSelectedOrderId(order.id)}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <p className="font-semibold text-base text-white truncate">{order.order_number}</p>
-                        {renderStatusBadge(order.status, false)}
-                      </div>
-                      <p className="text-xs text-white/60 mb-2">
-                        {new Date(order.created_at).toLocaleDateString('en-IN', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
+            {orders.map((order) => (
+              <div
+                key={order.id}
+                className="bg-white border border-gray-200 rounded-xl p-4"
+                onClick={() => setSelectedOrderId(order.id)}
+              >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <p className="font-semibold text-sm text-gray-900">{order.order_number}</p>
+                      {renderStatusBadge(order.status)}
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-lg text-amber-400 mb-1">
-                        {formatCurrency(order.total_amount)}
-                      </p>
-                      {order.item_count && (
-                        <p className="text-xs text-white/60">{order.item_count} item{order.item_count !== 1 ? 's' : ''}</p>
-                      )}
-                    </div>
+                    <p className="text-xs text-gray-500">
+                      {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <p className="text-xs text-white/60 mb-1">Customer</p>
-                      <p className="text-sm font-medium text-white truncate">{order.customer_name}</p>
-                      <p className="text-xs text-white/60 truncate">{order.customer_email}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-white/60 mb-1">Payment</p>
-                      <div className="mb-1">{renderPaymentMethod(order.payment_method)}</div>
-                      {renderStatusBadge(order.payment_status, true)}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedOrderId(order.id);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg font-medium transition-colors border border-amber-500/30"
-                  >
-                    <Eye className="h-4 w-4" />
-                    <span>View Details</span>
-                  </button>
+                  <p className="font-bold text-base text-amber-600 flex-shrink-0">{fmt(order.total_amount)}</p>
                 </div>
-              ))}
-            </div>
 
-            {/* Desktop Table View */}
-            <div className="hidden lg:block">
-              <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30">
-                <style>{`
-                  .scrollbar-thin::-webkit-scrollbar {
-                    height: 8px;
-                  }
-                  .scrollbar-thin::-webkit-scrollbar-track {
-                    background: transparent;
-                  }
-                  .scrollbar-thin::-webkit-scrollbar-thumb {
-                    background-color: rgba(255, 255, 255, 0.2);
-                    border-radius: 4px;
-                  }
-                  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-                    background-color: rgba(255, 255, 255, 0.3);
-                  }
-                `}</style>
-                <table className="w-full min-w-[1000px]">
-                  <thead>
-                    <tr className="bg-white/5 border-b border-white/10">
-                      <th className="text-left text-white/60 text-sm font-medium p-3 whitespace-nowrap">Order #</th>
-                      <th className="text-left text-white/60 text-sm font-medium p-3 whitespace-nowrap">Date & Time</th>
-                      <th className="text-left text-white/60 text-sm font-medium p-3 whitespace-nowrap min-w-[200px]">Customer</th>
-                      <th className="text-right text-white/60 text-sm font-medium p-3 whitespace-nowrap">Amount</th>
-                      <th className="text-left text-white/60 text-sm font-medium p-3 whitespace-nowrap">Items</th>
-                      <th className="text-left text-white/60 text-sm font-medium p-3 whitespace-nowrap">Order Status</th>
-                      <th className="text-left text-white/60 text-sm font-medium p-3 whitespace-nowrap">Payment Method</th>
-                      <th className="text-left text-white/60 text-sm font-medium p-3 whitespace-nowrap">Payment Status</th>
-                      <th className="text-center text-white/60 text-sm font-medium p-3 whitespace-nowrap">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/10">
-                    {orders.map((order) => (
-                      <tr key={order.id} className="hover:bg-white/5 transition-colors">
-                        <td className="p-3">
-                          <p className="font-semibold text-sm text-white whitespace-nowrap">{order.order_number}</p>
-                        </td>
-                        <td className="p-3">
-                          <p className="text-xs text-white/60 whitespace-nowrap">
-                            {new Date(order.created_at).toLocaleDateString('en-IN', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                          </p>
-                          <p className="text-xs text-white/60 whitespace-nowrap">
-                            {new Date(order.created_at).toLocaleTimeString('en-IN', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </td>
-                        <td className="p-3 min-w-[200px]">
-                          <p className="font-medium text-sm text-white truncate">{order.customer_name || 'N/A'}</p>
-                          <p className="text-xs text-white/60 truncate">{order.customer_email || 'N/A'}</p>
-                        </td>
-                        <td className="p-3 text-right">
-                          <p className="font-semibold text-sm text-amber-400 whitespace-nowrap">
-                            {formatCurrency(order.total_amount)}
-                          </p>
-                        </td>
-                        <td className="p-3">
-                          <p className="text-sm text-white/80 whitespace-nowrap">
-                            {order.item_count || 0} {order.item_count === 1 ? 'item' : 'items'}
-                          </p>
-                        </td>
-                        <td className="p-3">
-                          {renderStatusBadge(order.status, false)}
-                        </td>
-                        <td className="p-3">
-                          {renderPaymentMethod(order.payment_method)}
-                        </td>
-                        <td className="p-3">
-                          {renderStatusBadge(order.payment_status, true)}
-                        </td>
-                        <td className="p-3">
-                          <button
-                            onClick={() => setSelectedOrderId(order.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 text-amber-400 hover:bg-amber-500/20 active:bg-amber-500/30 rounded-lg transition-all hover:scale-105 whitespace-nowrap"
-                            title="View Details"
-                            aria-label="View order details"
-                          >
-                            <Eye className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-xs font-medium">View</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
+                  <div>
+                    <p className="text-gray-400 mb-0.5">Customer</p>
+                    <p className="font-medium text-gray-900 truncate">{order.customer_name}</p>
+                    <p className="text-gray-500 truncate">{order.customer_email}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 mb-0.5">Payment</p>
+                    <div className="mb-1">{renderPaymentMethod(order.payment_method)}</div>
+                    {renderStatusBadge(order.payment_status, true)}
+                  </div>
+                </div>
+
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSelectedOrderId(order.id); }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg font-medium text-sm transition-colors border border-amber-200"
+                >
+                  <Eye className="h-4 w-4" />
+                  View Details
+                </button>
+              </div>
+            ))}
+
+            {/* Mobile pagination */}
+            <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <p className="text-xs text-gray-500">
+                {totalItems > 0 ? `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalItems)} of ${totalItems}` : '0'}
+              </p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}
+                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 transition-colors">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="px-2 text-xs font-medium text-gray-700">{currentPage} / {totalPages}</span>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages}
+                  className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 transition-colors">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
           </>
         )}
+      </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white/5 px-6 py-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="text-sm text-white/60">
-              Showing{' '}
-              <span className="font-medium text-white">
-                {(currentPage - 1) * pageSize + 1}
-              </span>{' '}
-              to{' '}
-              <span className="font-medium text-white">
-                {Math.min(currentPage * pageSize, totalItems)}
-              </span>{' '}
-              of <span className="font-medium text-white">{totalItems}</span> orders
-            </div>
+      {/* Desktop table */}
+      <div className="hidden lg:block bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Order #</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Customer</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Order Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-20">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center">
+                    <Loader2 className="w-6 h-6 text-amber-500 animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Loading orders...</p>
+                  </td>
+                </tr>
+              ) : orders.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center">
+                    <ShoppingCart className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No orders found</p>
+                  </td>
+                </tr>
+              ) : (
+                orders.map((order) => (
+                  <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-gray-900">{order.order_number}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-gray-700 whitespace-nowrap">
+                        {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 max-w-[180px]">
+                      <p className="font-medium text-gray-900 truncate">{order.customer_name}</p>
+                      <p className="text-xs text-gray-400 truncate">{order.customer_email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <p className="font-semibold text-amber-600 whitespace-nowrap">{fmt(order.total_amount)}</p>
+                    </td>
+                    <td className="px-4 py-3">{renderStatusBadge(order.status)}</td>
+                    <td className="px-4 py-3">
+                      <div className="space-y-1">
+                        {renderStatusBadge(order.payment_status, true)}
+                        <div>{renderPaymentMethod(order.payment_method)}</div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => setSelectedOrderId(order.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors font-medium min-h-[40px]"
+                        aria-label="View order details"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="text-xs">View</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-            <div className="flex items-center justify-center gap-2">
-              <button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white/60 hover:text-white"
-                aria-label="Previous page"
-              >
+        {/* Desktop pagination */}
+        {!loading && orders.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalItems)} of {totalItems} orders
+            </p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}
+                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 transition-colors">
                 <ChevronLeft className="h-4 w-4" />
               </button>
-
-              <div className="flex items-center gap-1">
-                {[...Array(totalPages)].map((_, index) => {
-                  const page = index + 1;
-                  if (
-                    page === 1 ||
-                    page === totalPages ||
-                    (page >= currentPage - 1 && page <= currentPage + 1)
-                  ) {
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, i) => {
+                  const page = i + 1;
+                  if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
                     return (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                          page === currentPage
-                            ? 'bg-amber-500 text-white'
-                            : 'text-white/60 hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
+                      <button key={page} onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${page === currentPage ? 'bg-amber-500 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>
                         {page}
                       </button>
                     );
-                  } else if (
-                    page === currentPage - 2 ||
-                    page === currentPage + 2
-                  ) {
-                    return (
-                      <span key={page} className="px-2 text-white/40">
-                        ...
-                      </span>
-                    );
+                  }
+                  if (page === currentPage - 2 || page === currentPage + 2) {
+                    return <span key={page} className="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">…</span>;
                   }
                   return null;
                 })}
               </div>
-
-              <button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white/60 hover:text-white"
-                aria-label="Next page"
-              >
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages}
+                className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 disabled:opacity-40 transition-colors">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>

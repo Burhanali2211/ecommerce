@@ -5,6 +5,9 @@
 
 import ReactGA from 'react-ga4';
 
+// Track whether GA has been successfully initialized
+let gaInitialized = false;
+
 // Initialize Google Analytics
 export const initGA = (measurementId?: string) => {
   const gaId = measurementId || import.meta.env.VITE_GA_MEASUREMENT_ID;
@@ -24,6 +27,7 @@ export const initGA = (measurementId?: string) => {
         cookieFlags: 'SameSite=None;Secure'
       }
     });
+    gaInitialized = true;
 
     // Only log in development
     if (import.meta.env.DEV) {
@@ -39,14 +43,17 @@ export const initGA = (measurementId?: string) => {
 
 // Track page views
 export const trackPageView = (path: string, title?: string) => {
+  if (!gaInitialized) return;
   try {
-    ReactGA.send({ 
-      hitType: 'pageview', 
+    ReactGA.send({
+      hitType: 'pageview',
       page: path,
       title: title || document.title
     });
   } catch (error) {
-    console.error('Failed to track page view:', error);
+    if (import.meta.env.DEV) {
+      console.warn('Failed to track page view:', error);
+    }
   }
 };
 
@@ -57,6 +64,7 @@ export const trackEvent = (
   label?: string,
   value?: number
 ) => {
+  if (!gaInitialized) return;
   try {
     ReactGA.event({
       category,
@@ -65,273 +73,99 @@ export const trackEvent = (
       value
     });
   } catch (error) {
-    console.error('Failed to track event:', error);
+    // silent
   }
 };
 
 // E-commerce tracking
 export const trackEcommerce = {
-  // View product
-  viewProduct: (product: {
-    id: string;
-    name: string;
-    price: number;
-    category?: string;
-    brand?: string;
-  }) => {
+  viewProduct: (product: { id: string; name: string; price: number; category?: string; brand?: string }) => {
+    if (!gaInitialized) return;
     try {
-      ReactGA.event('view_item', {
-        currency: 'INR',
-        value: product.price,
-        items: [{
-          item_id: product.id,
-          item_name: product.name,
-          item_category: product.category,
-          item_brand: product.brand || 'HimalayanSpicesExports',
-          price: product.price
-        }]
-      });
-    } catch (error) {
-      console.error('Failed to track product view:', error);
-    }
+      ReactGA.event('view_item', { currency: 'INR', value: product.price, items: [{ item_id: product.id, item_name: product.name, item_category: product.category, item_brand: product.brand || 'HimalayanSpicesExports', price: product.price }] });
+    } catch { /* silent */ }
   },
 
-  // Add to cart
-  addToCart: (product: {
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-    category?: string;
-  }) => {
+  addToCart: (product: { id: string; name: string; price: number; quantity: number; category?: string }) => {
+    if (!gaInitialized) return;
     try {
-      ReactGA.event('add_to_cart', {
-        currency: 'INR',
-        value: product.price * product.quantity,
-        items: [{
-          item_id: product.id,
-          item_name: product.name,
-          item_category: product.category,
-          price: product.price,
-          quantity: product.quantity
-        }]
-      });
-    } catch (error) {
-      console.error('Failed to track add to cart:', error);
-    }
+      ReactGA.event('add_to_cart', { currency: 'INR', value: product.price * product.quantity, items: [{ item_id: product.id, item_name: product.name, item_category: product.category, price: product.price, quantity: product.quantity }] });
+    } catch { /* silent */ }
   },
 
-  // Remove from cart
-  removeFromCart: (product: {
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-  }) => {
+  removeFromCart: (product: { id: string; name: string; price: number; quantity: number }) => {
+    if (!gaInitialized) return;
     try {
-      ReactGA.event('remove_from_cart', {
-        currency: 'INR',
-        value: product.price * product.quantity,
-        items: [{
-          item_id: product.id,
-          item_name: product.name,
-          price: product.price,
-          quantity: product.quantity
-        }]
-      });
-    } catch (error) {
-      console.error('Failed to track remove from cart:', error);
-    }
+      ReactGA.event('remove_from_cart', { currency: 'INR', value: product.price * product.quantity, items: [{ item_id: product.id, item_name: product.name, price: product.price, quantity: product.quantity }] });
+    } catch { /* silent */ }
   },
 
-  // Begin checkout
-  beginCheckout: (cart: {
-    items: Array<{
-      id: string;
-      name: string;
-      price: number;
-      quantity: number;
-    }>;
-    total: number;
-  }) => {
+  beginCheckout: (cart: { items: Array<{ id: string; name: string; price: number; quantity: number }>; total: number }) => {
+    if (!gaInitialized) return;
     try {
-      ReactGA.event('begin_checkout', {
-        currency: 'INR',
-        value: cart.total,
-        items: cart.items.map(item => ({
-          item_id: item.id,
-          item_name: item.name,
-          price: item.price,
-          quantity: item.quantity
-        }))
-      });
-    } catch (error) {
-      console.error('Failed to track begin checkout:', error);
-    }
+      ReactGA.event('begin_checkout', { currency: 'INR', value: cart.total, items: cart.items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })) });
+    } catch { /* silent */ }
   },
 
-  // Purchase
-  purchase: (order: {
-    orderId: string;
-    total: number;
-    tax?: number;
-    shipping?: number;
-    items: Array<{
-      id: string;
-      name: string;
-      price: number;
-      quantity: number;
-      category?: string;
-    }>;
-  }) => {
+  purchase: (order: { orderId: string; total: number; tax?: number; shipping?: number; items: Array<{ id: string; name: string; price: number; quantity: number; category?: string }> }) => {
+    if (!gaInitialized) return;
     try {
-      ReactGA.event('purchase', {
-        transaction_id: order.orderId,
-        currency: 'INR',
-        value: order.total,
-        tax: order.tax || 0,
-        shipping: order.shipping || 0,
-        items: order.items.map(item => ({
-          item_id: item.id,
-          item_name: item.name,
-          item_category: item.category,
-          price: item.price,
-          quantity: item.quantity
-        }))
-      });
-    } catch (error) {
-      console.error('Failed to track purchase:', error);
-    }
+      ReactGA.event('purchase', { transaction_id: order.orderId, currency: 'INR', value: order.total, tax: order.tax || 0, shipping: order.shipping || 0, items: order.items.map(i => ({ item_id: i.id, item_name: i.name, item_category: i.category, price: i.price, quantity: i.quantity })) });
+    } catch { /* silent */ }
   },
 
-  // View cart
-  viewCart: (cart: {
-    items: Array<{
-      id: string;
-      name: string;
-      price: number;
-      quantity: number;
-    }>;
-    total: number;
-  }) => {
+  viewCart: (cart: { items: Array<{ id: string; name: string; price: number; quantity: number }>; total: number }) => {
+    if (!gaInitialized) return;
     try {
-      ReactGA.event('view_cart', {
-        currency: 'INR',
-        value: cart.total,
-        items: cart.items.map(item => ({
-          item_id: item.id,
-          item_name: item.name,
-          price: item.price,
-          quantity: item.quantity
-        }))
-      });
-    } catch (error) {
-      console.error('Failed to track view cart:', error);
-    }
+      ReactGA.event('view_cart', { currency: 'INR', value: cart.total, items: cart.items.map(i => ({ item_id: i.id, item_name: i.name, price: i.price, quantity: i.quantity })) });
+    } catch { /* silent */ }
   },
 
-  // Search
   search: (searchTerm: string) => {
-    try {
-      ReactGA.event('search', {
-        search_term: searchTerm
-      });
-    } catch (error) {
-      console.error('Failed to track search:', error);
-    }
+    if (!gaInitialized) return;
+    try { ReactGA.event('search', { search_term: searchTerm }); } catch { /* silent */ }
   }
 };
 
 // User engagement tracking
 export const trackUserEngagement = {
-  // Login
   login: (method: string = 'email') => {
-    try {
-      ReactGA.event('login', {
-        method
-      });
-    } catch (error) {
-      console.error('Failed to track login:', error);
-    }
+    if (!gaInitialized) return;
+    try { ReactGA.event('login', { method }); } catch { /* silent */ }
   },
 
-  // Sign up
   signUp: (method: string = 'email') => {
-    try {
-      ReactGA.event('sign_up', {
-        method
-      });
-    } catch (error) {
-      console.error('Failed to track sign up:', error);
-    }
+    if (!gaInitialized) return;
+    try { ReactGA.event('sign_up', { method }); } catch { /* silent */ }
   },
 
-  // Share
   share: (contentType: string, itemId: string) => {
-    try {
-      ReactGA.event('share', {
-        content_type: contentType,
-        item_id: itemId
-      });
-    } catch (error) {
-      console.error('Failed to track share:', error);
-    }
+    if (!gaInitialized) return;
+    try { ReactGA.event('share', { content_type: contentType, item_id: itemId }); } catch { /* silent */ }
   },
 
-  // Add to wishlist
-  addToWishlist: (product: {
-    id: string;
-    name: string;
-    price: number;
-  }) => {
+  addToWishlist: (product: { id: string; name: string; price: number }) => {
+    if (!gaInitialized) return;
     try {
-      ReactGA.event('add_to_wishlist', {
-        currency: 'INR',
-        value: product.price,
-        items: [{
-          item_id: product.id,
-          item_name: product.name,
-          price: product.price
-        }]
-      });
-    } catch (error) {
-      console.error('Failed to track add to wishlist:', error);
-    }
+      ReactGA.event('add_to_wishlist', { currency: 'INR', value: product.price, items: [{ item_id: product.id, item_name: product.name, price: product.price }] });
+    } catch { /* silent */ }
   }
 };
 
 // Set user properties
-export const setUserProperties = (properties: {
-  userId?: string;
-  userType?: 'customer' | 'admin';
-  [key: string]: any;
-}) => {
+export const setUserProperties = (properties: { userId?: string; userType?: 'customer' | 'admin'; [key: string]: any }) => {
+  if (!gaInitialized) return;
   try {
-    if (properties.userId) {
-      ReactGA.set({ userId: properties.userId });
-    }
+    if (properties.userId) ReactGA.set({ userId: properties.userId });
     ReactGA.set(properties);
-  } catch (error) {
-    console.error('Failed to set user properties:', error);
-  }
+  } catch { /* silent */ }
 };
 
 // Track timing
-export const trackTiming = (
-  category: string,
-  variable: string,
-  value: number,
-  label?: string
-) => {
+export const trackTiming = (category: string, variable: string, value: number, label?: string) => {
+  if (!gaInitialized) return;
   try {
-    ReactGA.event('timing_complete', {
-      name: variable,
-      value,
-      event_category: category,
-      event_label: label
-    });
-  } catch (error) {
-    console.error('Failed to track timing:', error);
-  }
+    ReactGA.event('timing_complete', { name: variable, value, event_category: category, event_label: label });
+  } catch { /* silent */ }
 };
 

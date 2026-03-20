@@ -133,9 +133,10 @@ export const AboutPage: React.FC = () => {
               variants={itemVariants}
             >
               <div className="relative rounded-2xl overflow-hidden shadow-xl">
-                <img 
-                  src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&q=80" 
-                  alt="Colorful spices from Kashmir" 
+                <img
+                  src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&q=80"
+                  alt="Colorful spices from Kashmir"
+                  crossOrigin="anonymous"
                   className="w-full h-96 object-cover"
                 />
               </div>
@@ -238,9 +239,10 @@ export const AboutPage: React.FC = () => {
               variants={itemVariants}
             >
               <div className="relative rounded-2xl overflow-hidden shadow-xl">
-                <img 
-                  src="https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=800&q=80" 
-                  alt="Premium Kashmiri Saffron" 
+                <img
+                  src="https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=800&q=80"
+                  alt="Premium Kashmiri Saffron"
+                  crossOrigin="anonymous"
                   className="w-full h-96 object-cover"
                 />
               </div>

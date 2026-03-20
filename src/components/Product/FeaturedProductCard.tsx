@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Heart, ShoppingCart, Award } from 'lucide-react';
+import { Star, Heart, ShoppingCart } from 'lucide-react';
 import { Product } from '../../types';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
@@ -41,15 +41,11 @@ export const FeaturedProductCard: React.FC<FeaturedProductCardProps> = ({ produc
     }
   };
 
-  const discount = product.originalPrice && Number(product.originalPrice) > Number(product.price)
-    ? Math.round((1 - Number(product.price) / Number(product.originalPrice)) * 100)
-    : null;
-
   return (
     <Link to={`/products/${product.id}`} className="group block h-full">
-      <article className="relative bg-white h-full flex flex-col overflow-hidden border border-gray-100 hover:border-amber-200 transition-all duration-300 rounded-xl shadow-sm hover:shadow-xl">
+      <article className="relative bg-white h-full flex flex-col overflow-hidden border border-gray-100 hover:border-green-300 transition-all duration-300 rounded-xl shadow-sm hover:shadow-xl">
         {/* Image Container */}
-        <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="relative aspect-[4/5] overflow-hidden bg-gray-50">
           <img
             src={product.images?.[0] || '/placeholder-product.jpg'}
             alt={product.name}
@@ -61,22 +57,6 @@ export const FeaturedProductCard: React.FC<FeaturedProductCardProps> = ({ produc
             }}
           />
 
-          {/* Top Badges Row */}
-          <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
-            {/* Featured Badge */}
-            <div className="flex items-center gap-1.5 bg-amber-500 text-white px-2.5 py-1 text-xs font-bold tracking-wide uppercase rounded">
-              <Award className="w-3 h-3" />
-              <span>Featured</span>
-            </div>
-
-            {/* Discount Badge */}
-            {discount && (
-              <div className="bg-rose-500 text-white px-2 py-1 text-xs font-bold rounded">
-                -{discount}%
-              </div>
-            )}
-          </div>
-
           {/* Wishlist Button - Always visible */}
           <button
             onClick={handleToggleWishlist}
@@ -84,7 +64,7 @@ export const FeaturedProductCard: React.FC<FeaturedProductCardProps> = ({ produc
               isInWishlist(product.id)
                 ? 'bg-rose-500 text-white'
                 : 'bg-white/95 text-gray-600 hover:text-rose-500 hover:bg-white'
-            } ${discount ? 'top-12' : 'top-3'}`}
+            }`}
             aria-label={isInWishlist(product.id) ? 'Remove from wishlist' : 'Add to wishlist'}
           >
             <Heart className={`w-4 h-4 ${isInWishlist(product.id) ? 'fill-current' : ''}`} />
@@ -104,13 +84,13 @@ export const FeaturedProductCard: React.FC<FeaturedProductCardProps> = ({ produc
         <div className="flex flex-col flex-grow p-4">
           {/* Category */}
           {product.category && (
-            <span className="text-xs font-medium text-amber-600 uppercase tracking-wider mb-1.5">
+            <span className="text-xs font-medium text-green-700 uppercase tracking-wider mb-1.5">
               {product.category}
             </span>
           )}
 
           {/* Product Name */}
-          <h3 className="text-sm md:text-base font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-amber-700 transition-colors leading-snug">
+          <h3 className="text-sm md:text-base font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-green-800 transition-colors leading-snug">
             {product.name}
           </h3>
 

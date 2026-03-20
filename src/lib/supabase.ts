@@ -51,11 +51,7 @@ export const db = {
       query = query.or(`name.ilike.%${params.search}%,description.ilike.%${params.search}%`);
     }
 
-    if (params?.latest) {
-      query = query.order('created_at', { ascending: false });
-    } else {
-      query = query.order('created_at', { ascending: false });
-    }
+    query = query.order('created_at', { ascending: false });
 
     const { data, error, count } = await query
       .eq('is_active', true)
@@ -75,12 +71,17 @@ export const db = {
   },
 
   async getProduct(id: string) {
+    // Supabase id column is UUID — skip the query for non-UUID strings
+    // to avoid a 400 error (e.g. when a slug is passed via the URL)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) return null;
+
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('id', id)
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -359,22 +360,39 @@ export const db = {
   },
 
   async setDefaultAddress(userId: string, addressId: string) {
-    // First reset all addresses to not default
+    // Step 1: find the current default so we can restore it if step 2 fails
+    const { data: currentDefault } = await supabase
+      .from('addresses')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .maybeSingle();
+
+    // Step 2: clear all defaults
     const { error: resetError } = await supabase
       .from('addresses')
       .update({ is_default: false })
       .eq('user_id', userId);
-    
+
     if (resetError) throw resetError;
 
-    // Set the specific address as default
+    // Step 3: set the new default — restore previous on failure
     const { data, error } = await supabase
       .from('addresses')
       .update({ is_default: true })
       .eq('id', addressId)
       .select();
-    
-    if (error) throw error;
+
+    if (error) {
+      // Restore the previous default to avoid leaving user with no default address
+      if (currentDefault?.id) {
+        await supabase
+          .from('addresses')
+          .update({ is_default: true })
+          .eq('id', currentDefault.id);
+      }
+      throw error;
+    }
     return data;
   },
 };

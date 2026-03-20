@@ -101,10 +101,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               </h1>
 
               <p className="text-gray-600 mb-6">
-                We're sorry, but something unexpected happened. Please try again or return to the home page.
+                Something went wrong. Please try again — if the problem continues, go back to the home page.
               </p>
 
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {import.meta.env.DEV && this.state.error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-left">
                   <p className="text-sm font-medium text-red-800 mb-2">Error Details:</p>
                   <pre className="text-xs text-red-700 overflow-auto max-h-32">
@@ -116,7 +116,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               <div className="flex flex-col sm:flex-row gap-4">
                 <button
                   onClick={this.handleRetry}
-                  className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium flex items-center justify-center"
+                  className="flex-1 bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition-colors font-medium flex items-center justify-center"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Try Again

@@ -69,13 +69,11 @@ export const SiteLogo: React.FC<SiteLogoProps> = ({
 
   const sizes = sizeMap[size];
   
-  const containerClasses = variant === 'default' 
-    ? 'bg-amber-500 rounded-full flex items-center justify-center'
-    : variant === 'white'
-    ? 'bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center'
-    : 'bg-gray-900 rounded-2xl flex items-center justify-center p-2';
+  const containerClasses = variant === 'white'
+    ? 'bg-white/20 rounded-lg flex items-center justify-center'
+    : 'bg-gray-900 rounded-lg flex items-center justify-center';
 
-  const iconColor = variant === 'default' || variant === 'white' ? 'text-white' : 'text-gray-900';
+  const iconColor = 'text-white';
   const imgFilter = variant === 'dark' ? 'brightness-0 invert' : '';
 
   if (isLoading) {
