@@ -172,7 +172,7 @@ export const ImprovedCheckoutPage: React.FC = () => {
           showNotification({ type: 'error', title: 'Authentication Required', message: 'Please log in to place an order' });
           return;
         }
-        const razorpayRes = await fetch('/.netlify/functions/payment-process?action=create-order', {
+        const razorpayRes = await fetch('/api/payment-process?action=create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

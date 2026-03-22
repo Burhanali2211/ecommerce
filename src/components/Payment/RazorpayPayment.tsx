@@ -86,7 +86,7 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       let razorpayOrderIdToUse = razorpayOrderId;
 
       if (!razorpayOrderIdToUse) {
-        const res = await fetch('/.netlify/functions/payment-process?action=create-order', {
+        const res = await fetch('/api/payment-process?action=create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -133,7 +133,7 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         method: selectedMethod !== 'card' ? selectedMethod : undefined,
         handler: async function (response: any) {
           try {
-            const verifyRes = await fetch('/.netlify/functions/payment-process?action=verify-payment', {
+            const verifyRes = await fetch('/api/payment-process?action=verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
