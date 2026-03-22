@@ -188,7 +188,7 @@ export const MobileAuthView: React.FC<MobileAuthViewProps> = ({
 
             <div className="flex-1 text-center">
               <h2 className="text-xl font-bold">
-                {mode === 'login' && 'Welcome to HimalayanSpicesExports'}
+                {mode === 'login' && 'Welcome to Aligarh Attar House'}
                 {mode === 'signup' && (step === 1 ? 'Create Account' : 'Complete Profile')}
                 {mode === 'forgot' && 'Reset Password'}
                 {mode === 'verify' && 'Verify Email'}

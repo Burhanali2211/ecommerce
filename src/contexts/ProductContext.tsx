@@ -118,7 +118,7 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
       reviewCount: dbProduct.review_count || 0,
       reviews: [],
       sellerId: dbProduct.seller_id,
-      sellerName: dbProduct.seller_name || 'Himalayan Spices',
+      sellerName: dbProduct.seller_name || 'Aligarh Attar House',
       tags: dbProduct.tags || [],
       specifications: dbProduct.specifications || {},
       featured: dbProduct.is_featured || false,
@@ -430,21 +430,28 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const previousPage = useCallback(() => { if (pagination?.page > 1) fetchProducts(pagination.page - 1); }, [pagination, fetchProducts]);
   const goToPage     = useCallback((page: number) => { if (page >= 1 && page <= pagination?.pages) fetchProducts(page); }, [pagination, fetchProducts]);
 
-  // ── Initial data load — fire once, all parallel ──
-  // force=true: shows stale cache instantly (zero loading flash) AND always fetches
-  // fresh data from DB regardless of TTL. This guarantees up-to-date data on every
-  // page load while still avoiding empty loading states when cache is warm.
+  // ── Initial data load — fire once, sequenced to avoid auth lock contention ──
+  // All 5 Supabase calls used to fire simultaneously via Promise.all, causing
+  // them to compete for the GoTrue auth token lock and triggering the
+  // "Lock was not released within 5000ms" warning.
+  //
+  // Fix: categories + products first (needed for immediate render), then the
+  // remaining sections staggered with a small delay so the lock is free.
   useEffect(() => {
     if (initFetched.current) return;
     initFetched.current = true;
+
+    // Phase 1: critical data — show UI immediately
     Promise.all([
-      fetchCategories(false, true),   // force=true bypasses TTL, still shows cache first
+      fetchCategories(false, true),
       fetchProducts(1, 20, undefined, true),
       fetchFeaturedProducts(8, true),
-      fetchLatestProducts(8, true),
-      fetchBestSellers(8, true),
-    ]);
-    // Reset on unmount so StrictMode / HMR remount gets a fresh fetch
+    ]).then(() => {
+      // Phase 2: below-the-fold sections — fetch after lock is free
+      fetchLatestProducts(8, true);
+      fetchBestSellers(8, true);
+    });
+
     return () => { initFetched.current = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

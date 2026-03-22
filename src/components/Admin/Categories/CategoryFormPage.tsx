@@ -195,7 +195,7 @@ export const CategoryFormPage: React.FC = () => {
               onChange={handleChange}
               error={errors.name || ''}
               required
-              placeholder="e.g. Himalayan Spices"
+              placeholder="e.g. Attars & Perfumes"
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -207,7 +207,7 @@ export const CategoryFormPage: React.FC = () => {
                 error={errors.slug || ''}
                 required
                 helperText="URL-friendly name (auto-generated)"
-                placeholder="himalayan-spices"
+                placeholder="attars-perfumes"
               />
 
               <FormInput

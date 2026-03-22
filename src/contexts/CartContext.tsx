@@ -36,7 +36,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       showOnHomepage: dbItem.products.show_on_homepage || false,
       reviews: [],
       tags: dbItem.products.tags || [],
-      sellerName: dbItem.products.seller_name || 'Himalayan Spices',
+      sellerName: dbItem.products.seller_name || 'Aligarh Attar House',
       createdAt: new Date(dbItem.products.created_at)
     },
     productId: dbItem.product_id,

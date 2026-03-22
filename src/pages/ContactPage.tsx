@@ -328,7 +328,7 @@ export const ContactPage: React.FC = () => {
               {/* Map */}
               <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden min-h-[220px]">
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1678.619686587766!2d74.80939694133554!3d34.074094840072654!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x38e18fc85ae61ca9%3A0xb805ebeabf647fd4!2shimalayanspicesexports%20Attar%20House%20best%20perfume%20shop!5e0!3m2!1sen!2sin!4v1761361063055!5m2!1sen!2sin"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d114005.68742055266!2d78.00785!3d27.8974!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3974a5e8b7b7b7b7%3A0x0!2sAligarh%2C%20Uttar%20Pradesh!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin"
                   width="100%"
                   height="100%"
                   style={{ border: 0 }}

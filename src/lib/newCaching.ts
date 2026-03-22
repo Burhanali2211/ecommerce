@@ -1,5 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-
 // In-memory cache with TTL
 const memoryCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
 

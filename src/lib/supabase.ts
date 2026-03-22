@@ -7,7 +7,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Single shared client — never call createClient() anywhere else in the app.
+// auth.detectSessionInUrl:false prevents duplicate PKCE token exchanges on
+// navigation. auth.persistSession:true keeps the session alive across tabs.
+// These settings also reduce concurrent lock contention on cold start.
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
 
 // Helper functions for common operations

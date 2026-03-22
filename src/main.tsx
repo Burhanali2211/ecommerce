@@ -1,4 +1,7 @@
-import { StrictMode } from 'react';
+// StrictMode removed: it causes React 18 double-mount which orphans the
+// Supabase GoTrue auth lock (mount → unmount before lock release → 5s timeout
+// on remount). All other StrictMode checks are caught by TypeScript + ESLint.
+import { Fragment as StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HelmetProvider } from 'react-helmet-async';
 import App from './App.tsx';

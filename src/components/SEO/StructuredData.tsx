@@ -39,17 +39,17 @@ export const ProductStructuredData: React.FC<{ product: Product }> = ({ product 
     sku: product.sku || product.id,
     brand: {
       '@type': 'Brand',
-      name: product.brand || 'HimalayanSpicesExports'
+      name: product.brand || 'Aligarh Attar House'
     },
     offers: {
       '@type': 'Offer',
-      url: `https://himalayanspicesexports.com/products/${product.id}`,
+      url: `https://aligarhattar.com/products/${product.id}`,
       priceCurrency: 'INR',
       price: product.price,
       availability: `https://schema.org/${product.availability || 'InStock'}`,
       seller: {
         '@type': 'Organization',
-        name: 'HimalayanSpicesExports'
+        name: 'Aligarh Attar House'
       }
     }
   };
@@ -195,10 +195,10 @@ export const ArticleStructuredData: React.FC<{
     },
     publisher: {
       '@type': 'Organization',
-      name: 'HimalayanSpicesExports',
+      name: 'Aligarh Attar House',
       logo: {
         '@type': 'ImageObject',
-        url: 'https://himalayanspicesexports.com/logo.png'
+        url: 'https://aligarhattar.com/logo.png'
       }
     }
   };
@@ -219,24 +219,24 @@ export const LocalBusinessStructuredData: React.FC = () => {
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'LocalBusiness',
-    name: 'HimalayanSpicesExports',
-    image: 'https://himalayanspicesexports.com/logo.png',
-    '@id': 'https://himalayanspicesexports.com',
-    url: 'https://himalayanspicesexports.com',
+    name: 'Aligarh Attar House',
+    image: 'https://aligarhattar.com/logo.png',
+    '@id': 'https://aligarhattar.com',
+    url: 'https://aligarhattar.com',
     telephone: '+91-XXXXXXXXXX',
     priceRange: '₹₹',
     address: {
       '@type': 'PostalAddress',
       streetAddress: 'Your Street Address',
-      addressLocality: 'Kashmir',
-      addressRegion: 'J&K',
+      addressLocality: 'Aligarh',
+      addressRegion: 'Uttar Pradesh',
       postalCode: 'XXXXXX',
       addressCountry: 'IN'
     },
     geo: {
       '@type': 'GeoCoordinates',
-      latitude: 34.0837,
-      longitude: 74.7973
+      latitude: 27.8974,
+      longitude: 78.0880
     },
     openingHoursSpecification: [
       {

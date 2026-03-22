@@ -82,7 +82,7 @@ export const trackEcommerce = {
   viewProduct: (product: { id: string; name: string; price: number; category?: string; brand?: string }) => {
     if (!gaInitialized) return;
     try {
-      ReactGA.event('view_item', { currency: 'INR', value: product.price, items: [{ item_id: product.id, item_name: product.name, item_category: product.category, item_brand: product.brand || 'HimalayanSpicesExports', price: product.price }] });
+      ReactGA.event('view_item', { currency: 'INR', value: product.price, items: [{ item_id: product.id, item_name: product.name, item_category: product.category, item_brand: product.brand || 'Aligarh Attar House', price: product.price }] });
     } catch { /* silent */ }
   },
 

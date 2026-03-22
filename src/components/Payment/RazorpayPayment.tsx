@@ -29,6 +29,7 @@ interface RazorpayPaymentProps {
     country: string;
   };
   razorpayOrderId?: string;
+  orderId?: string;     // DB order ID for payment status update
   onSuccess: (paymentId: string) => void;
   onError: (error: string) => void;
   onCancel: () => void;
@@ -43,6 +44,7 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
   customerInfo,
   shippingAddress,
   razorpayOrderId,
+  orderId,
   onSuccess,
   onError,
   onCancel
@@ -82,11 +84,12 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
       await loadRazorpayScript();
 
       let razorpayOrderIdToUse = razorpayOrderId;
-      
+
       if (!razorpayOrderIdToUse) {
-        const { data, error: functionError } = await supabase.functions.invoke('payment-process', {
+        const res = await fetch('/.netlify/functions/payment-process?action=create-order', {
           method: 'POST',
-          body: {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             amount: total,
             currency: 'INR',
             receipt: `receipt_${Date.now()}`,
@@ -96,13 +99,11 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
               items_count: items.length,
               payment_method: selectedMethod
             }
-          },
-          queryParams: { action: 'create-order' }
+          }),
         });
-
-        if (functionError) throw functionError;
+        const data = await res.json();
         if (!data?.success || !data.data?.id) {
-          throw new Error('Failed to create payment order');
+          throw new Error(data?.error || 'Failed to create payment order');
         }
         razorpayOrderIdToUse = data.data.id;
       }
@@ -132,21 +133,22 @@ export const RazorpayPayment: React.FC<RazorpayPaymentProps> = ({
         method: selectedMethod !== 'card' ? selectedMethod : undefined,
         handler: async function (response: any) {
           try {
-            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('payment-process', {
+            const verifyRes = await fetch('/.netlify/functions/payment-process?action=verify-payment', {
               method: 'POST',
-              body: {
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature
-              },
-              queryParams: { action: 'verify-payment' }
+                razorpay_signature: response.razorpay_signature,
+                order_id: orderId
+              }),
             });
+            const verifyData = await verifyRes.json();
 
-            if (verifyError) throw verifyError;
             if (verifyData.success) {
               onSuccess(response.razorpay_payment_id);
             } else {
-              throw new Error('Payment verification failed');
+              throw new Error(verifyData.error || 'Payment verification failed');
             }
           } catch (error: any) {
             setIsProcessing(false);

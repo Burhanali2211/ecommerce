@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Mountain, Star, Award, Users, Lock, Truck, ShieldCheck } from 'lucide-react';
+import { Droplets, Star, Award, Users, Lock, Truck, ShieldCheck } from 'lucide-react';
 import { SiteLogo } from '../Common/SiteLogo';
 
 interface ProfessionalAuthLayoutProps {
@@ -58,15 +58,15 @@ export const ProfessionalAuthLayout: React.FC<ProfessionalAuthLayoutProps> = ({
             <div className="relative z-10">
               <div className="flex items-center space-x-3 mb-8">
                 <SiteLogo size="lg" variant="white" />
-                <h1 className="text-2xl font-bold tracking-wide">Himalayan Spices</h1>
+                <h1 className="text-2xl font-bold tracking-wide">Aligarh Attar House</h1>
               </div>
 
               <h2 className="text-3xl font-bold mb-4 leading-tight tracking-tight">
-                From Kashmir to Your Kitchen
+                Pure Attars. Islamic Lifestyle.
               </h2>
 
               <p className="text-white/90 text-base mb-8 max-w-md leading-relaxed">
-                Experience the authentic flavors of the Himalayas. Premium saffron, spices, dry fruits & more - delivered worldwide.
+                Discover authentic alcohol-free attars, oud, bakhoor, hijabs & Islamic lifestyle products — crafted the traditional way.
               </p>
             </div>
 
@@ -74,19 +74,19 @@ export const ProfessionalAuthLayout: React.FC<ProfessionalAuthLayoutProps> = ({
             <div className="relative z-10">
               <div className="grid grid-cols-3 gap-4 mb-8">
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover:bg-white/20">
-                  <SiteLogo size="sm" variant="white" className="mb-2" />
-                  <h3 className="font-semibold text-sm mb-1">100% Natural</h3>
-                  <p className="text-xs text-white/80">Pure & authentic</p>
+                  <Droplets className="h-6 w-6 mb-2 text-amber-300" />
+                  <h3 className="font-semibold text-sm mb-1">Alcohol-Free</h3>
+                  <p className="text-xs text-white/80">100% halal attars</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover:bg-white/20">
-                  <Mountain className="h-6 w-6 mb-2 text-amber-300" />
-                  <h3 className="font-semibold text-sm mb-1">Direct Source</h3>
-                  <p className="text-xs text-white/80">From Kashmir</p>
+                  <Droplets className="h-6 w-6 mb-2 text-amber-300" />
+                  <h3 className="font-semibold text-sm mb-1">From Aligarh</h3>
+                  <p className="text-xs text-white/80">Direct from artisans</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover:bg-white/20">
                   <Star className="h-6 w-6 mb-2 text-amber-300" />
                   <h3 className="font-semibold text-sm mb-1">Premium Grade</h3>
-                  <p className="text-xs text-white/80">Quality certified</p>
+                  <p className="text-xs text-white/80">Quality guaranteed</p>
                 </div>
               </div>
 
@@ -110,7 +110,7 @@ export const ProfessionalAuthLayout: React.FC<ProfessionalAuthLayoutProps> = ({
                   </div>
                   <div>
                     <p className="text-sm font-semibold">{reviewCount.toLocaleString('en-IN')}+ 5-Star Reviews</p>
-                    <p className="text-xs text-white/70">Trusted by food lovers</p>
+                    <p className="text-xs text-white/70">Trusted by fragrance lovers</p>
                   </div>
                 </div>
 
@@ -142,7 +142,7 @@ export const ProfessionalAuthLayout: React.FC<ProfessionalAuthLayoutProps> = ({
                     <ShieldCheck className="h-4 w-4 text-amber-300" />
                     <p className="text-sm font-semibold">New Member Offer</p>
                   </div>
-                  <p className="text-xs text-white/90">Get 10% off your first order + free Kashmiri Kahwa sample!</p>
+                  <p className="text-xs text-white/90">Get 10% off your first order + free attar sample with every order!</p>
                 </div>
               </div>
             </div>

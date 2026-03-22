@@ -12,7 +12,7 @@ interface SearchOverlayProps {
   initialQuery?: string;
 }
 
-const trendingSearches = ['Saffron', 'Cardamom', 'Kashmiri Chili', 'Turmeric', 'Cinnamon', 'Black Pepper'];
+const trendingSearches = ['Rose Attar', 'Oud', 'Hijab', 'Bakhoor', 'Islamic Books', 'Gift Sets'];
 
 export const SearchOverlay: React.FC<SearchOverlayProps> = ({ isOpen, onClose, initialQuery = '' }) => {
   const [query, setQuery] = useState('');

@@ -116,6 +116,14 @@ export const ImprovedCheckoutPage: React.FC = () => {
     setIsProcessing(true);
     try {
       if (orderId) {
+        // Update order payment status to paid in DB
+        await supabase.from('orders').update({
+          payment_status: 'paid',
+          status: 'confirmed',
+          razorpay_payment_id: paymentId,
+          updated_at: new Date().toISOString()
+        }).eq('id', orderId);
+
         setShowPaymentModal(false);
         await clearCart();
         localStorage.removeItem(SHIPPING_INFO_KEY);
@@ -164,16 +172,16 @@ export const ImprovedCheckoutPage: React.FC = () => {
           showNotification({ type: 'error', title: 'Authentication Required', message: 'Please log in to place an order' });
           return;
         }
-        const { data: razorpayData, error: functionError } = await supabase.functions.invoke('payment-process', {
+        const razorpayRes = await fetch('/.netlify/functions/payment-process?action=create-order', {
           method: 'POST',
-          body: {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             amount: finalTotal, currency: 'INR', receipt: `receipt_${Date.now()}`,
             notes: { customer_name: `${formData.firstName} ${formData.lastName}`, customer_email: formData.email, items_count: items.length }
-          },
-          queryParams: { action: 'create-order' }
+          }),
         });
-        if (functionError) throw functionError;
-        if (!razorpayData?.success || !razorpayData.data?.id) throw new Error('Failed to create payment order');
+        const razorpayData = await razorpayRes.json();
+        if (!razorpayData?.success || !razorpayData.data?.id) throw new Error(razorpayData?.error || 'Failed to create payment order');
         const rzpOrderId = razorpayData.data.id;
         const newOrderId = await createOrder(items, shippingAddress as any, 'Razorpay', finalTotal, rzpOrderId);
         if (newOrderId) {
@@ -595,6 +603,7 @@ export const ImprovedCheckoutPage: React.FC = () => {
             customerInfo={{ name: `${formData.firstName} ${formData.lastName}`, email: formData.email, phone: formData.phone }}
             shippingAddress={{ street: formData.address, city: formData.city, state: formData.state, zipCode: formData.zipCode, country: formData.country }}
             razorpayOrderId={razorpayOrderId || undefined}
+            orderId={orderId || undefined}
             onSuccess={handlePaymentSuccess}
             onError={(err) => { showNotification({ type: 'error', title: 'Payment Failed', message: err }); setShowPaymentModal(false); }}
             onCancel={() => setShowPaymentModal(false)}

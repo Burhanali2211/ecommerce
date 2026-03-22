@@ -69,7 +69,7 @@ const TermsOfServicePage: React.FC = () => {
         },
         {
           subtitle: 'Authenticity',
-          text: 'All our spices and products are 100% authentic and sourced directly from Kashmir and the Himalayas. We guarantee the quality and authenticity of all products sold.'
+          text: 'All our attars and products are 100% authentic and sourced directly from Aligarh artisans. We guarantee the quality and authenticity of all products sold.'
         },
         {
           subtitle: 'Variations',
@@ -134,7 +134,7 @@ const TermsOfServicePage: React.FC = () => {
         >
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Agreement to Terms</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            Welcome to HimalayanSpicesExports. These Terms of Service ("Terms") govern your use of our website and the purchase 
+            Welcome to Aligarh Attar House. These Terms of Service ("Terms") govern your use of our website and the purchase 
             of products from our online store. By accessing or using our website, you agree to be bound by these Terms.
           </p>
           <p className="text-gray-600 leading-relaxed">
@@ -183,7 +183,7 @@ const TermsOfServicePage: React.FC = () => {
           </div>
           <p className="text-gray-600 leading-relaxed mb-4">
             All content on this website, including text, graphics, logos, images, and software, is the property of 
-            HimalayanSpicesExports or its content suppliers and is protected by Indian and international copyright laws.
+            Aligarh Attar House or its content suppliers and is protected by Indian and international copyright laws.
           </p>
           <p className="text-gray-600 leading-relaxed">
             You may not reproduce, distribute, modify, or create derivative works from any content on our website 
@@ -200,7 +200,7 @@ const TermsOfServicePage: React.FC = () => {
         >
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Limitation of Liability</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            To the maximum extent permitted by law, HimalayanSpicesExports shall not be liable for any indirect, incidental, 
+            To the maximum extent permitted by law, Aligarh Attar House shall not be liable for any indirect, incidental, 
             special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly.
           </p>
           <p className="text-gray-600 leading-relaxed">
@@ -238,7 +238,7 @@ const TermsOfServicePage: React.FC = () => {
           <p className="text-gray-600 leading-relaxed">
             These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising 
             from these Terms or your use of our website shall be subject to the exclusive jurisdiction of the courts 
-            located in Kashmir, India.
+            located in Aligarh, Uttar Pradesh, India.
           </p>
         </motion.div>
 

@@ -315,7 +315,7 @@ export const ProductFormPage: React.FC = () => {
               onChange={handleChange}
               error={errors.name || ''}
               required
-              placeholder="e.g. Premium Kashmiri Saffron"
+              placeholder="e.g. Premium Rose Attar"
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -325,7 +325,7 @@ export const ProductFormPage: React.FC = () => {
                 value={formData.slug}
                 onChange={handleChange}
                 helperText="Auto-generated from name"
-                placeholder="premium-kashmiri-saffron"
+                placeholder="premium-rose-attar"
               />
 
               <FormSelect
@@ -504,7 +504,7 @@ export const ProductFormPage: React.FC = () => {
               value={formData.tags}
               onChange={handleChange}
               rows={2}
-              placeholder="saffron, organic, himalayan (comma-separated)"
+              placeholder="rose, attar, alcohol-free (comma-separated)"
               helperText="Separate tags with commas"
             />
 
@@ -514,7 +514,7 @@ export const ProductFormPage: React.FC = () => {
               value={formData.specifications}
               onChange={handleChange}
               rows={5}
-              placeholder='{"brand": "Himalayan", "volume": "5g", "type": "Grade A"}'
+              placeholder='{"brand": "Aligarh Attar House", "volume": "5ml", "type": "Pure Attar"}'
               error={errors.specifications || ''}
               helperText='Enter as JSON. Example: {"key": "value"}'
               className="font-mono text-sm"
