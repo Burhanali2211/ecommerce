@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { TrendingUp, Star, Heart, ShoppingBag, Flame } from 'lucide-react';
 import { Product } from '../../types';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useAuthModal } from '../../contexts/AuthModalContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useCartButtonStyles } from '../../hooks/useCartButtonStyles';
 import { AddToCartButton } from './AddToCartButton';
@@ -20,13 +22,15 @@ export const BestSellerProductCard: React.FC<BestSellerProductCardProps> = ({ pr
   const { addItem: addToCart } = useCart();
   const { addItem: addToWishlist, isInWishlist } = useWishlist();
   const { cartButtonText, cartButtonStyle, cartButtonHoverStyle } = useCartButtonStyles();
+  const { user } = useAuth();
+  const { showAuthModal } = useAuthModal();
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user) { showAuthModal(product, 'cart'); return; }
     try {
       await addToCart(product, 1);
-      // Notification is handled by CartContext
     } catch (error) {
       console.error('Failed to add to cart:', error);
     }

@@ -3,11 +3,15 @@ import { Star, TrendingUp, ArrowRight, Flame, Tag } from 'lucide-react';
 import { useProducts } from '../../contexts/ProductContext';
 import { Link } from 'react-router-dom';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useAuthModal } from '../../contexts/AuthModalContext';
 import { BuyNowButton } from '../Product/BuyNowButton';
 
 export const BestSellers: React.FC = memo(() => {
   const { bestSellers, bestSellersLoading, fetchBestSellers } = useProducts();
   const { addItem } = useCart();
+  const { user } = useAuth();
+  const { showAuthModal } = useAuthModal();
 
   useEffect(() => {
     fetchBestSellers(1);
@@ -26,6 +30,7 @@ export const BestSellers: React.FC = memo(() => {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user) { showAuthModal(product, 'cart'); return; }
     addItem(product, 1);
   };
 

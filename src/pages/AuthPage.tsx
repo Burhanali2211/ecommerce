@@ -210,41 +210,67 @@ const AuthPage: React.FC = () => {
     }`;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
 
-      {/* ── Header ─────────────────────────────────────────────── */}
-      <header className="bg-white border-b border-gray-100 px-5 py-3">
-        <div className="max-w-sm mx-auto flex items-center justify-between">
-          {/* Logo + brand */}
-          <Link to="/" className="flex items-center gap-2.5">
-            <img
-              src="/logo.png"
-              alt={siteName}
-              className="h-9 w-9 object-contain rounded-lg"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-            <span className="font-semibold text-gray-900 text-[15px] leading-tight">
-              {siteName}
-            </span>
+      {/* ── Left panel — brand (desktop only) ────────────────── */}
+      <div className="hidden lg:flex lg:w-[45%] xl:w-1/2 bg-gray-900 flex-col items-center justify-center p-12 relative overflow-hidden">
+        {/* subtle grid pattern */}
+        <div className="absolute inset-0 opacity-[0.04]" style={{
+          backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+          backgroundSize: '28px 28px'
+        }} />
+        <div className="relative z-10 text-center max-w-xs">
+          <Link to="/" className="inline-flex items-center gap-3 mb-10">
+            <img src="/logo.png" alt={siteName} className="h-12 w-12 object-contain rounded-xl"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <span className="text-2xl font-bold text-white">{siteName}</span>
           </Link>
+          <h2 className="text-3xl font-bold text-white leading-tight mb-4">
+            {mode === 'signup' ? 'Join our community' : 'Welcome back'}
+          </h2>
+          <p className="text-gray-400 text-base leading-relaxed">
+            {mode === 'signup'
+              ? 'Create your account and enjoy exclusive deals, order tracking, and a seamless shopping experience.'
+              : 'Sign in to access your orders, wishlist, and personalised recommendations.'}
+          </p>
+          <div className="mt-10 flex flex-col gap-3 text-left">
+            {['Free & fast delivery on ₹2000+', 'Track your orders in real time', 'Exclusive member-only deals'].map(f => (
+              <div key={f} className="flex items-center gap-3 text-sm text-gray-300">
+                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full flex-shrink-0" />
+                {f}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-          {/* Home button */}
+      {/* ── Right panel — form ────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-h-screen lg:min-h-0">
+        {/* Top bar (mobile + desktop) */}
+        <header className="flex items-center justify-between px-5 py-3 lg:px-8 lg:py-4 border-b border-gray-100 bg-white lg:bg-transparent">
+          <Link to="/" className="flex items-center gap-2 lg:hidden">
+            <img src="/logo.png" alt={siteName} className="h-8 w-8 object-contain rounded-lg"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <span className="font-semibold text-gray-900 text-[15px]">{siteName}</span>
+          </Link>
+          <Link to="/" className="hidden lg:inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors">
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to store
+          </Link>
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"
+            className="lg:hidden inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Home
           </Link>
-        </div>
-      </header>
+        </header>
 
-      {/* ── Main ───────────────────────────────────────────────── */}
-      <main className="flex-1 flex items-start justify-center px-5 pt-10 pb-8">
-        <div className="w-full max-w-sm">
+        {/* Form area — centered */}
+        <main className="flex-1 flex items-center justify-center px-5 py-10 lg:px-12">
+        <div className="w-full max-w-sm lg:max-w-md">
 
           {/* Card */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-7">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-7 lg:px-8 lg:py-8">
 
             {/* Heading */}
             <div className="mb-6">
@@ -499,7 +525,8 @@ const AuthPage: React.FC = () => {
             <Link to="/privacy-policy" className="underline hover:text-gray-600 transition-colors">Privacy Policy</Link>
           </p>
         </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 };

@@ -5,6 +5,8 @@ import { Product } from '../../types';
 import { useCartButtonStyles } from '../../hooks/useCartButtonStyles';
 import { useCartButtonState } from '../../hooks/useCartButtonState';
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useAuthModal } from '../../contexts/AuthModalContext';
 
 interface AddToCartButtonProps {
   product: Product;
@@ -20,6 +22,8 @@ export const AddToCartButton: React.FC<AddToCartButtonProps> = ({
   showIcon = true,
 }) => {
   const { addItem: addToCart } = useCart();
+  const { user } = useAuth();
+  const { showAuthModal } = useAuthModal();
   const { cartButtonText, cartButtonStyle, cartButtonHoverStyle } = useCartButtonStyles();
   const { buttonState, markAsJustAdded } = useCartButtonState(product);
   const [isHovered, setIsHovered] = useState(false);
@@ -28,6 +32,12 @@ export const AddToCartButton: React.FC<AddToCartButtonProps> = ({
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Require login — show clean modal instead of guest cart
+    if (!user) {
+      showAuthModal(product, 'cart');
+      return;
+    }
 
     if (product.stock > 0 && !isAdding) {
       setIsAdding(true);

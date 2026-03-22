@@ -1,8 +1,6 @@
-import React, { useState, FormEvent } from 'react';
-import { X, Mail, Lock, User, Eye, EyeOff, ArrowLeft, CheckCircle, Shield } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useNotification } from '../../contexts/NotificationContext';
-
+import React from 'react';
+import { X, ShoppingCart, Heart, LogIn } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Product } from '../../types';
 
 interface AuthModalProps {
@@ -13,868 +11,94 @@ interface AuthModalProps {
   product?: Product | null;
 }
 
-type AuthMode = 'login' | 'signup' | 'forgot' | 'verify' | 'reset';
-
-const AuthModal: React.FC<AuthModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  initialMode = 'login',
-  action,
-  product
-}) => {
-  const [mode, setMode] = useState<AuthMode>(initialMode);
-  const [step, setStep] = useState(1);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const { login, signUp } = useAuth();
-  const { showSuccess, showError } = useNotification();
-
-  // Form states
-  const [loginData, setLoginData] = useState({ email: '', password: '' });
-  const [signupData, setSignupData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    firstName: '',
-    lastName: '',
-    phone: '',
-  });
-  const [forgotEmail, setForgotEmail] = useState('');
-
-  const handleLoginSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      const error = await login(loginData.email, loginData.password);
-      if (error) {
-        showError('Login Failed', error);
-      } else {
-        showSuccess('Success', 'Logged in successfully!');
-        onClose();
-      }
-    } catch (error: any) {
-      showError('Login Failed', error.message || 'Invalid credentials');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSignupSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-
-    if (step === 1) {
-      // Validate email and password
-      if (!signupData.email || !signupData.password) {
-        showError('Validation Error', 'Please fill in all fields');
-        return;
-      }
-      if (signupData.password !== signupData.confirmPassword) {
-        showError('Validation Error', 'Passwords do not match');
-        return;
-      }
-      if (signupData.password.length < 6) {
-        showError('Validation Error', 'Password must be at least 6 characters');
-        return;
-      }
-      setStep(2);
-      return;
-    }
-
-    // Step 2: Submit signup
-    setIsLoading(true);
-    try {
-      // Combine firstName and lastName into fullName
-      const fullName = `${signupData.firstName || ''} ${signupData.lastName || ''}`.trim() || 'User';
-      
-      await signUp(signupData.email, signupData.password, {
-        fullName: fullName,
-        phone: signupData.phone,
-      });
-      showSuccess('Success', 'Account created successfully!');
-      setMode('verify');
-    } catch (error: any) {
-      showError('Signup Failed', error.message || 'Could not create account');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (e: FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      showSuccess('Email Sent', 'Password reset link sent to your email');
-      setMode('verify');
-    } catch (error: any) {
-      showError('Error', error.message || 'Could not send reset email');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setLoginData({ email: '', password: '' });
-    setSignupData({
-      email: '',
-      password: '',
-      confirmPassword: '',
-      firstName: '',
-      lastName: '',
-      phone: '',
-    });
-    setForgotEmail('');
-    setStep(1);
-    setShowPassword(false);
-    setShowConfirmPassword(false);
-  };
-
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
-
-  const handleModeChange = (newMode: AuthMode) => {
-    resetForm();
-    setMode(newMode);
-  };
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, action, product }) => {
+  const navigate = useNavigate();
 
   if (!isOpen) return null;
 
+  const isWishlist = action === 'wishlist';
+  const actionText = isWishlist ? 'save to your wishlist' : 'add items to your cart';
+  const ActionIcon = isWishlist ? Heart : ShoppingCart;
+
+  const go = (mode: 'login' | 'signup') => {
+    onClose();
+    navigate(`/auth?mode=${mode}`);
+  };
+
   return (
-    <>
-      {/* Backdrop */}
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      {/* Sheet on mobile, centered card on desktop */}
       <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(8px)',
-          zIndex: 99998,
-        }}
-        onClick={handleClose}
-      />
-
-      {/* Modal Container */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '1rem',
-          zIndex: 99999,
-          pointerEvents: 'none',
-        }}
+        className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl shadow-2xl px-6 pt-6 pb-8 sm:pb-6 relative"
+        onClick={e => e.stopPropagation()}
       >
-        {/* Modal Content */}
-        <div
-          style={{
-            position: 'relative',
-            backgroundColor: 'white',
-            borderRadius: '1rem',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            width: '100%',
-            maxWidth: '500px',
-            maxHeight: '90vh',
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            pointerEvents: 'auto',
-          }}
-          onClick={(e) => e.stopPropagation()}
+        {/* Drag handle (mobile) */}
+        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5 sm:hidden" />
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          aria-label="Close"
         >
-            {/* Header */}
-            <div
-              style={{
-                background: action === 'cart' 
-                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' // Amber for Cart
-                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // Original Purple
-                padding: '2rem',
-                color: 'white',
-                position: 'relative',
-              }}
-            >
-              {/* Reason Section - Psychological Design */}
-              {action === 'cart' && product && mode === 'login' && (
-                <div 
-                  style={{ 
-                    background: 'rgba(255, 255, 255, 0.15)',
-                    backdropFilter: 'blur(10px)',
-                    padding: '1rem',
-                    borderRadius: '0.75rem',
-                    marginBottom: '1.5rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    animation: 'slideDown 0.4s ease-out'
-                  }}
-                >
-                  <div style={{ width: '3.5rem', height: '3.5rem', borderRadius: '0.5rem', overflow: 'hidden', flexShrink: 0, border: '2px solid white' }}>
-                    <img src={product.images?.[0] || product.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 600, margin: 0 }}>Almost there!</p>
-                    <p style={{ fontSize: '0.75rem', opacity: 0.9, margin: 0 }}>Sign in to add <strong>{product.name}</strong> to your cart and save your progress.</p>
-                  </div>
-                </div>
-              )}
+          <X className="w-4 h-4" />
+        </button>
 
-              <button
-                onClick={handleClose}
-                style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  padding: '0.5rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'background 0.2s',
-                  zIndex: 10
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                }}
-              >
-                <X className="h-5 w-5" />
-              </button>
-
-              {(mode === 'signup' && step === 2) || (mode !== 'login' && mode !== 'verify') ? (
-                <button
-                  onClick={() => {
-                    if (mode === 'signup' && step === 2) {
-                      setStep(1);
-                    } else {
-                      handleModeChange('login');
-                    }
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: '1rem',
-                    left: '1rem',
-                    padding: '0.5rem',
-                    borderRadius: '0.5rem',
-                    border: 'none',
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background 0.2s',
-                    zIndex: 10
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </button>
-              ) : null}
-
-              <div style={{ textAlign: 'center' }}>
-                {!action && (
-                  <div
-                    style={{
-                      width: '4rem',
-                      height: '4rem',
-                      background: 'rgba(255, 255, 255, 0.2)',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 1rem',
-                    }}
-                  >
-                    {mode === 'verify' ? (
-                      <CheckCircle className="h-8 w-8" />
-                    ) : mode === 'forgot' || mode === 'reset' ? (
-                      <Shield className="h-8 w-8" />
-                    ) : (
-                      <User className="h-8 w-8" />
-                    )}
-                  </div>
-                )}
-                <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.25rem', letterSpacing: '-0.025em' }}>
-                  {mode === 'login' ? (action === 'cart' ? 'One Quick Step!' : 'Welcome Back') : ''}
-                  {mode === 'signup' && (step === 1 ? 'Start Your Journey' : 'Complete Profile')}
-                  {mode === 'forgot' && 'Reset Password'}
-                  {mode === 'verify' && 'Check Your Email'}
-                  {mode === 'reset' && 'New Password'}
-                </h2>
-                <p style={{ opacity: 0.9, fontSize: '0.925rem', fontWeight: 500 }}>
-                  {mode === 'login' && (action === 'cart' ? 'Sign in to finish adding to cart' : 'It\'s great to see you again!')}
-                  {mode === 'signup' && (step === 1 ? 'Create an account in seconds' : 'Just a few more details')}
-                  {mode === 'forgot' && 'Enter your email to reset password'}
-                  {mode === 'verify' && 'We sent a verification link'}
-                  {mode === 'reset' && 'Enter your new password'}
-                </p>
-              </div>
-            </div>
-
-          {/* Content */}
-          <div style={{ padding: '2rem', overflowY: 'auto', flex: 1 }}>
-            {mode === 'verify' ? (
-              <div style={{ textAlign: 'center' }}>
-                <div
-                  style={{
-                    width: '5rem',
-                    height: '5rem',
-                    background: '#dcfce7',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1rem',
-                  }}
-                >
-                  <Mail className="h-10 w-10 text-green-600" />
-                </div>
-                <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-                  Please check your email and click the verification link to continue.
-                </p>
-                <button
-                  onClick={handleClose}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Got it
-                </button>
-              </div>
-            ) : mode === 'login' ? (
-              <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                    Email Address
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Mail className="h-5 w-5 text-gray-400" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="email"
-                      value={loginData.email}
-                      onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                      placeholder="you@example.com"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                    Password
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock className="h-5 w-5 text-gray-400" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={loginData.password}
-                      onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 2.5rem 0.75rem 2.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '0.25rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleModeChange('forgot')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#667eea',
-                      fontSize: '0.875rem',
-                      cursor: 'pointer',
-                      fontWeight: 500,
-                    }}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: isLoading ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    transition: 'transform 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoading) e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  {isLoading ? 'Signing in...' : 'Sign In'}
-                </button>
-
-                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Don't have an account? </span>
-                  <button
-                    type="button"
-                    onClick={() => handleModeChange('signup')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#667eea',
-                      fontSize: '0.875rem',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Sign up
-                  </button>
-                </div>
-              </form>
-            ) : mode === 'signup' && step === 1 ? (
-              <form onSubmit={handleSignupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                    Email Address
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Mail className="h-5 w-5 text-gray-400" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="email"
-                      value={signupData.email}
-                      onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                      placeholder="you@example.com"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                    Password
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock className="h-5 w-5 text-gray-400" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={signupData.password}
-                      onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 2.5rem 0.75rem 2.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '0.25rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                    Confirm Password
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock className="h-5 w-5 text-gray-400" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={signupData.confirmPassword}
-                      onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 2.5rem 0.75rem 2.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: '0.25rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'transform 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  Continue
-                </button>
-
-                <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                  <span style={{ color: '#6b7280', fontSize: '0.875rem' }}>Already have an account? </span>
-                  <button
-                    type="button"
-                    onClick={() => handleModeChange('login')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#667eea',
-                      fontSize: '0.875rem',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Sign in
-                  </button>
-                </div>
-              </form>
-            ) : mode === 'signup' && step === 2 ? (
-              <form onSubmit={handleSignupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      value={signupData.firstName}
-                      onChange={(e) => setSignupData({ ...signupData, firstName: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                      placeholder="John"
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                      Last Name
-                    </label>
-                    <input
-                      type="text"
-                      value={signupData.lastName}
-                      onChange={(e) => setSignupData({ ...signupData, lastName: e.target.value })}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                      placeholder="Doe"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                    Phone Number (Optional)
-                  </label>
-                  <input
-                    type="tel"
-                    value={signupData.phone}
-                    onChange={(e) => setSignupData({ ...signupData, phone: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.5rem',
-                      fontSize: '1rem',
-                      outline: 'none',
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#667eea';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#d1d5db';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                    placeholder="+1 (555) 000-0000"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: isLoading ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    transition: 'transform 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoading) e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  {isLoading ? 'Creating Account...' : 'Create Account'}
-                </button>
-              </form>
-            ) : mode === 'forgot' ? (
-              <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>
-                    Email Address
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Mail className="h-5 w-5 text-gray-400" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input
-                      type="email"
-                      value={forgotEmail}
-                      onChange={(e) => setForgotEmail(e.target.value)}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem 0.75rem 0.75rem 2.5rem',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '0.5rem',
-                        fontSize: '1rem',
-                        outline: 'none',
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#667eea';
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#d1d5db';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                      placeholder="you@example.com"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    background: isLoading ? '#9ca3af' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    transition: 'transform 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isLoading) e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  {isLoading ? 'Sending...' : 'Send Reset Link'}
-                </button>
-              </form>
-            ) : null}
-          </div>
+        {/* Icon */}
+        <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <ActionIcon className="w-7 h-7 text-indigo-600" />
         </div>
+
+        {/* Heading */}
+        <h2 className="text-[17px] font-bold text-gray-900 text-center leading-snug">
+          Sign in to continue
+        </h2>
+
+        {/* Product name if provided */}
+        {product && (
+          <p className="text-sm text-gray-500 text-center mt-1 px-4 line-clamp-1">
+            "{product.name}"
+          </p>
+        )}
+
+        <p className="text-sm text-gray-500 text-center mt-1.5 mb-6">
+          You need an account to {actionText}.
+        </p>
+
+        {/* Primary CTA */}
+        <button
+          onClick={() => go('login')}
+          className="w-full flex items-center justify-center gap-2 py-3.5 bg-gray-900 hover:bg-gray-800 active:bg-black text-white font-semibold rounded-xl text-sm transition-colors"
+        >
+          <LogIn className="w-4 h-4" />
+          Sign In
+        </button>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-3">
+          <div className="flex-1 h-px bg-gray-100" />
+          <span className="text-xs text-gray-400">or</span>
+          <div className="flex-1 h-px bg-gray-100" />
+        </div>
+
+        {/* Secondary CTA */}
+        <button
+          onClick={() => go('signup')}
+          className="w-full py-3.5 border border-gray-200 hover:bg-gray-50 active:bg-gray-100 text-gray-800 font-semibold rounded-xl text-sm transition-colors"
+        >
+          Create a Free Account
+        </button>
+
+        <p className="text-[11px] text-gray-400 text-center mt-4">
+          Free to join · Takes less than a minute
+        </p>
       </div>
-    </>
+    </div>
   );
 };
 
+export { AuthModal };
 export default AuthModal;
-
