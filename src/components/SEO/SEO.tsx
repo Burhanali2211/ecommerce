@@ -22,11 +22,11 @@ interface SEOProps {
   canonical?: string;
 }
 
-const DEFAULT_TITLE = 'Himalayan Spices Exports - Premium Himalayan Spices, Saffron & Herbs Online';
-const DEFAULT_DESCRIPTION = 'Shop authentic Himalayan spices, Kashmiri saffron, herbs & teas at HimalayanSpicesExports. Premium quality sourced from mountain farmers. Free shipping on orders above ₹999. India & worldwide delivery.';
-const DEFAULT_IMAGE = 'https://himalayanspicesexports.com/og-image.jpg';
-const DEFAULT_URL = 'https://himalayanspicesexports.com';
-const SITE_NAME = 'Himalayan Spices Exports';
+const DEFAULT_TITLE = 'Aligarh Attar House – Pure Attars, Perfumes & Islamic Lifestyle Store';
+const DEFAULT_DESCRIPTION = 'Shop pure attars, oud, perfumes, hijabs, Islamic books, kids clothes and toys at Aligarh Attar House. Authentic fragrances crafted in the tradition of Aligarh. Free shipping on orders above ₹499. India & worldwide delivery.';
+const DEFAULT_IMAGE = 'https://aligarhattar.com/og-image.jpg';
+const DEFAULT_URL = 'https://aligarhattar.com';
+const SITE_NAME = 'Aligarh Attar House';
 
 export const SEO: React.FC<SEOProps> = ({
   title,
@@ -99,8 +99,8 @@ export const ProductSEO: React.FC<{
   availability?: string;
 }> = ({ productName, description, price, image, category, availability }) => {
   const title = `${productName} - Buy Online`;
-  const desc = `${description.substring(0, 150)}... Price: ₹${price}. ${availability === 'InStock' ? 'In Stock' : 'Out of Stock'}. HimalayanSpicesExports - Free shipping on orders above ₹999.`;
-  const keywords = `${productName}, ${category || 'spice'}, himalayan spices, buy ${productName} online, himalayanspicesexports`;
+  const desc = `${description.substring(0, 150)}... Price: ₹${price}. ${availability === 'InStock' ? 'In Stock' : 'Out of Stock'}. Aligarh Attar House – Free shipping on orders above ₹499.`;
+  const keywords = `${productName}, ${category || 'attar'}, aligarh attar, buy ${productName} online, aligarhattar`;
 
   return (
     <SEO
@@ -121,9 +121,9 @@ export const CategorySEO: React.FC<{
   description?: string;
   productCount?: number;
 }> = ({ categoryName, description, productCount }) => {
-  const title = `${categoryName} - Himalayan Spices Exports`;
-  const desc = description || `Browse premium ${categoryName.toLowerCase()} at HimalayanSpicesExports. ${productCount ? `${productCount} products available.` : ''} Authentic Himalayan spices. Free shipping on orders above ₹999.`;
-  const keywords = `${categoryName}, himalayanspicesexports, buy ${categoryName} online, ${categoryName} shop, himalayan spices`;
+  const title = `${categoryName} - Aligarh Attar House`;
+  const desc = description || `Browse premium ${categoryName.toLowerCase()} at Aligarh Attar House. ${productCount ? `${productCount} products available.` : ''} Authentic attars & Islamic lifestyle products. Free shipping on orders above ₹499.`;
+  const keywords = `${categoryName}, aligarh attar house, buy ${categoryName} online, ${categoryName} shop, attar perfume`;
 
   return (
     <SEO

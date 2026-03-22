@@ -12,22 +12,22 @@ const stats = [
 const features = [
   {
     title: "Express Delivery",
-    description: "Get your premium spices and herbs delivered within 24-48 hours across major cities.",
+    description: "Get your pure attars and perfumes delivered within 24-48 hours across major cities.",
     icon: Zap,
   },
   {
-    title: "Global Sourcing",
-    description: "Authentic spices sourced directly from Himalayan farmers and renowned growers worldwide.",
+    title: "Alcohol-Free Fragrances",
+    description: "All our attars are 100% alcohol-free, crafted using traditional deg-bhapka distillation for a halal experience.",
     icon: Globe,
   },
   {
     title: "Expert Curation",
-    description: "Every product in our collection is handpicked by spice experts for premium quality.",
+    description: "Every fragrance in our collection is handpicked by attar experts for authenticity and lasting sillage.",
     icon: Star,
   },
   {
-    title: "Timeless Quality",
-    description: "Sourced using traditional methods that ensure authentic flavor and aroma.",
+    title: "Timeless Craft",
+    description: "Made using centuries-old methods from the attar capital of India — Aligarh.",
     icon: Clock,
   }
 ];
@@ -66,7 +66,7 @@ export const LovedByThousands: React.FC = () => {
             className="inline-flex items-center gap-2 bg-gray-100 px-4 py-1.5 rounded-full mb-6"
           >
             <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" />
-            <span className="text-gray-600 font-bold text-xs tracking-widest uppercase">The Himalayan Spices Exports Advantage</span>
+            <span className="text-gray-600 font-bold text-xs tracking-widest uppercase">The Aligarh Attar House Advantage</span>
           </motion.div>
           
           <motion.h2
@@ -86,7 +86,7 @@ export const LovedByThousands: React.FC = () => {
             transition={{ delay: 0.2 }}
             className="text-gray-500 text-lg md:text-xl max-w-3xl mx-auto leading-relaxed"
           >
-            We've redefined the spice shopping experience by combining traditional sourcing with modern efficiency.
+            We've redefined the attar shopping experience by combining centuries-old craft with modern convenience.
           </motion.p>
         </div>
 

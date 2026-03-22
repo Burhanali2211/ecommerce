@@ -39,9 +39,9 @@ export const ContactPage: React.FC = () => {
   const addressContact = contactInfo.find(c => c.contact_type === 'address' && c.is_primary) ||
                          contactInfo.find(c => c.contact_type === 'address');
 
-  const email = emailContact?.value || 'info@himalayanspicesexports.com';
-  const phone = phoneContact?.value || '+91-1234567890';
-  const address = addressContact?.value || 'Gaw Kadal, Srinagar, Kashmir';
+  const email = emailContact?.value || 'info@aligarhattar.com';
+  const phone = phoneContact?.value || '+91-9876543210';
+  const address = addressContact?.value || 'Aligarh, Uttar Pradesh, India';
 
   const formatBusinessHours = () => {
     if (!businessHours || businessHours.length === 0) return 'Monday - Sunday: 10:00 AM - 9:00 PM';
@@ -336,7 +336,7 @@ export const ContactPage: React.FC = () => {
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
                   className="w-full h-full"
-                  title="HimalayanSpicesExports Location"
+                  title="Aligarh Attar House Location"
                 />
               </div>
             </motion.div>

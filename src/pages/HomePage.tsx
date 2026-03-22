@@ -215,7 +215,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div>
             <h2 className="text-white text-xl sm:text-2xl font-bold mb-1">50,000+ Happy Customers</h2>
-            <p className="text-green-100 text-sm">Premium Himalayan spices delivered to your doorstep</p>
+            <p className="text-green-100 text-sm">Pure attars & Islamic lifestyle products delivered to your doorstep</p>
           </div>
           <Link
             to="/products"

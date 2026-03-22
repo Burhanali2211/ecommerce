@@ -35,7 +35,7 @@ const ShippingPolicyPage: React.FC = () => {
             transition={{ delay: 0.4 }}
             className="text-xl text-orange-100"
           >
-            Fast, secure delivery of authentic Kashmir & Himalayan spices
+            Fast, secure delivery of pure attars, perfumes & Islamic lifestyle products
           </motion.p>
           <motion.p
             initial={{ y: 20, opacity: 0 }}
@@ -59,7 +59,7 @@ const ShippingPolicyPage: React.FC = () => {
         >
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Shipping Overview</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            We ship our authentic Kashmir and Himalayan spices across India and select international locations. 
+            We ship our pure attars, perfumes, hijabs, Islamic books and lifestyle products across India and select international locations.
             All orders are carefully packaged to ensure your products arrive in perfect condition.
           </p>
           <p className="text-gray-600 leading-relaxed">
@@ -84,7 +84,7 @@ const ShippingPolicyPage: React.FC = () => {
           {/* Kashmir */}
           <div className="mb-6 pb-6 border-b border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xl font-semibold text-gray-800">Kashmir & J&K</h3>
+              <h3 className="text-xl font-semibold text-gray-800">Aligarh & UP</h3>
               <span className="text-2xl font-bold text-orange-600">₹50</span>
             </div>
             <div className="grid md:grid-cols-2 gap-4 text-sm">
@@ -136,7 +136,7 @@ const ShippingPolicyPage: React.FC = () => {
 
           <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded mt-6">
             <p className="text-orange-800 font-semibold">
-              🎉 Free Shipping on all orders above ₹2,000 within India!
+              🎉 Free Shipping on all orders above ₹499 within India!
             </p>
           </div>
         </motion.div>

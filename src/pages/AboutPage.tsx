@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, Award, Clock, Users, Leaf, Heart, Mountain, Globe, Truck } from 'lucide-react';
+import { MapPin, Award, Clock, Users, Leaf, Heart, Droplets, Globe, Truck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -9,7 +9,7 @@ export const AboutPage: React.FC = () => {
 
   const addressContact = contactInfo.find(c => c.contact_type === 'address' && c.is_primary) ||
                          contactInfo.find(c => c.contact_type === 'address');
-  const address = addressContact?.value || 'Srinagar, Kashmir, India - 190001';
+  const address = addressContact?.value || 'Aligarh, Uttar Pradesh, India';
 
   const formatBusinessHours = () => {
     if (!businessHours || businessHours.length === 0) {
@@ -42,7 +42,7 @@ export const AboutPage: React.FC = () => {
 
       {/* ── Hero ── */}
       <div className="relative bg-gray-900 text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=1600&q=80')] bg-cover bg-center opacity-10" />
+        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1547887538-e3a2f32cb1cc?w=1600&q=80')] bg-cover bg-center opacity-10" />
         {/* subtle dot grid */}
         <div className="absolute inset-0 opacity-[0.04]" style={{
           backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
@@ -56,7 +56,7 @@ export const AboutPage: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
             >
-              Himalayan Spices Exports
+              Aligarh Attar House
             </motion.h1>
             <motion.p
               className="text-xl md:text-2xl max-w-3xl mx-auto mb-8 text-gray-300"
@@ -64,7 +64,7 @@ export const AboutPage: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
             >
-              Bringing the Essence of Kashmir to the World
+              Pure Attars & Islamic Lifestyle Products — Crafted with Tradition
             </motion.p>
             <motion.div
               className="flex items-center justify-center text-gray-400 text-lg"
@@ -92,36 +92,36 @@ export const AboutPage: React.FC = () => {
             <motion.div variants={itemVariants}>
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">Our Story</h2>
               <p className="text-lg text-gray-600 mb-6 leading-relaxed">
-                Founded in the picturesque valleys of Kashmir, Himalayan Spices Exports has been on a mission
-                to bring the authentic flavors and aromas of the Himalayas to kitchens around the world.
-                Our journey began with a simple passion — to share the incredible richness of Kashmiri spices
-                with those who appreciate quality and authenticity.
+                Founded in the heart of Aligarh — India's attar capital — Aligarh Attar House has been
+                dedicated to preserving and sharing the ancient art of pure fragrance. Our journey began
+                with a simple passion: to bring the world's finest alcohol-free attars and perfumes to
+                those who appreciate authenticity, tradition, and quality.
               </p>
               <p className="text-lg text-gray-600 mb-6 leading-relaxed">
-                Kashmir, known as "Paradise on Earth," is blessed with a unique climate and fertile soil
-                that produces some of the world's finest saffron, spices, dry fruits, and herbs. We work
-                directly with local farmers and artisans who have been cultivating these treasures for
-                generations, ensuring fair prices and sustainable practices.
+                Aligarh has been the epicentre of India's attar industry for centuries, celebrated for
+                its master perfumers (attarwalas) who craft pure concentrates using the traditional
+                deg-bhapka method — a steam distillation process that preserves every nuance of the
+                natural ingredient. We work directly with these artisans to bring their craft to your doorstep.
               </p>
               <p className="text-lg text-gray-600 leading-relaxed">
-                Today, we proudly export premium Kashmiri products to customers across India and
-                internationally, maintaining the same commitment to quality and authenticity that
-                has defined us from the beginning.
+                Beyond fragrance, we are proud to offer a thoughtfully curated range of Islamic lifestyle
+                products — beautiful hijabs, Quranic books, modest kids' clothing, and educational toys —
+                making us a one-stop destination for the Muslim household.
               </p>
             </motion.div>
 
             <motion.div className="relative" variants={itemVariants}>
               <div className="relative rounded-2xl overflow-hidden shadow-xl">
                 <img
-                  src="https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=800&q=80"
-                  alt="Colorful spices from Kashmir"
+                  src="https://images.unsplash.com/photo-1547887538-e3a2f32cb1cc?w=800&q=80"
+                  alt="Pure attars from Aligarh"
                   crossOrigin="anonymous"
                   className="w-full h-96 object-cover"
                 />
               </div>
               <div className="absolute -bottom-6 -right-6 bg-gray-900 text-white p-6 rounded-xl shadow-lg">
                 <div className="flex items-center gap-3">
-                  <Globe className="h-8 w-8 text-green-400" />
+                  <Globe className="h-8 w-8 text-amber-400" />
                   <div>
                     <p className="text-2xl font-bold">50+</p>
                     <p className="text-sm text-gray-300">Countries Served</p>
@@ -144,10 +144,10 @@ export const AboutPage: React.FC = () => {
             viewport={{ once: true }}
           >
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Why Choose Himalayan Spices?
+              Why Choose Aligarh Attar House?
             </h2>
             <p className="text-lg text-gray-500 max-w-3xl mx-auto">
-              We bring you the finest products sourced directly from Kashmiri farmers
+              We bring you the finest attars and Islamic lifestyle products, sourced directly from Aligarh's master artisans
             </p>
           </motion.div>
 
@@ -159,17 +159,17 @@ export const AboutPage: React.FC = () => {
             viewport={{ once: true }}
           >
             {[
-              { icon: Mountain, title: 'Direct from Kashmir', text: 'Every product is sourced directly from the pristine valleys of Kashmir, ensuring you receive the freshest and most authentic spices available anywhere.' },
-              { icon: Leaf, title: '100% Natural & Pure', text: 'No additives, no preservatives, no artificial colors. Our products are completely natural, preserving the authentic taste and health benefits.' },
-              { icon: Award, title: 'Quality Guaranteed', text: 'Each batch is carefully tested and certified for quality. We stand behind every product with our satisfaction guarantee.' },
+              { icon: Droplets, title: 'Pure & Alcohol-Free', text: 'All our attars are 100% alcohol-free, made using the traditional deg-bhapka steam distillation — halal, natural, and free from synthetic additives.' },
+              { icon: Leaf, title: 'Direct from Artisans', text: 'We work directly with Aligarh\'s master perfumers (attarwalas), cutting out middlemen to bring you authentic fragrances at honest prices.' },
+              { icon: Award, title: 'Quality Guaranteed', text: 'Every product is carefully selected for quality, longevity, and authenticity. We stand behind every bottle with our full satisfaction guarantee.' },
             ].map(({ icon: Icon, title, text }) => (
               <motion.div
                 key={title}
                 className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm text-center hover:shadow-md transition-shadow duration-300"
                 variants={itemVariants}
               >
-                <div className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center mx-auto mb-6">
-                  <Icon className="h-7 w-7 text-green-700" />
+                <div className="w-14 h-14 bg-amber-50 rounded-xl flex items-center justify-center mx-auto mb-6">
+                  <Icon className="h-7 w-7 text-amber-700" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">{title}</h3>
                 <p className="text-gray-500 leading-relaxed">{text}</p>
@@ -192,8 +192,8 @@ export const AboutPage: React.FC = () => {
             <motion.div className="order-2 lg:order-1" variants={itemVariants}>
               <div className="relative rounded-2xl overflow-hidden shadow-xl">
                 <img
-                  src="https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=800&q=80"
-                  alt="Premium Kashmiri Saffron"
+                  src="https://images.unsplash.com/photo-1541643600914-78b084683702?w=800&q=80"
+                  alt="Premium attars and perfumes"
                   crossOrigin="anonymous"
                   className="w-full h-96 object-cover"
                 />
@@ -205,20 +205,21 @@ export const AboutPage: React.FC = () => {
                 Our Premium Collection
               </h2>
               <p className="text-lg text-gray-600 mb-6 leading-relaxed">
-                From the world-renowned Kashmiri Saffron (Kesar) to aromatic spice blends,
-                premium dry fruits, and traditional Kashmiri teas — we offer a curated selection
-                of the finest Himalayan products.
+                From traditional rose attars and Shamama to rich oud, floral perfumes, hijabs, Islamic books,
+                modest kids' clothing and educational toys — we offer a curated selection of everything
+                a Muslim household needs.
               </p>
               <ul className="space-y-4">
                 {[
-                  ['Saffron (Kesar)', 'World\'s finest from Pampore'],
-                  ['Dry Fruits', 'Walnuts, Almonds, Apricots & more'],
-                  ['Spice Blends', 'Authentic Kashmiri masalas'],
-                  ['Kahwa & Teas', 'Traditional Kashmiri beverages'],
-                  ['Himalayan Honey', 'Pure & natural'],
+                  ['Attars & Perfumes', 'Alcohol-free, long-lasting fragrances'],
+                  ['Oud & Bakhoor', 'Rich agarwood for home & gifting'],
+                  ['Hijabs & Modest Wear', 'Chiffon, jersey, silk & more'],
+                  ['Islamic Books', 'Quran, duas, and children\'s titles'],
+                  ['Kids Clothes & Toys', 'Modest, educational and fun'],
+                  ['Gift Sets', 'Curated for Eid, Nikah & celebrations'],
                 ].map(([title, desc]) => (
                   <li key={title} className="flex items-center gap-3 text-gray-700">
-                    <span className="w-2 h-2 bg-green-600 rounded-full flex-shrink-0" />
+                    <span className="w-2 h-2 bg-amber-600 rounded-full flex-shrink-0" />
                     <span><strong className="text-gray-900">{title}</strong> — {desc}</span>
                   </li>
                 ))}
@@ -252,17 +253,17 @@ export const AboutPage: React.FC = () => {
             viewport={{ once: true }}
           >
             {[
-              { title: 'Authenticity', text: 'Every product is 100% authentic and traceable to its source in Kashmir.' },
-              { title: 'Fair Trade', text: 'We ensure fair prices for our farmers and support local communities.' },
-              { title: 'Sustainability', text: 'Eco-friendly packaging and sustainable farming practices.' },
-              { title: 'Excellence', text: 'Unwavering commitment to quality in every product we deliver.' },
+              { title: 'Authenticity', text: 'Every attar is 100% pure and traceable to its master perfumer in Aligarh.' },
+              { title: 'Halal', text: 'All our fragrances are alcohol-free and permissible — crafted for the conscious Muslim consumer.' },
+              { title: 'Community', text: 'We support local artisans and attar craftsmen, preserving a centuries-old tradition.' },
+              { title: 'Excellence', text: 'Unwavering commitment to quality in every product — from fragrance to packaging.' },
             ].map(({ title, text }) => (
               <motion.div
                 key={title}
                 className="bg-white/5 p-6 rounded-xl border border-white/10"
                 variants={itemVariants}
               >
-                <h3 className="text-lg font-bold mb-3 text-green-400">{title}</h3>
+                <h3 className="text-lg font-bold mb-3 text-amber-400">{title}</h3>
                 <p className="text-gray-400 text-sm leading-relaxed">{text}</p>
               </motion.div>
             ))}
@@ -284,7 +285,7 @@ export const AboutPage: React.FC = () => {
               Worldwide Shipping
             </h2>
             <p className="text-lg text-gray-500 max-w-3xl mx-auto">
-              From Kashmir to your doorstep — we deliver across India and internationally
+              From Aligarh to your doorstep — we deliver across India and internationally
             </p>
           </motion.div>
 
@@ -320,7 +321,7 @@ export const AboutPage: React.FC = () => {
                   <h4 className="font-semibold text-gray-900 mb-2">Bulk Orders & Inquiries</h4>
                   <p className="text-sm text-gray-500 mb-5 leading-relaxed">
                     We offer special pricing for bulk orders and welcome inquiries from retailers,
-                    restaurants, and businesses looking for premium Kashmiri products.
+                    gift shops, and businesses looking for premium attars and Islamic lifestyle products.
                   </p>
                   <a
                     href="/contact"
@@ -334,7 +335,7 @@ export const AboutPage: React.FC = () => {
 
             <motion.div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 h-96 lg:h-auto" variants={itemVariants}>
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d106268.25254313771!2d74.70070115!3d34.0836708!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x38e1856c39b8c971%3A0x8db5c77c0f2b8a64!2sSrinagar%2C%20Jammu%20and%20Kashmir!5e0!3m2!1sen!2sin!4v1705000000000!5m2!1sen!2sin"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d56904.14226041853!2d78.02665115!3d27.8973572!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3974a58d3034cfe5%3A0xe5c13cde61a95e9a!2sAligarh%2C%20Uttar%20Pradesh!5e0!3m2!1sen!2sin!4v1705000000000!5m2!1sen!2sin"
                 width="100%"
                 height="100%"
                 style={{ border: 0 }}
@@ -342,7 +343,7 @@ export const AboutPage: React.FC = () => {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
                 className="w-full h-full"
-                title="Himalayan Spices Exports Location"
+                title="Aligarh Attar House Location"
               />
             </motion.div>
           </motion.div>

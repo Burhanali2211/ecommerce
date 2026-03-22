@@ -9,19 +9,23 @@ interface CategoryChipsProps {
   loading?: boolean;
 }
 
-// Emoji map for common spice categories
+// Emoji map for Islamic lifestyle / attar store categories
 const categoryEmojis: Record<string, string> = {
-  saffron: '🌸',
-  spices: '🌶️',
-  herbs: '🌿',
-  tea: '🍵',
-  salt: '🧂',
-  honey: '🍯',
-  seeds: '🫘',
-  blends: '🫙',
-  gifts: '🎁',
-  organic: '🌱',
-  default: '🏔️',
+  attar: '🫙',
+  perfume: '✨',
+  oud: '🪵',
+  agarwood: '🪵',
+  floral: '🌸',
+  rose: '🌹',
+  musky: '💜',
+  amber: '🟤',
+  hijab: '🧕',
+  gift: '🎁',
+  book: '📖',
+  islamic: '📖',
+  kids: '👶',
+  toy: '🧸',
+  default: '🕌',
 };
 
 function getCategoryEmoji(name: string): string {
@@ -33,11 +37,11 @@ function getCategoryEmoji(name: string): string {
 }
 
 const fallbackImages = [
-  'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=120&q=70',
-  'https://images.unsplash.com/photo-1532336414038-cf19250c5757?w=120&q=70',
-  'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=120&q=70',
-  'https://images.unsplash.com/photo-1547592180-85f173990554?w=120&q=70',
-  'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=120&q=70',
+  'https://images.unsplash.com/photo-1547887538-e3a2f32cb1cc?w=120&q=70',
+  'https://images.unsplash.com/photo-1541643600914-78b084683702?w=120&q=70',
+  'https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=120&q=70',
+  'https://images.unsplash.com/photo-1609357605129-26f69add5d6e?w=120&q=70',
+  'https://images.unsplash.com/photo-1585241936939-be4099591252?w=120&q=70',
 ];
 
 export const CategoryChips: React.FC<CategoryChipsProps> = memo(({ categories, loading }) => {

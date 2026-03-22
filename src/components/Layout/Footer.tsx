@@ -24,7 +24,7 @@ export const Footer: React.FC = () => {
     settings: { footerLinks, socialMedia, contactInfo }
   } = useSettings();
 
-  const siteName = getSiteSetting('site_name') || 'Himalayan Spices Exports';
+  const siteName = getSiteSetting('site_name') || 'Aligarh Attar House';
   const copyrightText = getSiteSetting('copyright_text');
 
   const groupedFooterLinks = footerLinks.reduce((acc, link) => {
@@ -50,12 +50,12 @@ export const Footer: React.FC = () => {
                 <h3 className="text-2xl font-black text-gray-900 tracking-tighter">
                   {siteName}<span className="text-purple-600">.</span>
                 </h3>
-                <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em]">From Kashmir with Love</p>
+                <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em]">Pure Attars from Aligarh</p>
               </div>
             </Link>
 
               <p className="text-gray-500 leading-relaxed max-w-sm font-medium">
-                Premium Kashmiri spices, saffron, dry fruits and more - direct from Kashmir to your doorstep. Serving customers across India and internationally.
+                Pure attars, perfumes, oud, hijabs, Islamic books and more — crafted with tradition, delivered with love. Serving customers across India and internationally.
               </p>
 
             <div className="space-y-4">
