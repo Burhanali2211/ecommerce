@@ -24,6 +24,7 @@ const DealsPage = React.lazy(() => import('@/pages/DealsPage'));
 const AuthPage = React.lazy(() => import('@/pages/AuthPage'));
 const ResetPasswordPage = React.lazy(() => import('@/pages/ResetPasswordPage'));
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'));
+const CategoriesPage = React.lazy(() => import('@/pages/CategoriesPage'));
 const AboutPage = React.lazy(() => import('@/pages/AboutPage')); // Added About page
 const ContactPage = React.lazy(() => import('@/pages/ContactPage')); // Added Contact page
 
@@ -175,7 +176,7 @@ function App() {
                       <Route path="/compare" element={<ComparePage />} />
                       <Route path="/new-arrivals" element={<NewArrivalsPage />} />
                       <Route path="/deals" element={<DealsPage />} />
-                      <Route path="/categories" element={<Navigate to="/products" replace />} />
+                      <Route path="/categories" element={<CategoriesPage />} />
                       <Route path="/categories/:slug" element={<ProductsPage />} />
                       <Route path="/collections" element={<Navigate to="/products" replace />} />
                       <Route path="/collections/:slug" element={<ProductsPage />} />

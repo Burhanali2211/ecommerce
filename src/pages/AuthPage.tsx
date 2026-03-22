@@ -91,6 +91,7 @@ const AuthPage: React.FC = () => {
   const location = useLocation();
 
   const siteName = getSiteSetting('site_name') || 'Aligarh Attars';
+  const logoUrl = getSiteSetting('logo_url');
   const isProduction = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
 
   const sendEmail = (payload: object) => {
@@ -221,8 +222,8 @@ const AuthPage: React.FC = () => {
         }} />
         <div className="relative z-10 text-center max-w-xs">
           <Link to="/" className="inline-flex items-center gap-3 mb-10">
-            <img src="/logo.png" alt={siteName} className="h-12 w-12 object-contain rounded-xl"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            {logoUrl && <img src={logoUrl} alt={siteName} className="h-12 w-12 object-contain rounded-xl"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
             <span className="text-2xl font-bold text-white">{siteName}</span>
           </Link>
           <h2 className="text-3xl font-bold text-white leading-tight mb-4">
@@ -249,8 +250,8 @@ const AuthPage: React.FC = () => {
         {/* Top bar (mobile + desktop) */}
         <header className="flex items-center justify-between px-5 py-3 lg:px-8 lg:py-4 border-b border-gray-100 bg-white lg:bg-transparent">
           <Link to="/" className="flex items-center gap-2 lg:hidden">
-            <img src="/logo.png" alt={siteName} className="h-8 w-8 object-contain rounded-lg"
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            {logoUrl && <img src={logoUrl} alt={siteName} className="h-8 w-8 object-contain rounded-lg"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
             <span className="font-semibold text-gray-900 text-[15px]">{siteName}</span>
           </Link>
           <Link to="/" className="hidden lg:inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors">

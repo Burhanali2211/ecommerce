@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Sparkles } from 'lucide-react';
+import { SiteLogo } from './SiteLogo';
 
 interface ProfessionalLoaderProps {
   fullPage?: boolean;
@@ -22,16 +22,16 @@ export const ProfessionalLoader = memo<ProfessionalLoaderProps>(({
       {showBrand && (
         <div className="relative w-20 h-20 flex items-center justify-center">
           {/* Outer rotating ring */}
-          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-amber-500 border-r-amber-500 animate-spin" 
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-gray-900 border-r-gray-900 animate-spin"
                style={{ animationDuration: '2s' }} />
-          
+
           {/* Middle rotating ring (opposite direction) */}
-          <div className="absolute inset-2 rounded-full border-3 border-transparent border-b-orange-500 border-l-orange-500 animate-spin" 
+          <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-gray-500 border-l-gray-500 animate-spin"
                style={{ animationDuration: '3s', animationDirection: 'reverse' }} />
-          
+
           {/* Inner logo */}
-          <div className="relative z-10 w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center shadow-lg">
-            <Sparkles className="w-6 h-6 text-white" />
+          <div className="relative z-10">
+            <SiteLogo size="lg" variant="default" />
           </div>
         </div>
       )}
@@ -40,14 +40,14 @@ export const ProfessionalLoader = memo<ProfessionalLoaderProps>(({
       {text && (
         <div className="text-center">
           <p className="text-lg font-semibold text-gray-800 mb-2">{text}</p>
-          
+
           {/* Animated dots */}
           <div className="flex items-center justify-center space-x-1">
-            <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" 
+            <span className="w-2 h-2 bg-gray-900 rounded-full animate-bounce"
                   style={{ animationDelay: '0s' }} />
-            <span className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" 
+            <span className="w-2 h-2 bg-gray-600 rounded-full animate-bounce"
                   style={{ animationDelay: '0.2s' }} />
-            <span className="w-2 h-2 bg-amber-600 rounded-full animate-bounce" 
+            <span className="w-2 h-2 bg-gray-900 rounded-full animate-bounce"
                   style={{ animationDelay: '0.4s' }} />
           </div>
         </div>
@@ -55,7 +55,7 @@ export const ProfessionalLoader = memo<ProfessionalLoaderProps>(({
 
       {/* Subtle progress bar */}
       <div className="w-48 h-1 bg-gray-200 rounded-full overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-amber-500 to-orange-600 rounded-full animate-pulse" 
+        <div className="h-full bg-gray-900 rounded-full animate-pulse"
              style={{ width: '60%' }} />
       </div>
 
@@ -88,11 +88,11 @@ ProfessionalLoader.displayName = 'ProfessionalLoader';
  */
 export const MinimalLoader = memo(() => (
   <div className="flex items-center justify-center space-x-2">
-    <div className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" 
+    <div className="w-2 h-2 bg-gray-900 rounded-full animate-bounce"
          style={{ animationDelay: '0s' }} />
-    <div className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" 
+    <div className="w-2 h-2 bg-gray-600 rounded-full animate-bounce"
          style={{ animationDelay: '0.2s' }} />
-    <div className="w-2 h-2 bg-amber-600 rounded-full animate-bounce" 
+    <div className="w-2 h-2 bg-gray-900 rounded-full animate-bounce"
          style={{ animationDelay: '0.4s' }} />
   </div>
 ));
@@ -113,4 +113,3 @@ export const PageTransitionLoader = memo<{ isLoading: boolean }>(({ isLoading })
 });
 
 PageTransitionLoader.displayName = 'PageTransitionLoader';
-

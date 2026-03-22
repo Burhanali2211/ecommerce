@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Grid3X3, ShoppingCart, Heart, User } from 'lucide-react';
+import { Home, LayoutGrid, Store, ShoppingCart, Heart, User, LogIn } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,86 +15,147 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
   const { user } = useAuth();
   const location = useLocation();
 
+  const isHome = location.pathname === '/';
+
   const isActive = (path: string) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
+  const accountActive = isActive('/dashboard') || isActive('/auth');
+
+  // ── Center button logic ────────────────────────────────────────────────────
+  // Home page        → Shop (always — main CTA is to go browse)
+  // All other pages  → Cart (signed in) or Sign In (guest)
+  const centerVariant: 'shop' | 'cart' | 'signin' =
+    isHome ? 'shop' : user ? 'cart' : 'signin';
+
+  // Shared class for the elevated center button — only this gets the black pill/circle
+  const centerBtnClass =
+    'relative -mt-6 w-[52px] h-[52px] bg-gray-900 text-white rounded-full flex flex-col items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.22)] active:scale-95 transition-transform duration-150 select-none';
+
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-200 flex items-stretch"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-100 flex items-stretch h-[60px]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      aria-label="Bottom navigation"
     >
-      {/* Home */}
+
+      {/* ── Home ──────────────────────────────────────────────────────── */}
       <Link
         to="/"
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 transition-colors ${
-          isActive('/') ? 'text-gray-900' : 'text-gray-400 hover:text-gray-700'
-        }`}
         aria-label="Home"
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 select-none transition-colors duration-150"
       >
-        <Home className={`h-5 w-5 ${isActive('/') ? 'fill-gray-900 stroke-gray-900' : ''}`} />
-        <span className="text-[10px] font-medium leading-none">Home</span>
+        <Home
+          className={`h-5 w-5 transition-colors duration-150 ${
+            isActive('/') ? 'text-gray-900' : 'text-gray-400'
+          }`}
+          strokeWidth={isActive('/') ? 2.5 : 1.8}
+          fill={isActive('/') ? 'currentColor' : 'none'}
+        />
+        <span className={`text-[9.5px] font-medium leading-none transition-colors duration-150 ${
+          isActive('/') ? 'text-gray-900' : 'text-gray-400'
+        }`}>
+          Home
+        </span>
       </Link>
 
-      {/* Shop */}
+      {/* ── Categories ────────────────────────────────────────────────── */}
       <Link
-        to="/products"
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 transition-colors ${
-          isActive('/products') ? 'text-gray-900' : 'text-gray-400 hover:text-gray-700'
-        }`}
-        aria-label="Shop"
+        to="/categories"
+        aria-label="Categories"
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 select-none"
       >
-        <Grid3X3 className={`h-5 w-5 ${isActive('/products') ? 'fill-gray-900 stroke-gray-900' : ''}`} />
-        <span className="text-[10px] font-medium leading-none">Shop</span>
+        <LayoutGrid
+          className={`h-5 w-5 transition-colors duration-150 ${
+            isActive('/categories') ? 'text-gray-900' : 'text-gray-400'
+          }`}
+          strokeWidth={isActive('/categories') ? 2.5 : 1.8}
+        />
+        <span className={`text-[9.5px] font-medium leading-none transition-colors duration-150 ${
+          isActive('/categories') ? 'text-gray-900' : 'text-gray-400'
+        }`}>
+          Categories
+        </span>
       </Link>
 
-      {/* Cart — elevated center button */}
-      <div className="flex-1 flex items-center justify-center relative">
-        <button
-          onClick={onCartClick}
-          aria-label="Cart"
-          className="relative -mt-5 w-14 h-14 bg-gray-900 hover:bg-gray-800 active:bg-black text-white rounded-full flex items-center justify-center shadow-lg shadow-gray-300 transition-colors"
-        >
-          <ShoppingCart className="h-6 w-6" />
-          {itemCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center leading-none">
-              {itemCount > 9 ? '9+' : itemCount}
-            </span>
-          )}
-        </button>
+      {/* ── Center elevated button (only this has the black circle) ───── */}
+      <div className="flex-1 flex items-center justify-center">
+
+        {centerVariant === 'shop' && (
+          <Link to="/products" aria-label="Shop" className={centerBtnClass}>
+            <Store className="h-[22px] w-[22px]" strokeWidth={1.8} />
+            <span className="text-[9px] font-semibold mt-0.5 leading-none">Shop</span>
+          </Link>
+        )}
+
+        {centerVariant === 'cart' && (
+          <button onClick={onCartClick} aria-label="Open cart" className={centerBtnClass}>
+            <ShoppingCart className="h-[22px] w-[22px]" strokeWidth={1.8} />
+            {itemCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-[18px] w-[18px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none">
+                {itemCount > 9 ? '9+' : itemCount}
+              </span>
+            )}
+            <span className="text-[9px] font-semibold mt-0.5 leading-none">Cart</span>
+          </button>
+        )}
+
+        {centerVariant === 'signin' && (
+          <Link to="/auth" aria-label="Sign in" className={centerBtnClass}>
+            <LogIn className="h-[22px] w-[22px]" strokeWidth={1.8} />
+            <span className="text-[9px] font-semibold mt-0.5 leading-none">Sign in</span>
+          </Link>
+        )}
+
       </div>
 
-      {/* Wishlist */}
+      {/* ── Wishlist ──────────────────────────────────────────────────── */}
       <Link
         to="/wishlist"
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 transition-colors ${
-          isActive('/wishlist') ? 'text-gray-900' : 'text-gray-400 hover:text-gray-700'
-        }`}
         aria-label="Wishlist"
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 select-none"
       >
         <div className="relative">
-          <Heart className={`h-5 w-5 ${isActive('/wishlist') ? 'fill-gray-900 stroke-gray-900' : ''}`} />
+          <Heart
+            className={`h-5 w-5 transition-colors duration-150 ${
+              isActive('/wishlist') ? 'text-gray-900' : 'text-gray-400'
+            }`}
+            strokeWidth={isActive('/wishlist') ? 2.5 : 1.8}
+            fill={isActive('/wishlist') ? 'currentColor' : 'none'}
+          />
           {wishlistItems.length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 h-4 w-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none">
+            <span className="absolute -top-1.5 -right-1.5 h-[15px] w-[15px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center leading-none">
               {wishlistItems.length > 9 ? '9+' : wishlistItems.length}
             </span>
           )}
         </div>
-        <span className="text-[10px] font-medium leading-none">Wishlist</span>
-      </Link>
-
-      {/* Account */}
-      <Link
-        to={user ? '/dashboard' : '/auth'}
-        className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 transition-colors ${
-          isActive('/dashboard') || isActive('/auth') ? 'text-gray-900' : 'text-gray-400 hover:text-gray-700'
-        }`}
-        aria-label={user ? 'My account' : 'Sign in'}
-      >
-        <User className={`h-5 w-5 ${(isActive('/dashboard') || isActive('/auth')) ? 'fill-gray-900 stroke-gray-900' : ''}`} />
-        <span className="text-[10px] font-medium leading-none truncate max-w-[52px]">
-          {user ? (user.name?.split(' ')[0] || 'Account') : 'Sign in'}
+        <span className={`text-[9.5px] font-medium leading-none transition-colors duration-150 ${
+          isActive('/wishlist') ? 'text-gray-900' : 'text-gray-400'
+        }`}>
+          Wishlist
         </span>
       </Link>
+
+      {/* ── Account ───────────────────────────────────────────────────── */}
+      <Link
+        to={user ? '/dashboard' : '/auth'}
+        aria-label={user ? 'My account' : 'Sign in'}
+        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 select-none"
+      >
+        <User
+          className={`h-5 w-5 transition-colors duration-150 ${
+            accountActive ? 'text-gray-900' : 'text-gray-400'
+          }`}
+          strokeWidth={accountActive ? 2.5 : 1.8}
+          fill={accountActive ? 'currentColor' : 'none'}
+        />
+        <span className={`text-[9.5px] font-medium leading-none transition-colors duration-150 truncate max-w-[44px] ${
+          accountActive ? 'text-gray-900' : 'text-gray-400'
+        }`}>
+          {user ? (user.name?.split(' ')[0] || 'Account') : 'Account'}
+        </span>
+      </Link>
+
     </nav>
   );
 });

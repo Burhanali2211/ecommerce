@@ -155,20 +155,20 @@ export const CartSidebar: React.FC<CartSidebarProps> = ({ isOpen, onClose }) => 
                     <span className="text-2xl font-bold text-neutral-900">₹{total.toLocaleString('en-IN')}</span>
                   </div>
 
-                  <div className="space-y-3">
-                    <Link to="/checkout" onClick={onClose}>
-                      <button
-                        className="w-full bg-neutral-900 text-white py-3.5 px-6 rounded-lg font-medium hover:bg-neutral-800 transition-colors duration-200 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
-                      >
-                        Proceed to Checkout
-                      </button>
-                    </Link>
+                  <div className="flex gap-3">
                     <button
                       onClick={onClose}
-                      className="w-full bg-white border-2 border-neutral-200 text-neutral-900 py-3.5 px-6 rounded-lg font-medium hover:bg-neutral-50 hover:border-neutral-300 transition-colors duration-200"
+                      className="flex-1 bg-white border-2 border-neutral-200 text-neutral-700 py-3.5 px-4 rounded-lg font-medium hover:bg-neutral-50 hover:border-neutral-300 transition-colors duration-200 text-sm"
                     >
-                      Continue Shopping
+                      ← Back to Shop
                     </button>
+                    <Link to="/checkout" onClick={onClose} className="flex-1">
+                      <button
+                        className="w-full bg-neutral-900 text-white py-3.5 px-4 rounded-lg font-medium hover:bg-neutral-800 transition-colors duration-200 shadow-lg active:scale-95 text-sm"
+                      >
+                        Checkout →
+                      </button>
+                    </Link>
                   </div>
                 </div>
               )}
