@@ -120,7 +120,15 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const addToCart = useCallback(async (product: Product, quantity: number = 1, variantId?: string) => {
     try {
       if (user) {
-        await db.addToCart(user.id, product.id, quantity);
+        // Check if item already exists — if so, increment quantity to avoid 409 duplicate key
+        const existingItem = items.find(
+          item => item.product.id === product.id && item.variantId === variantId
+        );
+        if (existingItem && existingItem.id) {
+          await db.updateCartItem(existingItem.id, existingItem.quantity + quantity);
+        } else {
+          await db.addToCart(user.id, product.id, quantity);
+        }
         await fetchCart();
       } else {
         const existingItemIndex = guestCart.findIndex(

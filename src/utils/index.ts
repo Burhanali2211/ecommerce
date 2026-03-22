@@ -13,7 +13,7 @@ export * from './database';
 export * from './auth';
 
 // Core utilities
-export { cacheManager, AdvancedCacheManager, advancedCacheManager } from './cache';
+export { cacheManager } from './cache';
 export {
   detectRLSRecursionError,
   generateRLSFixSuggestion,

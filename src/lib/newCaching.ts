@@ -6,7 +6,7 @@ const memoryCache = new Map<string, { data: any; timestamp: number; ttl: number 
 // Cache configuration
 const CACHE_CONFIG = {
   MEMORY_TTL: 5 * 60 * 1000, // 5 minutes
-  SESSION_TTL: 24 * 60 * 60 * 1000, // 24 hours
+  SESSION_TTL: 5 * 60 * 1000, // 5 minutes — matches product data freshness requirement
   MAX_MEMORY_SIZE: 100 // Maximum number of items in memory cache
 };
 

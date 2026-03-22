@@ -406,7 +406,7 @@ class EnhancedCache {
 export const primaryCache = new EnhancedCache({
   maxSize: 50 * 1024 * 1024, // 50MB
   maxEntries: 1000,
-  defaultTTL: 15 * 60 * 1000, // Increased from 5 to 15 minutes
+  defaultTTL: 5 * 60 * 1000, // 5 minutes — aligned with ProductContext
 });
 
 export const imageCache = new EnhancedCache({
@@ -619,5 +619,4 @@ class Cache<T> {
   }
 }
 
-export { AdvancedCacheManager, advancedCacheManager } from './advancedCaching';
 export default Cache;

@@ -168,30 +168,11 @@ class DataPreloader {
    * Preload essential data for faster navigation
    */
   async preloadEssentials() {
-    const preloadTask = async () => {
-      try {
-        
-        // Preload categories if not cached
-        const categoryCacheKey = generateCacheKey('categories');
-        if (!categoryCache.has(categoryCacheKey)) {
-          const categories = await getCategories();
-          categoryCache.set(categoryCacheKey, categories);
-        }
-
-        // Preload featured products if not cached
-        const featuredCacheKey = generateCacheKey('products-featured');
-        if (!productCache.has(featuredCacheKey)) {
-          const featuredProducts = await getProductsBasic({ featured: true, limit: 8 });
-          productCache.set(featuredCacheKey, featuredProducts);
-        }
-      } catch (error) {
-        console.warn('⚠️ Failed to preload essentials:', error);
-      }
-    };
-
-    // High priority for essentials
-    this.preloadQueue.unshift(preloadTask);
-    this.processQueue();
+    // ProductContext owns categories, featured, latest, and bestseller product data.
+    // It fetches these on mount with its own sessionStorage cache (5-min TTL).
+    // Writing the same data into primaryCache (a separate store) creates divergence
+    // where two caches can serve different product data at the same time.
+    // This method is intentionally a no-op — ProductContext is the single source of truth.
   }
 
   /**
@@ -259,10 +240,7 @@ class DataPreloader {
       }
     }
 
-    // If user is on home page, preload category products
-    if (currentPage === 'home' && timeOnPage > 5000) {
-      this.preloadEssentials();
-    }
+    // Home page essentials are handled by ProductContext on mount.
 
     // If user is viewing a product, preload related products
     if (currentPage?.startsWith('product-') && timeOnPage > 3000) {
@@ -274,12 +252,7 @@ class DataPreloader {
 // Create singleton instance
 export const dataPreloader = new DataPreloader();
 
-// Auto-preload essentials when module loads
-if (typeof window !== 'undefined') {
-  // Preload essentials after a short delay
-  setTimeout(() => {
-    dataPreloader.preloadEssentials();
-  }, 2000);
-}
+// ProductContext handles initial data fetch on mount.
+// No module-level auto-preload is needed — it would duplicate ProductContext's work.
 
 export default dataPreloader;

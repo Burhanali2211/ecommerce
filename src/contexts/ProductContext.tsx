@@ -58,21 +58,33 @@ function cacheClear(pattern: string) {
   } catch { /* ignore */ }
 }
 
-const CACHE_KEYS = {
-  products: (page: number, filters: string) => `pc_products_${page}_${filters}`,
-  featured: 'pc_featured',
-  latest:   'pc_latest',
-  bestSellers: 'pc_bestsellers',
-  categories: 'pc_categories',
-};
+// ─── Cache versioning — bump on any mutation to instantly invalidate all stale caches ───
+let cacheVersion = (() => {
+  try { return parseInt(sessionStorage.getItem('pc_cache_version') || '0', 10); } catch { return 0; }
+})();
+
+function bumpCacheVersion() {
+  cacheVersion++;
+  try { sessionStorage.setItem('pc_cache_version', String(cacheVersion)); } catch { /* ignore */ }
+  cacheClear('pc_'); // nuke all versioned keys immediately
+}
+
+// Keys include version so any bump makes old cached data unreachable
+const getCacheKeys = () => ({
+  products: (page: number, filters: string) => `pc_v${cacheVersion}_products_${page}_${filters}`,
+  featured:    `pc_v${cacheVersion}_featured`,
+  latest:      `pc_v${cacheVersion}_latest`,
+  bestSellers: `pc_v${cacheVersion}_bestsellers`,
+  categories:  `pc_v${cacheVersion}_categories`,
+});
 
 export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // ── State initialised from cache immediately — zero loading flash ──
-  const [products, setProducts]           = useState<Product[]>(cacheGet<Product[]>(CACHE_KEYS.featured) ? [] : []);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(cacheGet<Product[]>(CACHE_KEYS.featured) || []);
-  const [bestSellers, setBestSellers]     = useState<Product[]>(cacheGet<Product[]>(CACHE_KEYS.bestSellers) || []);
-  const [latestProducts, setLatestProducts] = useState<Product[]>(cacheGet<Product[]>(CACHE_KEYS.latest) || []);
-  const [categories, setCategories]       = useState<Category[]>(cacheGet<Category[]>(CACHE_KEYS.categories) || []);
+  const [products, setProducts]           = useState<Product[]>(cacheGet<Product[]>(getCacheKeys().featured) ? [] : []);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(cacheGet<Product[]>(getCacheKeys().featured) || []);
+  const [bestSellers, setBestSellers]     = useState<Product[]>(cacheGet<Product[]>(getCacheKeys().bestSellers) || []);
+  const [latestProducts, setLatestProducts] = useState<Product[]>(cacheGet<Product[]>(getCacheKeys().latest) || []);
+  const [categories, setCategories]       = useState<Category[]>(cacheGet<Category[]>(getCacheKeys().categories) || []);
   const [loading, setLoading]             = useState(false);
   const [featuredLoading, setFeaturedLoading] = useState(featuredProducts.length === 0);
   const [bestSellersLoading, setBestSellersLoading] = useState(bestSellers.length === 0);
@@ -133,139 +145,120 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
     updatedAt: dbCategory.updated_at ? new Date(dbCategory.updated_at) : undefined,
   }), []);
 
-  const fetchCategories = useCallback(async (background = false) => {
-    const cached = cacheGet<Category[]>(CACHE_KEYS.categories);
-    if (cached && background) { setCategories(cached); return; }
+  const fetchCategories = useCallback(async (background = false, force = false) => {
+    const keys = getCacheKeys();
+    const cached = cacheGet<Category[]>(keys.categories);
+    // Always show cache instantly if available
+    if (cached) setCategories(cached);
+    // Skip network if: background mode AND not forced AND we have cached data
+    if (cached && background && !force) return;
     try {
       const data = await db.getCategories();
       const mapped = data.map(mapDbCategoryToAppCategory);
       setCategories(mapped);
-      cacheSet(CACHE_KEYS.categories, mapped);
+      cacheSet(keys.categories, mapped);
     } catch (error) {
-      showError('Failed to load categories', error instanceof Error ? error.message : undefined);
+      if (!cached) showError('Failed to load categories', error instanceof Error ? error.message : undefined);
     }
   }, [showError, mapDbCategoryToAppCategory]);
 
-  const fetchProducts = useCallback(async (page: number = 1, limit: number = 20, filters?: any) => {
+  const fetchProducts = useCallback(async (page: number = 1, limit: number = 20, filters?: any, force = false) => {
     const filterKey = JSON.stringify(filters || {});
-    const cacheKey = CACHE_KEYS.products(page, filterKey);
+    const keys = getCacheKeys();
+    const cacheKey = keys.products(page, filterKey);
 
-    // For default (page 1, no filters) serve cache instantly then background-refresh
     const isDefault = page === 1 && (!filters || Object.keys(filters).length === 0);
     const cached = isDefault ? cacheGet<{ products: Product[]; pagination: PaginationState }>(cacheKey) : null;
 
+    // Show cache instantly (zero loading flash)
     if (cached) {
       setProducts(cached.products);
       setPagination(cached.pagination);
-      // Background refresh — update silently
+    }
+
+    // Always fetch fresh when forced OR when no cache exists
+    // When forced: runs immediately but doesn't block (stale shown first)
+    // When not forced + cached: silent background refresh
+    if (force || !cached) {
+      if (!cached) setLoading(true);
       (async () => {
         try {
           const response = await db.getProducts({ page, limit, ...filters });
           const mapped = response.data.map(mapDbProductToAppProduct);
           setProducts(mapped);
           setPagination(response.pagination);
-          cacheSet(cacheKey, { products: mapped, pagination: response.pagination });
-        } catch { /* silent */ }
+          if (isDefault) cacheSet(cacheKey, { products: mapped, pagination: response.pagination });
+        } catch (error) {
+          if (!cached) showError('Failed to load products', error instanceof Error ? error.message : undefined);
+        } finally {
+          if (!cached) setLoading(false);
+        }
       })();
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await db.getProducts({ page, limit, ...filters });
-      const mapped = response.data.map(mapDbProductToAppProduct);
-      setProducts(mapped);
-      setPagination(response.pagination);
-      if (isDefault) cacheSet(cacheKey, { products: mapped, pagination: response.pagination });
-    } catch (error) {
-      showError('Failed to load products', error instanceof Error ? error.message : undefined);
-    } finally {
-      setLoading(false);
     }
   }, [showError, mapDbProductToAppProduct]);
 
-  const fetchFeaturedProducts = useCallback(async (limit: number = 8) => {
-    const cached = cacheGet<Product[]>(CACHE_KEYS.featured);
-    if (cached) {
-      setFeaturedProducts(cached);
-      setFeaturedLoading(false);
-      // Silent background refresh
+  const fetchFeaturedProducts = useCallback(async (limit: number = 8, force = false) => {
+    const keys = getCacheKeys();
+    const cached = cacheGet<Product[]>(keys.featured);
+    // Show cached data instantly
+    if (cached) { setFeaturedProducts(cached); setFeaturedLoading(false); }
+    // Fetch fresh when forced OR no cache
+    if (force || !cached) {
+      if (!cached) setFeaturedLoading(true);
       (async () => {
         try {
           const data = await db.getFeaturedProducts(limit);
           const mapped = data.map(mapDbProductToAppProduct);
           setFeaturedProducts(mapped);
-          cacheSet(CACHE_KEYS.featured, mapped);
-        } catch { /* silent */ }
+          cacheSet(keys.featured, mapped);
+        } catch (error) {
+          if (!cached) showError('Failed to load featured products', error instanceof Error ? error.message : undefined);
+        } finally {
+          if (!cached) setFeaturedLoading(false);
+        }
       })();
-      return;
-    }
-    try {
-      setFeaturedLoading(true);
-      const data = await db.getFeaturedProducts(limit);
-      const mapped = data.map(mapDbProductToAppProduct);
-      setFeaturedProducts(mapped);
-      cacheSet(CACHE_KEYS.featured, mapped);
-    } catch (error) {
-      showError('Failed to load featured products', error instanceof Error ? error.message : undefined);
-    } finally {
-      setFeaturedLoading(false);
     }
   }, [showError, mapDbProductToAppProduct]);
 
-  const fetchBestSellers = useCallback(async (limit: number = 8) => {
-    const cached = cacheGet<Product[]>(CACHE_KEYS.bestSellers);
-    if (cached) {
-      setBestSellers(cached);
-      setBestSellersLoading(false);
+  const fetchBestSellers = useCallback(async (limit: number = 8, force = false) => {
+    const keys = getCacheKeys();
+    const cached = cacheGet<Product[]>(keys.bestSellers);
+    if (cached) { setBestSellers(cached); setBestSellersLoading(false); }
+    if (force || !cached) {
+      if (!cached) setBestSellersLoading(true);
       (async () => {
         try {
           const response = await db.getProducts({ bestSellers: true, limit });
           const mapped = response.data.map(mapDbProductToAppProduct);
           setBestSellers(mapped);
-          cacheSet(CACHE_KEYS.bestSellers, mapped);
-        } catch { /* silent */ }
+          cacheSet(keys.bestSellers, mapped);
+        } catch (error) {
+          if (!cached) showError('Failed to load best sellers', error instanceof Error ? error.message : undefined);
+        } finally {
+          if (!cached) setBestSellersLoading(false);
+        }
       })();
-      return;
-    }
-    try {
-      setBestSellersLoading(true);
-      const response = await db.getProducts({ bestSellers: true, limit });
-      const mapped = response.data.map(mapDbProductToAppProduct);
-      setBestSellers(mapped);
-      cacheSet(CACHE_KEYS.bestSellers, mapped);
-    } catch (error) {
-      showError('Failed to load best sellers', error instanceof Error ? error.message : undefined);
-    } finally {
-      setBestSellersLoading(false);
     }
   }, [showError, mapDbProductToAppProduct]);
 
-  const fetchLatestProducts = useCallback(async (limit: number = 8) => {
-    const cached = cacheGet<Product[]>(CACHE_KEYS.latest);
-    if (cached) {
-      setLatestProducts(cached);
-      setLatestLoading(false);
+  const fetchLatestProducts = useCallback(async (limit: number = 8, force = false) => {
+    const keys = getCacheKeys();
+    const cached = cacheGet<Product[]>(keys.latest);
+    if (cached) { setLatestProducts(cached); setLatestLoading(false); }
+    if (force || !cached) {
+      if (!cached) setLatestLoading(true);
       (async () => {
         try {
           const data = await db.getLatestProducts(limit);
           const mapped = data.map(mapDbProductToAppProduct);
           setLatestProducts(mapped);
-          cacheSet(CACHE_KEYS.latest, mapped);
-        } catch { /* silent */ }
+          cacheSet(keys.latest, mapped);
+        } catch (error) {
+          if (!cached) showError('Failed to load latest products', error instanceof Error ? error.message : undefined);
+        } finally {
+          if (!cached) setLatestLoading(false);
+        }
       })();
-      return;
-    }
-    try {
-      setLatestLoading(true);
-      const data = await db.getLatestProducts(limit);
-      const mapped = data.map(mapDbProductToAppProduct);
-      setLatestProducts(mapped);
-      cacheSet(CACHE_KEYS.latest, mapped);
-    } catch (error) {
-      showError('Failed to load latest products', error instanceof Error ? error.message : undefined);
-    } finally {
-      setLatestLoading(false);
     }
   }, [showError, mapDbProductToAppProduct]);
 
@@ -297,8 +290,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
         .select()
         .single();
       if (error) throw error;
-      cacheClear('pc_products_');
-      await fetchProducts(1);
+      bumpCacheVersion(); // invalidates all versioned cache keys instantly
+      await fetchProducts(1, 20, undefined, true);
       return mapDbProductToAppProduct(data);
     } catch (error) {
       showError('Failed to create product', error instanceof Error ? error.message : undefined);
@@ -365,10 +358,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
         .select()
         .single();
       if (error) throw error;
-      cacheClear('pc_products_');
-      sessionStorage.removeItem(CACHE_KEYS.featured);
-      sessionStorage.removeItem(CACHE_KEYS.latest);
-      await fetchProducts(pagination?.page || 1);
+      bumpCacheVersion(); // invalidates all versioned cache keys instantly
+      await fetchProducts(pagination?.page || 1, 20, undefined, true);
       return mapDbProductToAppProduct(data);
     } catch (error) {
       showError('Failed to update product', error instanceof Error ? error.message : undefined);
@@ -380,8 +371,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
     try {
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) throw error;
-      cacheClear('pc_');
-      await fetchProducts(pagination?.page || 1);
+      bumpCacheVersion(); // invalidates all versioned cache keys instantly
+      await fetchProducts(pagination?.page || 1, 20, undefined, true);
     } catch (error) {
       showError('Failed to delete product', error instanceof Error ? error.message : undefined);
       throw error;
@@ -396,8 +387,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
         .select()
         .single();
       if (error) throw error;
-      sessionStorage.removeItem(CACHE_KEYS.categories);
-      await fetchCategories();
+      bumpCacheVersion(); // invalidates all versioned cache keys instantly
+      await fetchCategories(false, true);
       return mapDbCategoryToAppCategory(category);
     } catch (error) {
       showError('Failed to create category', error instanceof Error ? error.message : undefined);
@@ -414,8 +405,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
         .select()
         .single();
       if (error) throw error;
-      sessionStorage.removeItem(CACHE_KEYS.categories);
-      await fetchCategories();
+      bumpCacheVersion(); // invalidates all versioned cache keys instantly
+      await fetchCategories(false, true);
       return mapDbCategoryToAppCategory(category);
     } catch (error) {
       showError('Failed to update category', error instanceof Error ? error.message : undefined);
@@ -427,8 +418,8 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
     try {
       const { error } = await supabase.from('categories').delete().eq('id', id);
       if (error) throw error;
-      sessionStorage.removeItem(CACHE_KEYS.categories);
-      await fetchCategories();
+      bumpCacheVersion(); // invalidates all versioned cache keys instantly
+      await fetchCategories(false, true);
     } catch (error) {
       showError('Failed to delete category', error instanceof Error ? error.message : undefined);
       throw error;
@@ -440,20 +431,20 @@ export const ProductProvider: React.FC<{ children: ReactNode }> = ({ children })
   const goToPage     = useCallback((page: number) => { if (page >= 1 && page <= pagination?.pages) fetchProducts(page); }, [pagination, fetchProducts]);
 
   // ── Initial data load — fire once, all parallel ──
-  // Components that call fetchXxx again will get instant cache hits
+  // force=true: shows stale cache instantly (zero loading flash) AND always fetches
+  // fresh data from DB regardless of TTL. This guarantees up-to-date data on every
+  // page load while still avoiding empty loading states when cache is warm.
   useEffect(() => {
     if (initFetched.current) return;
     initFetched.current = true;
-    // All 5 run in parallel — fastest possible startup
     Promise.all([
-      fetchCategories(),
-      fetchProducts(1),
-      fetchFeaturedProducts(8),
-      fetchLatestProducts(8),
-      fetchBestSellers(8),
+      fetchCategories(false, true),   // force=true bypasses TTL, still shows cache first
+      fetchProducts(1, 20, undefined, true),
+      fetchFeaturedProducts(8, true),
+      fetchLatestProducts(8, true),
+      fetchBestSellers(8, true),
     ]);
-    // Reset on unmount so that if the provider remounts (React StrictMode double-invoke
-    // or HMR) a fresh fetch is allowed instead of leaving state empty with no retry.
+    // Reset on unmount so StrictMode / HMR remount gets a fresh fetch
     return () => { initFetched.current = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
