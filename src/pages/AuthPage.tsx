@@ -120,9 +120,12 @@ const AuthPage: React.FC = () => {
   }, [user, navigate]);
 
   useEffect(() => {
-    const p = new URLSearchParams(location.search).get('mode');
+    const params = new URLSearchParams(location.search);
+    const p = params.get('mode');
     if (p === 'signup') setMode('signup');
     else if (p === 'forgot') setMode('forgot');
+    const preEmail = params.get('email');
+    if (preEmail) setFormData(prev => ({ ...prev, email: decodeURIComponent(preEmail) }));
   }, [location.search]);
 
   const handleChange = (field: keyof FormData, value: string) => {

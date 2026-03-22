@@ -155,6 +155,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       email,
       password,
       options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
           full_name: fullName,
           role: additionalData?.role || 'customer',
@@ -287,6 +288,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: user.email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) throw error;
   };

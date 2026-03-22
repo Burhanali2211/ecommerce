@@ -25,6 +25,7 @@ const AuthPage = React.lazy(() => import('@/pages/AuthPage'));
 const ResetPasswordPage = React.lazy(() => import('@/pages/ResetPasswordPage'));
 const NotFoundPage = React.lazy(() => import('@/pages/NotFoundPage'));
 const CategoriesPage = React.lazy(() => import('@/pages/CategoriesPage'));
+const AuthCallbackPage = React.lazy(() => import('@/pages/AuthCallbackPage'));
 const AboutPage = React.lazy(() => import('@/pages/AboutPage')); // Added About page
 const ContactPage = React.lazy(() => import('@/pages/ContactPage')); // Added Contact page
 
@@ -201,6 +202,7 @@ function App() {
 
                       {/* Password reset - accessible without auth (user arrives from email link) */}
                       <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
                       {/* Protected routes - Require authentication */}
                       <Route 
