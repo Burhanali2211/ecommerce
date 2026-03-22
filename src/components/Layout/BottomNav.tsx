@@ -22,15 +22,21 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
 
   const accountActive = isActive('/dashboard') || isActive('/auth');
 
-  // ── Center button logic ────────────────────────────────────────────────────
-  // Home page        → Shop (always — main CTA is to go browse)
-  // All other pages  → Cart (signed in) or Sign In (guest)
+  // Home page → Shop | Other pages → Cart (signed in) or Sign In (guest)
   const centerVariant: 'shop' | 'cart' | 'signin' =
     isHome ? 'shop' : user ? 'cart' : 'signin';
 
-  // Shared class for the elevated center button — only this gets the black pill/circle
   const centerBtnClass =
-    'relative -mt-6 w-[52px] h-[52px] bg-gray-900 text-white rounded-full flex flex-col items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.22)] active:scale-95 transition-transform duration-150 select-none';
+    'relative -mt-6 w-[52px] h-[52px] bg-gray-900 text-white rounded-full flex flex-col items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.22)] active:scale-95 transition-transform duration-150 select-none flex-shrink-0';
+
+  // Icon + label colour helpers — no fill prop (lucide icons are stroke-based; fill breaks them)
+  const iconCls = (active: boolean) =>
+    `h-[22px] w-[22px] transition-colors duration-150 ${active ? 'text-gray-900' : 'text-gray-400'}`;
+  const labelCls = (active: boolean) =>
+    `text-[9px] font-medium leading-none mt-0.5 transition-colors duration-150 ${active ? 'text-gray-900' : 'text-gray-400'}`;
+
+  const tabCls =
+    'flex-1 min-w-0 flex flex-col items-center justify-center gap-0 py-2 select-none';
 
   return (
     <nav
@@ -39,46 +45,25 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
       aria-label="Bottom navigation"
     >
 
-      {/* ── Home ──────────────────────────────────────────────────────── */}
-      <Link
-        to="/"
-        aria-label="Home"
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 select-none transition-colors duration-150"
-      >
+      {/* ── Home ── */}
+      <Link to="/" aria-label="Home" className={tabCls}>
         <Home
-          className={`h-5 w-5 transition-colors duration-150 ${
-            isActive('/') ? 'text-gray-900' : 'text-gray-400'
-          }`}
+          className={iconCls(isActive('/'))}
           strokeWidth={isActive('/') ? 2.5 : 1.8}
-          fill={isActive('/') ? 'currentColor' : 'none'}
         />
-        <span className={`text-[9.5px] font-medium leading-none transition-colors duration-150 ${
-          isActive('/') ? 'text-gray-900' : 'text-gray-400'
-        }`}>
-          Home
-        </span>
+        <span className={labelCls(isActive('/'))}>Home</span>
       </Link>
 
-      {/* ── Categories ────────────────────────────────────────────────── */}
-      <Link
-        to="/categories"
-        aria-label="Categories"
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 select-none"
-      >
+      {/* ── Categories ── */}
+      <Link to="/categories" aria-label="Categories" className={tabCls}>
         <LayoutGrid
-          className={`h-5 w-5 transition-colors duration-150 ${
-            isActive('/categories') ? 'text-gray-900' : 'text-gray-400'
-          }`}
+          className={iconCls(isActive('/categories'))}
           strokeWidth={isActive('/categories') ? 2.5 : 1.8}
         />
-        <span className={`text-[9.5px] font-medium leading-none transition-colors duration-150 ${
-          isActive('/categories') ? 'text-gray-900' : 'text-gray-400'
-        }`}>
-          Categories
-        </span>
+        <span className={labelCls(isActive('/categories'))}>Browse</span>
       </Link>
 
-      {/* ── Center elevated button (only this has the black circle) ───── */}
+      {/* ── Center elevated button ── */}
       <div className="flex-1 flex items-center justify-center">
 
         {centerVariant === 'shop' && (
@@ -109,19 +94,12 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
 
       </div>
 
-      {/* ── Wishlist ──────────────────────────────────────────────────── */}
-      <Link
-        to="/wishlist"
-        aria-label="Wishlist"
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 select-none"
-      >
+      {/* ── Wishlist ── */}
+      <Link to="/wishlist" aria-label="Wishlist" className={tabCls}>
         <div className="relative">
           <Heart
-            className={`h-5 w-5 transition-colors duration-150 ${
-              isActive('/wishlist') ? 'text-gray-900' : 'text-gray-400'
-            }`}
+            className={iconCls(isActive('/wishlist'))}
             strokeWidth={isActive('/wishlist') ? 2.5 : 1.8}
-            fill={isActive('/wishlist') ? 'currentColor' : 'none'}
           />
           {wishlistItems.length > 0 && (
             <span className="absolute -top-1.5 -right-1.5 h-[15px] w-[15px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center leading-none">
@@ -129,29 +107,20 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
             </span>
           )}
         </div>
-        <span className={`text-[9.5px] font-medium leading-none transition-colors duration-150 ${
-          isActive('/wishlist') ? 'text-gray-900' : 'text-gray-400'
-        }`}>
-          Wishlist
-        </span>
+        <span className={labelCls(isActive('/wishlist'))}>Wishlist</span>
       </Link>
 
-      {/* ── Account ───────────────────────────────────────────────────── */}
+      {/* ── Account ── */}
       <Link
         to={user ? '/dashboard' : '/auth'}
         aria-label={user ? 'My account' : 'Sign in'}
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-w-0 select-none"
+        className={tabCls}
       >
         <User
-          className={`h-5 w-5 transition-colors duration-150 ${
-            accountActive ? 'text-gray-900' : 'text-gray-400'
-          }`}
+          className={iconCls(accountActive)}
           strokeWidth={accountActive ? 2.5 : 1.8}
-          fill={accountActive ? 'currentColor' : 'none'}
         />
-        <span className={`text-[9.5px] font-medium leading-none transition-colors duration-150 truncate max-w-[44px] ${
-          accountActive ? 'text-gray-900' : 'text-gray-400'
-        }`}>
+        <span className={`${labelCls(accountActive)} max-w-[42px] truncate`}>
           {user ? (user.name?.split(' ')[0] || 'Account') : 'Account'}
         </span>
       </Link>
