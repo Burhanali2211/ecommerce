@@ -1,6 +1,5 @@
 import React from 'react';
 import { X, ShoppingCart, Heart, LogIn } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { Product } from '../../types';
 
 interface AuthModalProps {
@@ -12,17 +11,16 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, action, product }) => {
-  const navigate = useNavigate();
-
   if (!isOpen) return null;
 
   const isWishlist = action === 'wishlist';
   const actionText = isWishlist ? 'save to your wishlist' : 'add items to your cart';
   const ActionIcon = isWishlist ? Heart : ShoppingCart;
 
+  // AuthModalProvider lives outside the Router — use window.location instead of useNavigate
   const go = (mode: 'login' | 'signup') => {
     onClose();
-    navigate(`/auth?mode=${mode}`);
+    window.location.href = `/auth?mode=${mode}`;
   };
 
   return (
