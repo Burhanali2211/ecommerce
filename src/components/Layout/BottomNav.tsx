@@ -30,26 +30,29 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
     'relative -mt-6 w-[52px] h-[52px] bg-gray-900 text-white rounded-full flex flex-col items-center justify-center shadow-[0_4px_16px_rgba(0,0,0,0.22)] active:scale-95 transition-transform duration-150 select-none flex-shrink-0';
 
   // Icon + label colour helpers — no fill prop (lucide icons are stroke-based; fill breaks them)
-  const iconCls = (active: boolean) =>
-    `h-[22px] w-[22px] transition-colors duration-150 ${active ? 'text-gray-900' : 'text-gray-400'}`;
+  // Use explicit color strings (not dynamic class names) so Tailwind always includes them
+  const iconColor = (active: boolean) => active ? '#111827' : '#9ca3af'; // gray-900 / gray-400
   const labelCls = (active: boolean) =>
-    `text-[9px] font-medium leading-none mt-0.5 transition-colors duration-150 ${active ? 'text-gray-900' : 'text-gray-400'}`;
+    `text-[10px] font-medium leading-none mt-1 transition-colors duration-150 ${active ? 'text-gray-900' : 'text-gray-400'}`;
 
   const tabCls =
-    'flex-1 min-w-0 flex flex-col items-center justify-center gap-0 py-2 select-none';
+    'flex-1 flex flex-col items-center justify-center py-2 select-none';
 
   return (
+    // Outer nav grows to fill safe-area; inner row is always a fixed 60px
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-100 flex items-stretch h-[60px]"
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-100"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       aria-label="Bottom navigation"
     >
+      <div className="flex items-stretch h-[60px]">
 
       {/* ── Home ── */}
       <Link to="/" aria-label="Home" className={tabCls}>
         <Home
-          className={iconCls(isActive('/'))}
+          size={22}
           strokeWidth={isActive('/') ? 2.5 : 1.8}
+          color={iconColor(isActive('/'))}
         />
         <span className={labelCls(isActive('/'))}>Home</span>
       </Link>
@@ -57,8 +60,9 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
       {/* ── Categories ── */}
       <Link to="/categories" aria-label="Categories" className={tabCls}>
         <LayoutGrid
-          className={iconCls(isActive('/categories'))}
+          size={22}
           strokeWidth={isActive('/categories') ? 2.5 : 1.8}
+          color={iconColor(isActive('/categories'))}
         />
         <span className={labelCls(isActive('/categories'))}>Browse</span>
       </Link>
@@ -68,27 +72,27 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
 
         {centerVariant === 'shop' && (
           <Link to="/products" aria-label="Shop" className={centerBtnClass}>
-            <Store className="h-[22px] w-[22px]" strokeWidth={1.8} />
-            <span className="text-[9px] font-semibold mt-0.5 leading-none">Shop</span>
+            <Store size={22} strokeWidth={1.8} />
+            <span className="text-[10px] font-semibold mt-0.5 leading-none">Shop</span>
           </Link>
         )}
 
         {centerVariant === 'cart' && (
           <button onClick={onCartClick} aria-label="Open cart" className={centerBtnClass}>
-            <ShoppingCart className="h-[22px] w-[22px]" strokeWidth={1.8} />
+            <ShoppingCart size={22} strokeWidth={1.8} />
             {itemCount > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-[18px] w-[18px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none">
                 {itemCount > 9 ? '9+' : itemCount}
               </span>
             )}
-            <span className="text-[9px] font-semibold mt-0.5 leading-none">Cart</span>
+            <span className="text-[10px] font-semibold mt-0.5 leading-none">Cart</span>
           </button>
         )}
 
         {centerVariant === 'signin' && (
           <Link to="/auth" aria-label="Sign in" className={centerBtnClass}>
-            <LogIn className="h-[22px] w-[22px]" strokeWidth={1.8} />
-            <span className="text-[9px] font-semibold mt-0.5 leading-none">Sign in</span>
+            <LogIn size={22} strokeWidth={1.8} />
+            <span className="text-[10px] font-semibold mt-0.5 leading-none">Sign in</span>
           </Link>
         )}
 
@@ -96,10 +100,11 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
 
       {/* ── Wishlist ── */}
       <Link to="/wishlist" aria-label="Wishlist" className={tabCls}>
-        <div className="relative">
+        <div className="relative inline-flex">
           <Heart
-            className={iconCls(isActive('/wishlist'))}
+            size={22}
             strokeWidth={isActive('/wishlist') ? 2.5 : 1.8}
+            color={iconColor(isActive('/wishlist'))}
           />
           {wishlistItems.length > 0 && (
             <span className="absolute -top-1.5 -right-1.5 h-[15px] w-[15px] bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center leading-none">
@@ -117,14 +122,16 @@ export const BottomNav: React.FC<BottomNavProps> = memo(({ onCartClick }) => {
         className={tabCls}
       >
         <User
-          className={iconCls(accountActive)}
+          size={22}
           strokeWidth={accountActive ? 2.5 : 1.8}
+          color={iconColor(accountActive)}
         />
         <span className={`${labelCls(accountActive)} max-w-[42px] truncate`}>
           {user ? (user.name?.split(' ')[0] || 'Account') : 'Account'}
         </span>
       </Link>
 
+      </div>
     </nav>
   );
 });
