@@ -3,6 +3,8 @@ import { Star, Heart, ShoppingCart, Check, Zap } from 'lucide-react';
 import { Product } from '../../types';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useAuthModal } from '../../contexts/AuthModalContext';
 import { Link } from 'react-router-dom';
 import ProductImage from '../Common/ProductImage';
 import { AddToCartButton } from './AddToCartButton';
@@ -23,6 +25,8 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
 }) => {
   const { isInWishlist, addItem: addToWishlist } = useWishlist();
   const { addItem: addToCart } = useCart();
+  const { user } = useAuth();
+  const { showAuthModal } = useAuthModal();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const handleWishlistToggle = useCallback((e: React.MouseEvent) => {
@@ -34,10 +38,11 @@ export const ProductCard: React.FC<ProductCardProps> = memo(({
   const handleAddToCart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user) { showAuthModal(product, 'cart'); return; }
     if (product.stock > 0) {
       addToCart(product, 1);
     }
-  }, [addToCart, product]);
+  }, [addToCart, product, user, showAuthModal]);
 
   const handleCompareClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

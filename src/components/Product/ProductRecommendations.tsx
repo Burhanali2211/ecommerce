@@ -17,6 +17,8 @@ import { useProducts } from '../../contexts/ProductContext';
 import { useCart } from '../../contexts/CartContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useAuthModal } from '../../contexts/AuthModalContext';
 import { MobileCompactCarousel } from '../Mobile/MobileProductCarousel';
 import { useMobileDetection } from '../../hooks/useMobileGestures';
 import { useCartButtonState } from '../../hooks/useCartButtonState';
@@ -92,6 +94,8 @@ export const ProductRecommendations: React.FC<ProductRecommendationsProps> = ({
   const { addItem: addToCart, items } = useCart();
   const { addItem: addToWishlist, isInWishlist } = useWishlist();
   const { showNotification } = useNotification();
+  const { user } = useAuth();
+  const { showAuthModal } = useAuthModal();
   const { isMobile } = useMobileDetection();
   const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -252,9 +256,11 @@ export const ProductRecommendations: React.FC<ProductRecommendationsProps> = ({
     e.preventDefault();
     e.stopPropagation();
     
+    if (!user) { showAuthModal(product, 'cart'); return; }
+
     // Check if product is already in cart
     const isInCart = items.some(item => item.product.id === product.id);
-    
+
     if (isInCart) {
       showNotification({
         type: 'info',

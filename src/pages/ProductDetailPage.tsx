@@ -10,6 +10,7 @@ import { useCart } from '../contexts/CartContext';
 import { useWishlist } from '../contexts/WishlistContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAuthModal } from '../contexts/AuthModalContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProductReview } from '../components/Product/ProductReview';
 import { ReviewForm } from '../components/Product/ReviewForm';
@@ -31,6 +32,7 @@ export const ProductDetailPage: React.FC = () => {
   const { addItem: addToCart } = useCart();
   const { addItem: addToWishlist, isInWishlist } = useWishlist();
   const { showNotification } = useNotification();
+  const { showAuthModal } = useAuthModal();
 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
@@ -91,6 +93,7 @@ export const ProductDetailPage: React.FC = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (!user) { showAuthModal(product, 'cart'); return; }
     if (!cartButtonState.isInCart) {
       addToCart(product, quantity);
       cartButtonState.markAsJustAdded();
